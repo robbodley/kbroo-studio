@@ -1,0 +1,590 @@
+/* Kbroo Studio: full-screen editor chrome. Layout styles live in frontend.css. */
+
+:root {
+	--kb-accent: #6d28d9;
+	--kb-accent-soft: #ede9fe;
+	--kb-section: #2563eb;
+	--kb-column: #64748b;
+	--kb-danger: #b91c1c;
+	--kb-bg: #f1f5f9;
+	--kb-panel-bg: #ffffff;
+	--kb-border: #e2e8f0;
+	--kb-text: #0f172a;
+	--kb-muted: #64748b;
+	--kb-topbar: #0f172a;
+	--kb-panel-width: 300px;
+}
+
+html,
+body.kbroo-editor-body {
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+	background: var(--kb-bg);
+	color: var(--kb-text);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	font-size: 14px;
+}
+
+.kbroo-app {
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+}
+
+.kbroo-app button {
+	font: inherit;
+}
+
+/* ---- Top bar ---------------------------------------------------------- */
+
+.kb-topbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	height: 52px;
+	padding: 0 12px;
+	background: var(--kb-topbar);
+	color: #fff;
+	flex: 0 0 auto;
+}
+
+.kb-topbar-start,
+.kb-topbar-end,
+.kb-topbar-title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.kb-topbar-title {
+	flex: 1 1 auto;
+	justify-content: center;
+}
+
+.kb-brand {
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+.kb-doc-title {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	font-weight: 600;
+}
+
+.kb-badge {
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: #334155;
+	font-size: 12px;
+}
+
+.kb-badge.is-live {
+	background: #15803d;
+}
+
+.kb-unsaved {
+	color: #fbbf24;
+	font-size: 12px;
+}
+
+.kb-topbar .kb-icon-btn {
+	color: #cbd5e1;
+}
+
+.kb-topbar .kb-icon-btn:hover {
+	color: #fff;
+}
+
+/* ---- Buttons ---------------------------------------------------------- */
+
+.kb-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 34px;
+	padding: 0 14px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	font-weight: 600;
+	text-decoration: none;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.kb-btn:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.kb-btn-primary {
+	background: var(--kb-accent);
+	color: #fff;
+}
+
+.kb-btn-primary:hover:not(:disabled) {
+	background: #5b21b6;
+}
+
+.kb-btn-secondary {
+	background: transparent;
+	border-color: #94a3b8;
+	color: inherit;
+}
+
+.kb-panel .kb-btn-secondary {
+	border-color: var(--kb-border);
+	background: #fff;
+}
+
+.kb-btn-danger {
+	background: #fff;
+	border-color: #fecaca;
+	color: var(--kb-danger);
+}
+
+.kb-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px;
+	border: 0;
+	background: none;
+	color: inherit;
+	text-decoration: none;
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.kb-link {
+	border: 0;
+	background: none;
+	color: var(--kb-accent);
+	cursor: pointer;
+	padding: 0;
+}
+
+/* ---- Layout ----------------------------------------------------------- */
+
+.kb-main {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.kb-panel {
+	flex: 0 0 var(--kb-panel-width);
+	display: flex;
+	flex-direction: column;
+	background: var(--kb-panel-bg);
+	border-right: 1px solid var(--kb-border);
+	overflow: hidden;
+}
+
+.kb-panel-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	height: 48px;
+	padding: 0 14px;
+	border-bottom: 1px solid var(--kb-border);
+	flex: 0 0 auto;
+}
+
+.kb-panel-header h2 {
+	margin: 0;
+	font-size: 15px;
+}
+
+.kb-panel-body {
+	padding: 16px 14px;
+	overflow-y: auto;
+}
+
+.kb-hint {
+	color: var(--kb-muted);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.kb-widget-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 10px;
+}
+
+.kb-widget-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 18px 8px;
+	border: 1px solid var(--kb-border);
+	border-radius: 8px;
+	background: #fff;
+	color: var(--kb-text);
+	cursor: grab;
+}
+
+.kb-widget-tile:hover {
+	border-color: var(--kb-accent);
+	color: var(--kb-accent);
+	box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.kb-widget-tile .dashicons {
+	width: 28px;
+	height: 28px;
+	font-size: 28px;
+}
+
+/* ---- Controls --------------------------------------------------------- */
+
+.kb-control {
+	margin-bottom: 16px;
+}
+
+.kb-control label {
+	display: block;
+	margin-bottom: 6px;
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.kb-control input[type="text"],
+.kb-control input[type="number"],
+.kb-control select,
+.kb-control textarea {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 7px 9px;
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	font: inherit;
+	background: #fff;
+}
+
+.kb-control textarea {
+	resize: vertical;
+	min-height: 120px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 13px;
+}
+
+.kb-color {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.kb-color input[type="color"] {
+	width: 44px;
+	height: 32px;
+	padding: 2px;
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	background: #fff;
+}
+
+.kb-panel-actions {
+	display: flex;
+	gap: 8px;
+	padding-top: 8px;
+	border-top: 1px solid var(--kb-border);
+}
+
+/* ---- Canvas ----------------------------------------------------------- */
+
+.kb-canvas-wrap {
+	flex: 1 1 auto;
+	overflow: auto;
+	padding: 24px;
+}
+
+.kb-canvas {
+	min-height: calc(100% - 4px);
+	background: #fff;
+	box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: 17px;
+	line-height: 1.6;
+	padding-bottom: 24px;
+}
+
+.kb-el {
+	outline: 1px dashed transparent;
+	outline-offset: -1px;
+}
+
+.kb-section:hover,
+.kb-section.is-selected {
+	outline: 2px solid var(--kb-section);
+	outline-offset: -2px;
+}
+
+.kb-column:hover,
+.kb-column.is-selected {
+	outline: 1px dashed var(--kb-column);
+}
+
+.kb-column.is-selected {
+	outline-style: solid;
+}
+
+.kb-widget {
+	cursor: move;
+}
+
+.kb-widget:hover,
+.kb-widget.is-selected {
+	outline: 2px solid var(--kb-accent);
+	outline-offset: 2px;
+}
+
+.kb-is-dragging {
+	opacity: 0.35;
+}
+
+/* Element toolbars appear on hover or selection. */
+.kb-toolbar {
+	position: absolute;
+	z-index: 20;
+	display: none;
+	align-items: center;
+	gap: 2px;
+	padding: 2px 4px;
+	border-radius: 0 0 6px 6px;
+	color: #fff;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 12px;
+	line-height: 1;
+}
+
+.kb-toolbar-section {
+	top: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	background: var(--kb-section);
+}
+
+.kb-toolbar-column {
+	top: 0;
+	left: 0;
+	border-radius: 0 0 6px 0;
+	background: var(--kb-column);
+}
+
+.kb-toolbar-widget {
+	top: -26px;
+	right: -2px;
+	border-radius: 6px 6px 0 0;
+	background: var(--kb-accent);
+}
+
+.kb-el:hover > .kb-toolbar,
+.kb-el.is-selected > .kb-toolbar,
+.kb-el.kb-toolbar-pinned > .kb-toolbar {
+	display: flex;
+}
+
+/* Only the innermost hovered element's toolbar when a widget is hovered. */
+.kb-column:has(.kb-widget:hover) > .kb-toolbar {
+	display: none;
+}
+
+/* Fade toolbars while dragging. Not display:none: hiding the section's drag
+   handle mid-drag would make Chrome cancel the drag. */
+.is-dragging-widget .kb-toolbar,
+.is-dragging-section .kb-toolbar {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.kb-toolbar-label {
+	padding: 0 6px;
+	font-weight: 600;
+}
+
+.kb-tool {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+}
+
+.kb-tool:hover {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+.kb-tool .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+.kb-handle {
+	cursor: grab;
+}
+
+.kb-column-inner.kb-dropzone {
+	min-height: 80px;
+}
+
+.kb-column-empty {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: 80px;
+	border: 1px dashed #cbd5e1;
+	border-radius: 4px;
+	color: var(--kb-muted);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 13px;
+}
+
+.kb-empty {
+	margin: 24px;
+	padding: 48px 24px;
+	border: 2px dashed #cbd5e1;
+	border-radius: 8px;
+	text-align: center;
+	color: var(--kb-muted);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 14px;
+}
+
+.kb-empty-title {
+	color: var(--kb-text);
+	font-size: 18px;
+	font-weight: 600;
+}
+
+/* Drop placeholder. */
+.kb-placeholder {
+	flex: 0 0 auto;
+	border-radius: 3px;
+	background: var(--kb-accent);
+	pointer-events: none;
+}
+
+.kb-placeholder-widget {
+	height: 4px;
+	margin: -2px 0;
+}
+
+.kb-placeholder-section {
+	height: 6px;
+	margin: 0 24px;
+}
+
+/* Add section. */
+.kb-add-section {
+	margin: 24px;
+	padding: 20px;
+	border: 2px dashed #cbd5e1;
+	border-radius: 8px;
+	text-align: center;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kb-add-section-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 14px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--kb-accent);
+	color: #fff;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.kb-structures {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.kb-structures[hidden] {
+	display: none;
+}
+
+.kb-structure {
+	width: 96px;
+	padding: 6px;
+	border: 1px solid var(--kb-border);
+	border-radius: 6px;
+	background: #fff;
+	cursor: pointer;
+}
+
+.kb-structure:hover {
+	border-color: var(--kb-accent);
+}
+
+.kb-structure-preview {
+	display: flex;
+	gap: 3px;
+	height: 36px;
+}
+
+.kb-structure-preview span {
+	background: #cbd5e1;
+	border-radius: 2px;
+}
+
+.kb-structure:hover .kb-structure-preview span {
+	background: var(--kb-accent);
+}
+
+/* ---- Toast ------------------------------------------------------------ */
+
+.kb-toast {
+	position: fixed;
+	bottom: 20px;
+	left: 50%;
+	transform: translate(-50%, 20px);
+	padding: 10px 18px;
+	border-radius: 6px;
+	background: #0f172a;
+	color: #fff;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s, transform 0.2s;
+	z-index: 100;
+}
+
+.kb-toast.is-visible {
+	opacity: 1;
+	transform: translate(-50%, 0);
+}
+
+.kb-toast.is-error {
+	background: var(--kb-danger);
+}
+
+@media (max-width: 782px) {
+	.kb-hide-sm {
+		display: none;
+	}
+
+	:root {
+		--kb-panel-width: 240px;
+	}
+}

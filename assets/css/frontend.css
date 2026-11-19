@@ -1,0 +1,83 @@
+/* Kbroo Studio: layout styles shared by the front end and the editor canvas. */
+
+.kbroo-page {
+	box-sizing: border-box;
+}
+
+/* Block themes size .alignfull with negative margins; never cap it. */
+.kbroo-page.alignfull {
+	max-width: none;
+}
+
+.kbroo-page *,
+.kbroo-page *::before,
+.kbroo-page *::after {
+	box-sizing: inherit;
+}
+
+/* Block themes add margins between post content children; sections own their spacing. */
+.kbroo-page > .kbroo-section {
+	margin-block-start: 0;
+	margin-block-end: 0;
+}
+
+.kbroo-section {
+	position: relative;
+	width: 100%;
+	padding-left: 20px;
+	padding-right: 20px;
+}
+
+.kbroo-section--boxed > .kbroo-container {
+	max-width: var(--kbroo-boxed-width, 1140px);
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.kbroo-row {
+	display: flex;
+	flex-wrap: nowrap;
+	gap: var(--kbroo-gap, 20px);
+	align-items: stretch;
+}
+
+/* Columns share the row in proportion to their width setting. */
+.kbroo-column {
+	position: relative;
+	flex: var(--kbroo-col-width, 100) 1 0;
+	min-width: 0;
+}
+
+.kbroo-column-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	height: 100%;
+}
+
+.kbroo-widget {
+	position: relative;
+}
+
+.kbroo-heading {
+	margin: 0;
+}
+
+.kbroo-text > :first-child {
+	margin-top: 0;
+}
+
+.kbroo-text > :last-child {
+	margin-bottom: 0;
+}
+
+/* Stack columns on small screens. */
+@media (max-width: 767px) {
+	.kbroo-row {
+		flex-direction: column;
+	}
+
+	.kbroo-column {
+		flex-basis: auto;
+	}
+}
