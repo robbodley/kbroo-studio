@@ -125,6 +125,7 @@ class Button extends Widget {
 					'selectors' => array( $hovered => 'border-color: {{VALUE}};' ),
 				),
 			),
+			ControlGroups::hover_animation( $button, $hover ),
 			ControlGroups::border( $button )
 		);
 	}

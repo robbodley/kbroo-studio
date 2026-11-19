@@ -96,8 +96,72 @@
 				}
 				out[ '{{UNIT}}' ] = unit( control, value.unit );
 				return out;
+
+			case 'media':
+				var url = mediaUrl( value );
+				return url ? { '{{URL}}': 'url("' + url + '")' } : null;
 		}
 		return null;
+	}
+
+	/** Image address safe inside url(""), as esc_url_raw() leaves it in PHP. */
+	function mediaUrl( value ) {
+		var url = value && typeof value.url === 'string' ? value.url.trim() : '';
+		if ( ! /^(https?:\/\/|\/)/i.test( url ) ) {
+			return '';
+		}
+		return url.replace( /[^a-z0-9\-~+_.?#=!&;,\/:%@$|*'()\[\]\u0080-\uffff]/gi, '' );
+	}
+
+	/** Twin of Css::device_value(). */
+	function deviceValue( control, settings, key, device ) {
+		var list = DEVICES.slice( 0, DEVICES.indexOf( device ) + 1 ).reverse();
+		for ( var i = 0; i < list.length; i++ ) {
+			var value = settings[ deviceKey( key, list[ i ] ) ];
+			var set = value && typeof value === 'object' ? !! replacements( control, value ) : value != null && value !== '';
+			if ( set || list[ i ] === 'desktop' || ! control.responsive ) {
+				return value;
+			}
+		}
+		return null;
+	}
+
+	/** Twin of Css::device_view(). */
+	function deviceView( controls, control, settings, device ) {
+		if ( device === 'desktop' || ! control.condition ) {
+			return settings;
+		}
+		var view = Object.assign( {}, settings );
+		Object.keys( control.condition ).forEach( function ( raw ) {
+			var key = raw.replace( /!$/, '' );
+			if ( controls[ key ] && controls[ key ].responsive ) {
+				view[ key ] = deviceValue( controls[ key ], settings, key, device );
+			}
+		} );
+		return view;
+	}
+
+	/** Twin of Css::resolve_references(). */
+	function resolveReferences( declaration, controls, settings, device ) {
+		var missing = false;
+		var out = declaration.replace( /\{\{([a-z0-9_]+)\.([A-Z]+)\}\}/g, function ( token, key, part ) {
+			var control = controls[ key ];
+			if ( ! control ) {
+				missing = true;
+				return '';
+			}
+			var value = deviceValue( control, settings, key, control.responsive ? device : 'desktop' );
+			var map =
+				globalReplacements( control, settings, key, 'desktop' ) ||
+				replacements( control, value ) ||
+				replacements( control, control.default );
+			if ( ! map || ! ( '{{' + part + '}}' in map ) ) {
+				missing = true;
+				return '';
+			}
+			return map[ '{{' + part + '}}' ];
+		} );
+		return missing ? null : out;
 	}
 
 	function globalId( settings, key ) {
@@ -211,11 +275,14 @@
 		var rules = { desktop: [], tablet: [], mobile: [] };
 		Object.keys( controls ).forEach( function ( key ) {
 			var control = controls[ key ];
-			if ( ! control.selectors || ! conditionMet( control, settings ) ) {
+			if ( ! control.selectors ) {
 				return;
 			}
 			var deviceKeys = keys( key, control );
 			Object.keys( deviceKeys ).forEach( function ( device ) {
+				if ( ! conditionMet( control, deviceView( controls, control, settings, device ) ) ) {
+					return;
+				}
 				var map =
 					globalReplacements( control, settings, deviceKeys[ device ], device ) ||
 					replacements( control, settings[ deviceKeys[ device ] ] );
@@ -223,10 +290,15 @@
 					return;
 				}
 				Object.keys( control.selectors ).forEach( function ( selector ) {
-					rules[ device ].push(
-						selector.split( '{{WRAPPER}}' ).join( wrapper ) +
-							'{' + fill( control.selectors[ selector ], Object.assign( { '{{DEVICE}}': device }, map ) ) + '}'
+					var declaration = resolveReferences(
+						fill( control.selectors[ selector ], Object.assign( { '{{DEVICE}}': device }, map ) ),
+						controls,
+						settings,
+						device
 					);
+					if ( declaration !== null ) {
+						rules[ device ].push( selector.split( '{{WRAPPER}}' ).join( wrapper ) + '{' + declaration + '}' );
+					}
 				} );
 			} );
 		} );
@@ -271,6 +343,7 @@
 		stylesheet: stylesheet,
 		forDevice: forDevice,
 		globalId: globalId,
+		mediaUrl: mediaUrl,
 		setGlobals: setGlobals,
 		globalsRules: globalsRules,
 		googleUrl: googleUrl,

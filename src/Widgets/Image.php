@@ -33,6 +33,10 @@ class Image extends Widget {
 			'tab'     => 'style',
 			'section' => __( 'Image', 'kbroo-studio' ),
 		);
+		$hover   = array(
+			'tab'     => 'style',
+			'section' => __( 'Image on hover', 'kbroo-studio' ),
+		);
 		$caption = array(
 			'tab'       => 'style',
 			'section'   => __( 'Caption', 'kbroo-studio' ),
@@ -124,14 +128,33 @@ class Image extends Widget {
 					'selectors' => array( $img => 'object-fit: {{VALUE}};' ),
 				),
 				'opacity'        => $style + array(
-					'type'      => 'number',
+					'type'      => 'slider',
 					'label'     => __( 'Opacity (0 to 1)', 'kbroo-studio' ),
-					'default'   => '',
+					'units'     => array( 'px' ),
 					'min'       => 0,
 					'max'       => 1,
-					'selectors' => array( $img => 'opacity: {{VALUE}};' ),
+					'selectors' => array( $img => 'opacity: {{SIZE}};' ),
 				),
 			),
+			ControlGroups::css_filters( $img, $style ),
+			array(
+				'opacity_hover'               => $hover + array(
+					'type'      => 'slider',
+					'label'     => __( 'Opacity (0 to 1)', 'kbroo-studio' ),
+					'units'     => array( 'px' ),
+					'min'       => 0,
+					'max'       => 1,
+					'selectors' => array( '{{WRAPPER}}:hover .kbroo-image img' => 'opacity: {{SIZE}};' ),
+				),
+				'background_hover_transition' => $hover + array(
+					'type'      => 'slider',
+					'label'     => __( 'Transition duration (s)', 'kbroo-studio' ),
+					'units'     => array( 's' ),
+					'selectors' => array( $img => 'transition-duration: {{SIZE}}s;' ),
+				),
+			),
+			ControlGroups::hover_animation( '{{WRAPPER}} .kbroo-image', $hover ),
+			ControlGroups::css_filters( '{{WRAPPER}}:hover .kbroo-image img', $hover, 'css_filters_hover' ),
 			ControlGroups::border( $img, array(), 'image_border' ),
 			array(
 				'caption_align' => ControlGroups::align( '{{WRAPPER}} .kbroo-image__caption', $caption ),

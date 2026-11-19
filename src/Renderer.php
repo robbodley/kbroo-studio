@@ -22,14 +22,25 @@ final class Renderer {
 	/** @var array<string,string[]> CSS rules collected while rendering, by device. */
 	private $rules = array();
 
+	/** @var bool Whether any element has an entrance animation. */
+	private $animated = false;
+
 	public function __construct( Registry $widgets ) {
 		$this->widgets = $widgets;
 	}
 
 	public function render( array $layout, int $post_id = 0 ): string {
-		$this->rules = array_fill_keys( Controls::DEVICES, array() );
+		$this->rules    = array_fill_keys( Controls::DEVICES, array() );
+		$this->animated = false;
 
 		$html = $this->render_children( (array) ( $layout['elements'] ?? array() ) );
+
+		if ( $this->animated ) {
+			// Animated elements start hidden only once this has run, so the
+			// page still shows everything if scripts never load.
+			$html = '<script>document.documentElement.classList.add("kbroo-js");</script>' . $html;
+			Frontend::enqueue_script();
+		}
 
 		$css = Css::stylesheet( $this->rules );
 		if ( '' !== $css ) {
@@ -94,7 +105,108 @@ final class Renderer {
 		if ( '' !== $css_id ) {
 			$attributes .= ' id="' . esc_attr( $css_id ) . '"';
 		}
-		return $attributes . ' data-id="' . esc_attr( $id ) . '"';
+		$attributes .= ' data-id="' . esc_attr( $id ) . '"';
+
+		$animation = (string) ( $settings[ $prefix . 'animation' ] ?? '' );
+		if ( in_array( $animation, ControlGroups::ENTRANCE_ANIMATIONS, true ) ) {
+			$this->animated = true;
+			$attributes    .= ' data-kbroo-animation="' . esc_attr( $animation ) . '"';
+			$duration       = (string) ( $settings['animation_duration'] ?? '' );
+			if ( in_array( $duration, array( 'slow', 'fast' ), true ) ) {
+				$attributes .= ' data-kbroo-duration="' . esc_attr( $duration ) . '"';
+			}
+			$delay = (int) ( $settings[ $prefix . 'animation_delay' ] ?? 0 );
+			if ( $delay > 0 ) {
+				$attributes .= ' data-kbroo-delay="' . min( 10000, $delay ) . '"';
+			}
+		}
+		return $attributes;
+	}
+
+	/**
+	 * Background video markup for an element whose background type is
+	 * "video", or ''. It sits under the overlay and the content.
+	 */
+	public static function background_video( array $settings, string $prefix = 'background' ): string {
+		if ( 'video' !== ( $settings[ $prefix . '_background' ] ?? '' ) ) {
+			return '';
+		}
+		$video = self::video_source( (string) ( $settings[ $prefix . '_video_link' ] ?? '' ) );
+		if ( ! $video ) {
+			return '';
+		}
+		$start = absint( $settings[ $prefix . '_video_start' ] ?? 0 );
+		$end   = absint( $settings[ $prefix . '_video_end' ] ?? 0 );
+		$once  = 'yes' === ( $settings[ $prefix . '_play_once' ] ?? '' );
+		$class = 'kbroo-bg-video' . ( 'yes' === ( $settings[ $prefix . '_play_on_mobile' ] ?? '' ) ? ' kbroo-bg-video--mobile' : '' );
+
+		if ( 'file' === $video['type'] ) {
+			$src = $video['url'];
+			if ( $start || $end ) {
+				$src .= '#t=' . $start . ( $end ? ',' . $end : '' );
+			}
+			return sprintf(
+				'<div class="%1$s" aria-hidden="true"><video src="%2$s" autoplay muted playsinline%3$s></video></div>',
+				esc_attr( $class ),
+				esc_url( $src ),
+				$once ? '' : ' loop'
+			);
+		}
+
+		if ( 'youtube' === $video['type'] ) {
+			$query = array(
+				'autoplay'       => 1,
+				'mute'           => 1,
+				'controls'       => 0,
+				'playsinline'    => 1,
+				'rel'            => 0,
+				'modestbranding' => 1,
+				'loop'           => $once ? 0 : 1,
+				'playlist'       => $once ? null : $video['id'],
+				'start'          => $start ? $start : null,
+				'end'            => $end ? $end : null,
+			);
+			$src   = 'https://www.youtube-nocookie.com/embed/' . rawurlencode( $video['id'] ) . '?' . http_build_query( array_filter( $query, 'is_scalar' ) );
+		} else {
+			$src = 'https://player.vimeo.com/video/' . rawurlencode( $video['id'] ) . '?' . http_build_query(
+				array(
+					'background' => 1,
+					'loop'       => $once ? 0 : 1,
+				)
+			) . ( $start ? '#t=' . $start . 's' : '' );
+		}
+		return sprintf(
+			'<div class="%1$s" aria-hidden="true"><iframe src="%2$s" title="" tabindex="-1" allow="autoplay; fullscreen" loading="lazy"></iframe></div>',
+			esc_attr( $class ),
+			esc_url( $src )
+		);
+	}
+
+	/**
+	 * What a video link points at: { type: youtube|vimeo|file, id|url }.
+	 */
+	public static function video_source( string $link ): ?array {
+		$link = trim( $link );
+		if ( preg_match( '#(?:youtube(?:-nocookie)?\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/)|youtu\.be/)([A-Za-z0-9_-]{6,20})#', $link, $m ) ) {
+			return array(
+				'type' => 'youtube',
+				'id'   => $m[1],
+			);
+		}
+		if ( preg_match( '#vimeo\.com/(?:video/)?(\d{3,12})#', $link, $m ) ) {
+			return array(
+				'type' => 'vimeo',
+				'id'   => $m[1],
+			);
+		}
+		$url = Controls::sanitize_url( $link, array( 'http', 'https' ) );
+		if ( '' !== $url && preg_match( '#\.(mp4|webm|ogv|mov)(\?|$)#i', $url ) ) {
+			return array(
+				'type' => 'file',
+				'url'  => $url,
+			);
+		}
+		return null;
 	}
 
 	/**
@@ -136,10 +248,11 @@ final class Renderer {
 		}
 
 		return sprintf(
-			'<%1$s%2$s><div class="kbroo-container"><div class="kbroo-row">%3$s</div></div></%1$s>',
+			'<%1$s%2$s>%4$s<div class="kbroo-container"><div class="kbroo-row">%3$s</div></div></%1$s>',
 			$tag,
 			$this->attributes( $section, $settings, $classes, '' ),
-			$this->render_children( (array) ( $section['elements'] ?? array() ) )
+			$this->render_children( (array) ( $section['elements'] ?? array() ) ),
+			self::background_video( $settings )
 		);
 	}
 
@@ -164,10 +277,11 @@ final class Renderer {
 		}
 
 		return sprintf(
-			'<%1$s%2$s><div class="kbroo-con-inner">%3$s</div></%1$s>',
+			'<%1$s%2$s>%4$s<div class="kbroo-con-inner">%3$s</div></%1$s>',
 			$tag,
 			$this->attributes( $container, $settings, $classes, '' ),
-			$this->render_children( (array) ( $container['elements'] ?? array() ) )
+			$this->render_children( (array) ( $container['elements'] ?? array() ) ),
+			self::background_video( $settings )
 		);
 	}
 

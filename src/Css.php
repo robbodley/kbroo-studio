@@ -42,24 +42,102 @@ final class Css {
 		$rules = array_fill_keys( Controls::DEVICES, array() );
 
 		foreach ( $controls as $key => $control ) {
-			if ( empty( $control['selectors'] ) || ! Controls::condition_met( $control, $settings ) ) {
+			if ( empty( $control['selectors'] ) ) {
 				continue;
 			}
 			foreach ( Controls::keys( $key, $control ) as $device => $setting_key ) {
+				if ( ! Controls::condition_met( $control, self::device_view( $controls, $control, $settings, $device ) ) ) {
+					continue;
+				}
 				$replacements = self::global_replacements( $control, $settings, $setting_key, $device )
 					?? self::replacements( $control, $settings[ $setting_key ] ?? null );
 				if ( null === $replacements ) {
 					continue;
 				}
 				foreach ( $control['selectors'] as $selector => $template ) {
-					$selector               = str_replace( '{{WRAPPER}}', $wrapper, $selector );
-					$declaration            = strtr( $template, $replacements + array( '{{DEVICE}}' => $device ) );
-					$rules[ $device ][]     = $selector . '{' . $declaration . '}';
+					$declaration = self::resolve_references(
+						strtr( $template, $replacements + array( '{{DEVICE}}' => $device ) ),
+						$controls,
+						$settings,
+						$device
+					);
+					if ( null !== $declaration ) {
+						$rules[ $device ][] = str_replace( '{{WRAPPER}}', $wrapper, $selector ) . '{' . $declaration . '}';
+					}
 				}
 			}
 		}
 
 		return $rules;
+	}
+
+	/**
+	 * Settings as seen on one device: each responsive setting a condition
+	 * reads takes that device's value, or the next larger screen's when it
+	 * is not set there.
+	 */
+	public static function device_view( array $controls, array $control, array $settings, string $device ): array {
+		if ( 'desktop' === $device || empty( $control['condition'] ) ) {
+			return $settings;
+		}
+		foreach ( array_keys( (array) $control['condition'] ) as $key ) {
+			$key = rtrim( $key, '!' );
+			if ( ! empty( $controls[ $key ]['responsive'] ) ) {
+				$settings[ $key ] = self::device_value( $controls[ $key ], $settings, $key, $device );
+			}
+		}
+		return $settings;
+	}
+
+	/**
+	 * A responsive setting's value on a device, inherited from larger
+	 * screens when not set there.
+	 *
+	 * @return mixed
+	 */
+	public static function device_value( array $control, array $settings, string $key, string $device ) {
+		$devices = array_slice( Controls::DEVICES, 0, (int) array_search( $device, Controls::DEVICES, true ) + 1 );
+		foreach ( array_reverse( $devices ) as $candidate ) {
+			$value = $settings[ Controls::device_key( $key, $candidate ) ] ?? null;
+			$set   = is_array( $value ) ? null !== self::replacements( $control, $value ) : ( null !== $value && '' !== $value );
+			if ( $set || 'desktop' === $candidate || empty( $control['responsive'] ) ) {
+				return $value;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Fill {{other_key.PART}} placeholders from other controls, falling back
+	 * to their defaults. Returns null when one has no value: the rule would
+	 * be incomplete, so it is left out.
+	 */
+	public static function resolve_references( string $declaration, array $controls, array $settings, string $device ): ?string {
+		if ( false === strpos( $declaration, '.' ) ) {
+			return $declaration;
+		}
+		$missing = false;
+		$out     = preg_replace_callback(
+			'/\{\{([a-z0-9_]+)\.([A-Z]+)\}\}/',
+			function ( $m ) use ( $controls, $settings, $device, &$missing ) {
+				$control = $controls[ $m[1] ] ?? null;
+				if ( ! $control ) {
+					$missing = true;
+					return '';
+				}
+				$value = self::device_value( $control, $settings, $m[1], empty( $control['responsive'] ) ? 'desktop' : $device );
+				$map   = self::global_replacements( $control, $settings, $m[1], 'desktop' )
+					?? self::replacements( $control, $value )
+					?? self::replacements( $control, Controls::default_for( $control ) );
+				if ( null === $map || ! isset( $map[ '{{' . $m[2] . '}}' ] ) ) {
+					$missing = true;
+					return '';
+				}
+				return $map[ '{{' . $m[2] . '}}' ];
+			},
+			$declaration
+		);
+		return $missing ? null : $out;
 	}
 
 	/**
@@ -150,6 +228,14 @@ final class Css {
 				}
 				$sides['{{UNIT}}'] = Controls::sanitize_unit( $control, $value['unit'] ?? '' );
 				return $sides;
+
+			case 'media':
+				$url = is_array( $value ) ? Controls::sanitize_url( $value['url'] ?? '', array( 'http', 'https' ) ) : '';
+				if ( '' === $url ) {
+					return null;
+				}
+				// esc_url_raw() has already removed quotes, backslashes and spaces.
+				return array( '{{URL}}' => 'url("' . str_replace( array( '"', '\\' ), '', $url ) . '")' );
 
 			default:
 				return null; // Free text never goes into CSS.
