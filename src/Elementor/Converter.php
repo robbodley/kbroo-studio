@@ -301,6 +301,9 @@ final class Converter {
 		$this->report['widgets'][ $type ] = ( $this->report['widgets'][ $type ] ?? 0 ) + 1;
 
 		$widget = $this->widgets->get( $type );
+		if ( 'video' === $type && ! in_array( $settings['video_type'] ?? 'youtube', array( 'youtube', 'vimeo', 'hosted' ), true ) ) {
+			$widget = null; // Dailymotion and VideoPress stay as Elementor showed them.
+		}
 		if ( $widget && 'elementor-fallback' !== $type ) {
 			$settings = $this->common( $settings );
 			$settings = $this->legacy_icons( $type, $settings );
@@ -309,6 +312,22 @@ final class Converter {
 			}
 			if ( 'form' === $type ) {
 				$settings = $this->form( $settings );
+			}
+			if ( in_array( $type, array( 'icon-box', 'image-box' ), true ) ) {
+				$settings = $this->box( $settings );
+			}
+			if ( 'image-gallery' === $type ) {
+				// Elementor's defaults, which differ from Kbroo Studio's.
+				$settings += array(
+					'thumbnail_size'          => 'thumbnail',
+					'gallery_display_caption' => '',
+				);
+			}
+			if ( 'video' === $type ) {
+				if ( 'yes' === ( $settings['lightbox'] ?? '' ) ) {
+					$this->drop( 'video lightbox (plays in the page)' );
+				}
+				unset( $settings['lightbox'] );
 			}
 			if ( 'divider' === $type && 'line_icon' === ( $settings['look'] ?? '' ) ) {
 				$settings['look'] = 'line';
@@ -400,6 +419,46 @@ final class Converter {
 	}
 
 	/**
+	 * Icon box and image box: newer Elementor versions name positions and
+	 * alignments by writing direction (inline-start), older ones by side.
+	 */
+	private function box( array $settings ): array {
+		$sides = array(
+			'block-start'  => 'top',
+			'block-end'    => 'top',
+			'inline-start' => 'left',
+			'inline-end'   => 'right',
+			'start'        => 'left',
+			'end'          => 'right',
+		);
+		if ( 'block-end' === ( $settings['position'] ?? '' ) ) {
+			$this->drop( 'image or icon below the text (moved above)' );
+		}
+		foreach ( array( '', '_tablet', '_mobile' ) as $device ) {
+			foreach ( array( 'position', 'text_align' ) as $key ) {
+				$value = $settings[ $key . $device ] ?? null;
+				if ( is_string( $value ) && isset( $sides[ $value ] ) ) {
+					$settings[ $key . $device ] = $sides[ $value ];
+				}
+			}
+		}
+		// The image box's border radius is a single size in Elementor.
+		$radius = $settings['image_border_radius'] ?? null;
+		if ( is_array( $radius ) && isset( $radius['size'] ) && ! isset( $radius['top'] ) ) {
+			$size                            = (string) $radius['size'];
+			$settings['image_border_radius'] = array(
+				'unit'     => (string) ( $radius['unit'] ?? 'px' ),
+				'top'      => $size,
+				'right'    => $size,
+				'bottom'   => $size,
+				'left'     => $size,
+				'isLinked' => true,
+			);
+		}
+		return $settings;
+	}
+
+	/**
 	 * Elementor's form stores ticked boxes in fields as "true".
 	 */
 	private function form( array $settings ): array {
@@ -430,7 +489,9 @@ final class Converter {
 	private function legacy_icons( string $type, array $settings ): array {
 		$pairs = array(
 			'icon'         => array( 'icon', 'selected_icon' ),
+			'icon-box'     => array( 'icon', 'selected_icon' ),
 			'social-icons' => array( 'social', 'social_icon' ),
+			'icon-list'    => array( 'icon', 'selected_icon' ),
 		);
 		if ( ! isset( $pairs[ $type ] ) ) {
 			return $settings;
@@ -446,10 +507,14 @@ final class Converter {
 			unset( $values[ $old ] );
 			return $values;
 		};
-		if ( 'social-icons' === $type ) {
-			foreach ( (array) ( $settings['social_icon_list'] ?? array() ) as $i => $item ) {
+		$lists = array(
+			'social-icons' => 'social_icon_list',
+			'icon-list'    => 'icon_list',
+		);
+		if ( isset( $lists[ $type ] ) ) {
+			foreach ( (array) ( $settings[ $lists[ $type ] ] ?? array() ) as $i => $item ) {
 				if ( is_array( $item ) ) {
-					$settings['social_icon_list'][ $i ] = $upgrade( $item );
+					$settings[ $lists[ $type ] ][ $i ] = $upgrade( $item );
 				}
 			}
 			return $settings;

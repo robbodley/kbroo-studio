@@ -50,6 +50,12 @@ final class Registry {
 		$this->register( new TestimonialCarousel() );
 		$this->register( new Posts() );
 		$this->register( new Form() );
+		$this->register( new IconList() );
+		$this->register( new IconBox() );
+		$this->register( new ImageBox() );
+		$this->register( new Video() );
+		$this->register( new Gallery() );
+		$this->register( new ImageCarousel() );
 		$this->register( new ElementorFallback() );
 
 		/**
