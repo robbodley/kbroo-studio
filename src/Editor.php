@@ -92,7 +92,7 @@ final class Editor {
 			$layout     = $result['layout'];
 			$conversion = array(
 				'fallbacks' => count( $result['report']['fallbacks'] ),
-				'toolsUrl'  => admin_url( 'tools.php?page=' . Elementor\Migration::PAGE ),
+				'toolsUrl'  => admin_url( 'admin.php?page=' . Elementor\Migration::PAGE ),
 			);
 		}
 
@@ -121,6 +121,9 @@ final class Editor {
 			'globalTypographyControls' => Controls::for_editor( Globals::typography_controls() ),
 			'systemGlobalIds' => Globals::SYSTEM_IDS,
 			'fonts'          => Fonts::all(),
+			'shapes'           => ShapeDividers::for_editor(),
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only picks which panel opens first.
+			'openPanel'        => 'globals' === ( $_GET['kb-panel'] ?? '' ) ? 'globals' : '',
 			'iconsUrl'         => esc_url_raw( add_query_arg( 'v', KBROO_STUDIO_VERSION, rest_url( Rest::NAMESPACE . '/icons' ) ) ),
 			'widgetPreviewUrl' => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/widget-preview' ) ),
 			'canUnfilteredHtml' => current_user_can( 'unfiltered_html' ),

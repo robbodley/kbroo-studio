@@ -112,6 +112,7 @@ final class Globals {
 		$clean   = array(
 			'colors'     => array(),
 			'typography' => array(),
+			'custom_css' => Controls::sanitize_css( $globals['custom_css'] ?? '' ),
 		);
 		$controls = self::typography_controls();
 
@@ -172,7 +173,8 @@ final class Globals {
 			}
 		}
 
-		return Css::stylesheet( $rules );
+		// Site-wide custom CSS comes last, so it can override the rest.
+		return Css::stylesheet( $rules ) . ( $globals['custom_css'] ?? '' );
 	}
 
 	/**

@@ -277,6 +277,15 @@
 		return rules;
 	}
 
+	/**
+	 * Site-wide custom CSS for the editor's preview, kept to the canvas so
+	 * it cannot restyle the editor around it.
+	 */
+	function globalsCustomCss( globals ) {
+		var css = customCss( globals.custom_css, '' );
+		return css ? '@scope (.kb-canvas) {' + css + '}' : '';
+	}
+
 	/** Twin of Fonts::google_url(). */
 	function googleUrl( names, fonts ) {
 		var families = [];
@@ -300,6 +309,12 @@
 	/**
 	 * Rules for one element, grouped by device.
 	 */
+	/** Twin of Css::custom_css(): "selector" stands for the element. */
+	function customCss( css, wrapper ) {
+		css = typeof css === 'string' ? css.split( '<' ).join( '' ).trim() : '';
+		return css ? css.replace( /\bselector\b/g, wrapper ) : '';
+	}
+
 	function elementRules( controls, settings, wrapper ) {
 		var rules = { desktop: [], tablet: [], mobile: [] };
 		Object.keys( controls ).forEach( function ( key ) {
@@ -309,6 +324,13 @@
 				DEVICES.forEach( function ( d ) {
 					rules[ d ] = rules[ d ].concat( r[ d ] );
 				} );
+				return;
+			}
+			if ( control.type === 'css' ) {
+				var css = customCss( settings[ key ], wrapper );
+				if ( css ) {
+					rules.desktop.push( css );
+				}
 				return;
 			}
 			if ( ! control.selectors ) {
@@ -377,6 +399,7 @@
 		conditionMet: conditionMet,
 		elementRules: elementRules,
 		stylesheet: stylesheet,
+		globalsCustomCss: globalsCustomCss,
 		forDevice: forDevice,
 		globalId: globalId,
 		mediaUrl: mediaUrl,

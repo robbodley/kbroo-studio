@@ -841,6 +841,9 @@
 		} );
 
 		resetHistory();
+		if ( config.openPanel === 'globals' ) {
+			state.panelView = 'globals'; // Opened from the Kbroo Studio admin menu.
+		}
 		renderAll();
 
 		if ( config.conversion ) {
@@ -954,7 +957,7 @@
 		);
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-end' }, [
-				panelButton( 'globals', 'dashicons-admin-site-alt3', 'Site colours and fonts' ),
+				panelButton( 'globals', 'dashicons-admin-site-alt3', 'Site colours, fonts and CSS' ),
 				panelButton( 'revisions', 'dashicons-backup', 'Revisions' ),
 				el(
 					'button',
@@ -1546,6 +1549,14 @@
 				code.value = value;
 				code.addEventListener( 'input', function () {
 					update( code.value, true );
+				} );
+				break;
+
+			case 'css':
+				input = el( 'textarea', { id: id, rows: 8, class: 'kb-code', spellcheck: 'false', placeholder: 'selector {\n\tcolor: #333;\n}' } );
+				input.value = value || '';
+				input.addEventListener( 'input', function () {
+					update( input.value, true );
 				} );
 				break;
 
@@ -2365,7 +2376,30 @@
 			);
 		}
 
-		ui.panel.appendChild( panelHeader( 'Site colours and fonts' ) );
+		// Custom CSS for the whole site.
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Custom CSS' } ) );
+		var siteCss = el( 'textarea', {
+			id: 'kb-global-custom-css',
+			rows: 10,
+			class: 'kb-code',
+			spellcheck: 'false',
+			disabled: ! editable,
+			'aria-describedby': 'kb-global-custom-css-note',
+		} );
+		siteCss.value = state.globals.custom_css || '';
+		siteCss.addEventListener( 'input', function () {
+			state.globals.custom_css = siteCss.value;
+			globalsChanged( false );
+		} );
+		body.appendChild(
+			el( 'div', { class: 'kb-control kb-control-css' }, [
+				el( 'label', { for: 'kb-global-custom-css', text: 'CSS for every page built with Kbroo Studio' } ),
+				siteCss,
+				el( 'p', { class: 'kb-control-note', id: 'kb-global-custom-css-note', text: 'Added after everything else, so it can override any style.' } ),
+			] )
+		);
+
+		ui.panel.appendChild( panelHeader( 'Site colours, fonts and CSS' ) );
 		ui.panel.appendChild( body );
 	}
 
@@ -2942,7 +2976,8 @@
 		ui.canvas.appendChild( renderAddSection() );
 		ui.styles.textContent =
 			Css.forDevice( Css.globalsRules( state.globals, config.globalTypographyControls ), state.device ) +
-			Css.forDevice( cssRules, state.device );
+			Css.forDevice( cssRules, state.device ) +
+			Css.globalsCustomCss( state.globals );
 		loadFonts( layout );
 		if ( window.KbrooStudio.initCarousels ) {
 			window.KbrooStudio.initCarousels( ui.canvas, { autoplay: 0 } );
@@ -3049,6 +3084,29 @@
 		return layer;
 	}
 
+	/** Shape dividers: the server's SVG for each shape (see ShapeDividers). */
+	function shapeDividers( s ) {
+		var layers = [];
+		[ 'top', 'bottom' ].forEach( function ( side ) {
+			var key = 'shape_divider_' + side;
+			var shape = ( config.shapes || {} )[ s[ key ] ];
+			if ( ! shape ) {
+				return;
+			}
+			var classes = 'kbroo-shape kbroo-shape--' + side;
+			if ( s[ key + '_flip' ] === 'yes' ) {
+				classes += ' kbroo-shape--flip';
+			}
+			if ( s[ key + '_above_content' ] === 'yes' ) {
+				classes += ' kbroo-shape--above';
+			}
+			var layer = el( 'div', { class: classes, 'aria-hidden': 'true' } );
+			layer.innerHTML = shape[ s[ key + '_negative' ] === 'yes' ? 1 : 0 ];
+			layers.push( layer );
+		} );
+		return layers;
+	}
+
 	function renderSection( section ) {
 		var s = withDefaults( config.sectionControls, section.settings );
 		collectCss( section, config.sectionControls, s );
@@ -3090,8 +3148,9 @@
 					} ),
 				] ),
 				backgroundVideo( s ),
+			].concat( shapeDividers( s ), [
 				el( 'div', { class: 'kbroo-container' }, [ row ] ),
-			]
+			] )
 		);
 		return sectionEl;
 	}
@@ -3164,8 +3223,9 @@
 					} ),
 				] ),
 				backgroundVideo( s ),
+			].concat( shapeDividers( s ), [
 				zone,
-			]
+			] )
 		);
 		return node;
 	}

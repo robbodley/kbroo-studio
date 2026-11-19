@@ -1,7 +1,7 @@
 <?php
 /**
- * Imports the colours and fonts of the active Elementor kit (Site Settings)
- * into Kbroo Studio's global styles.
+ * Imports the colours, fonts and custom CSS of the active Elementor kit
+ * (Site Settings) into Kbroo Studio's global styles.
  *
  * Both use the same shape and ids, so links in converted pages
  * (`globals/colors?id=...`) keep pointing at the right colour.
@@ -39,7 +39,7 @@ final class Kit {
 	 * Copy the kit's colours and fonts into the globals. Items with the
 	 * same id are replaced; Kbroo Studio's own extra items are kept.
 	 *
-	 * @return array{colors: int, typography: int, fonts: string[]}|null
+	 * @return array{colors: int, typography: int, fonts: string[], css: bool}|null
 	 */
 	public static function import(): ?array {
 		$kit = self::settings();
@@ -86,12 +86,19 @@ final class Kit {
 				}
 			}
 		}
+		// Elementor Pro's site-wide custom CSS joins any Kbroo Studio already has.
+		$css                  = Controls::sanitize_css( $kit['custom_css'] ?? '' );
+		$merged['custom_css'] = $current['custom_css'];
+		if ( '' !== $css && false === strpos( $current['custom_css'], $css ) ) {
+			$merged['custom_css'] = trim( $current['custom_css'] . "\n\n/* From Elementor */\n" . $css );
+		}
 		Globals::save( $merged );
 
 		return array(
 			'colors'     => count( $colors ),
 			'typography' => count( $typography ),
 			'fonts'      => array_values( array_unique( $fonts ) ),
+			'css'        => '' !== $css,
 		);
 	}
 }

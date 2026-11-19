@@ -8,7 +8,7 @@
  * outside service: a hidden trap field, a signed time stamp (forms sent
  * within a few seconds of loading are refused) and a limit per visitor.
  *
- * Saved messages are a private post type listed under Tools > Form messages
+ * Saved messages are a private post type listed under Kbroo Studio > Form messages
  * for administrators.
  *
  * @package KbrooStudio
@@ -69,7 +69,7 @@ final class Forms {
 				),
 				'public'          => false,
 				'show_ui'         => true,
-				'show_in_menu'    => 'tools.php',
+				'show_in_menu'    => Admin::MENU,
 				'show_in_rest'    => false,
 				'supports'        => array( 'title' ),
 				'map_meta_cap'    => false,

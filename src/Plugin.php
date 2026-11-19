@@ -42,6 +42,9 @@ final class Plugin {
 		( new Editor( $this->widgets ) )->hooks();
 		( new Frontend( $this->renderer ) )->hooks();
 		( new Revisions() )->hooks();
+		if ( is_admin() ) {
+			( new Admin() )->hooks();
+		}
 		( new Forms( $this->widgets ) )->hooks();
 		( new Elementor\Migration( $this->widgets, $this->renderer ) )->hooks();
 	}

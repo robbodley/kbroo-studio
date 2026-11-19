@@ -203,6 +203,50 @@
 	z-index: 2;
 }
 
+/* Shape dividers: an SVG along the top or bottom edge, under the content
+   unless set to sit in front of it. Bottom shapes are the top ones turned
+   upside down. */
+.kbroo-shape {
+	position: absolute;
+	left: 0;
+	z-index: 1;
+	width: 100%;
+	overflow: hidden;
+	line-height: 0;
+	direction: ltr;
+	pointer-events: none;
+}
+
+.kbroo-shape--top { top: -1px; }
+
+.kbroo-shape--bottom {
+	bottom: -1px;
+	transform: rotate(180deg);
+}
+
+.kbroo-shape svg {
+	position: relative;
+	left: 50%;
+	display: block;
+	width: calc(100% + 1.3px);
+	height: 100px;
+	fill: #fff;
+	transform: translateX(-50%);
+}
+
+.kbroo-shape--flip svg {
+	transform: translateX(-50%) rotateY(180deg);
+}
+
+.kbroo-shape--above {
+	z-index: 3;
+}
+
+.kbroo-section:has(> .kbroo-shape) > .kbroo-container,
+.kbroo-con:has(> .kbroo-shape) > .kbroo-con-inner {
+	z-index: 2;
+}
+
 /* Phones show the fallback image unless the video is set to play there. */
 @media (max-width: 767px) {
 	.kbroo-bg-video:not(.kbroo-bg-video--mobile) {

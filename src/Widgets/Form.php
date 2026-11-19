@@ -297,7 +297,7 @@ class Form extends Widget {
 					'type'        => 'switcher',
 					'label'       => __( 'Keep a copy of each message', 'kbroo-studio' ),
 					'default'     => 'yes',
-					'description' => __( 'Listed under Tools > Form messages, so nothing is lost if an email does not arrive.', 'kbroo-studio' ),
+					'description' => __( 'Listed under Kbroo Studio > Form messages, so nothing is lost if an email does not arrive.', 'kbroo-studio' ),
 				),
 				'redirect_to'      => $after + array(
 					'type'  => 'url',
