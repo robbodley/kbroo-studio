@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -45,6 +45,12 @@ In the editor:
 
 ![A converted Elementor form showing a field error](docs/screenshots/form-errors.png)
 ![Saved form messages under Tools](docs/screenshots/form-messages.png)
+
+- **Icon box** and **Image box** put an icon or image above, left or right of a title and description, with an optional link. **Icon list** shows items with icons, stacked or in a row, with optional dividers and links.
+- **Video** plays YouTube, Vimeo or a file from the Media Library, with start and end times, autoplay, mute, loop and aspect ratio. With an **image overlay**, nothing loads from YouTube or Vimeo until the visitor presses play; YouTube uses its privacy-enhanced (no-cookie) address by default.
+- **Image gallery** (a grid) and **Image carousel** take several Media Library images at once. Images can open in a built-in **lightbox** with captions, previous/next and keyboard support.
+
+![Icon boxes, image box, icon lists, videos, gallery and carousel converted from Elementor](docs/screenshots/boxes-media-frontend.png)
 
 - Buttons and images have a **hover animation** (grow, float, sink, rotate...), and images have CSS filters (brightness, contrast, saturation, blur, hue), normal and on hover.
 - **Copy and paste**: right-click any element for Duplicate, Copy, Paste, Paste style and Delete, or use Ctrl+C / Ctrl+V (Ctrl+Shift+V pastes style only). Copied elements go on the system clipboard, so they paste into another page or another site running Kbroo Studio.

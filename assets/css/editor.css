@@ -1196,6 +1196,60 @@ span.kb-unit {
 	object-fit: contain;
 }
 
+.kb-media-file {
+	padding: 0 12px;
+	overflow-wrap: anywhere;
+	font-size: 12px;
+}
+
+.kb-gallery {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.kb-gallery-thumbs {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
+}
+
+.kb-gallery-thumb {
+	position: relative;
+	aspect-ratio: 1;
+	overflow: hidden;
+	border: 1px solid var(--kb-border);
+	border-radius: 4px;
+}
+
+.kb-gallery-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.kb-gallery-remove {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: rgba(15, 23, 42, 0.75);
+	color: #fff;
+	font-size: 14px;
+	line-height: 20px;
+	cursor: pointer;
+	opacity: 0;
+}
+
+.kb-gallery-thumb:hover .kb-gallery-remove,
+.kb-gallery-remove:focus-visible {
+	opacity: 1;
+}
+
 .kb-media-actions {
 	display: flex;
 	align-items: center;
@@ -1563,4 +1617,9 @@ span.kb-unit {
 	align-items: center;
 	gap: 8px;
 	font-weight: 400;
+}
+
+.kb-gallery .kb-media-actions .kb-control-note {
+	margin-left: auto;
+	white-space: nowrap;
 }

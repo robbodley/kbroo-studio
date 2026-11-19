@@ -1553,6 +1553,10 @@
 				input = renderMedia( control, id, value || {}, update );
 				break;
 
+			case 'gallery':
+				input = renderGallery( id, Array.isArray( value ) ? value : [], update );
+				break;
+
 			case 'url':
 				input = renderUrl( control, id, value || {}, update );
 				break;
@@ -1621,19 +1625,23 @@
 
 	/** Image from the Media Library, or any image address. */
 	function renderMedia( control, id, value, update ) {
+		var video = control.media_type === 'video';
+		var noun = video ? 'video' : 'image';
 		var preview = el( 'button', {
 			type: 'button',
 			class: 'kb-media-preview' + ( value.url ? '' : ' is-empty' ),
-			title: 'Choose image',
+			title: 'Choose ' + noun,
 			onclick: openLibrary,
 		} );
-		if ( value.url ) {
+		if ( value.url && video ) {
+			preview.appendChild( el( 'span', { class: 'kb-media-file', text: value.url.split( '/' ).pop() } ) );
+		} else if ( value.url ) {
 			preview.appendChild( el( 'img', { src: value.url, alt: '' } ) );
 		} else {
-			preview.appendChild( el( 'span', { text: 'Choose image' } ) );
+			preview.appendChild( el( 'span', { text: 'Choose ' + noun } ) );
 		}
 
-		var address = el( 'input', { type: 'url', id: id, placeholder: 'or paste an image address' } );
+		var address = el( 'input', { type: 'url', id: id, placeholder: 'or paste ' + ( video ? 'a video' : 'an image' ) + ' address' } );
 		address.value = value.id ? '' : value.url || '';
 		address.addEventListener( 'change', function () {
 			update( { url: address.value.trim(), id: '' }, false );
@@ -1644,7 +1652,7 @@
 				toast( 'The Media Library is not available here. Paste an image address instead.', true );
 				return;
 			}
-			var frame = wp.media( { title: 'Choose image', library: { type: 'image' }, multiple: false, button: { text: 'Use this image' } } );
+			var frame = wp.media( { title: 'Choose ' + noun, library: { type: noun }, multiple: false, button: { text: 'Use this ' + noun } } );
 			frame.on( 'open', function () {
 				if ( value.id ) {
 					var attachment = wp.media.attachment( value.id );
@@ -1663,7 +1671,7 @@
 		return el( 'div', { class: 'kb-media' }, [
 			preview,
 			el( 'div', { class: 'kb-media-actions' }, [
-				el( 'button', { type: 'button', class: 'kb-btn kb-btn-secondary', text: value.url ? 'Replace' : 'Choose image', onclick: openLibrary } ),
+				el( 'button', { type: 'button', class: 'kb-btn kb-btn-secondary', text: value.url ? 'Replace' : 'Choose ' + noun, onclick: openLibrary } ),
 				value.url
 					? el( 'button', {
 							type: 'button',
@@ -1676,6 +1684,79 @@
 					: null,
 			] ),
 			address,
+		] );
+	}
+
+	/** Gallery: several Media Library images, in order. */
+	function renderGallery( id, value, update ) {
+		function openLibrary() {
+			if ( ! window.wp || ! wp.media ) {
+				toast( 'The Media Library is not available here.', true );
+				return;
+			}
+			var frame = wp.media( {
+				title: 'Choose images',
+				library: { type: 'image' },
+				multiple: 'add',
+				button: { text: 'Use these images' },
+			} );
+			frame.on( 'open', function () {
+				var selection = frame.state().get( 'selection' );
+				value.forEach( function ( image ) {
+					if ( image.id ) {
+						var attachment = wp.media.attachment( image.id );
+						attachment.fetch();
+						selection.add( attachment );
+					}
+				} );
+			} );
+			frame.on( 'select', function () {
+				var picked = frame.state().get( 'selection' ).toJSON().map( function ( image ) {
+					window.KbrooStudio.captions[ image.id ] = image.caption || '';
+					return { id: image.id, url: image.url };
+				} );
+				update( picked, false );
+			} );
+			frame.open();
+		}
+
+		var thumbs = el( 'div', { class: 'kb-gallery-thumbs' } );
+		value.forEach( function ( image, i ) {
+			thumbs.appendChild(
+				el( 'div', { class: 'kb-gallery-thumb' }, [
+					el( 'img', { src: image.url, alt: '' } ),
+					el( 'button', {
+						type: 'button',
+						class: 'kb-gallery-remove',
+						title: 'Remove',
+						'aria-label': 'Remove image ' + ( i + 1 ),
+						text: '×',
+						onclick: function () {
+							update( value.filter( function ( other, j ) {
+								return j !== i;
+							} ), false );
+						},
+					} ),
+				] )
+			);
+		} );
+
+		return el( 'div', { class: 'kb-gallery', id: id }, [
+			value.length ? thumbs : el( 'p', { class: 'kb-control-note', text: 'No images yet.' } ),
+			el( 'div', { class: 'kb-media-actions' }, [
+				el( 'button', { type: 'button', class: 'kb-btn kb-btn-secondary', text: value.length ? 'Add or change images' : 'Choose images', onclick: openLibrary } ),
+				value.length
+					? el( 'button', {
+							type: 'button',
+							class: 'kb-link',
+							text: 'Clear',
+							onclick: function () {
+								update( [], false );
+							},
+					  } )
+					: null,
+				value.length ? el( 'span', { class: 'kb-control-note', text: value.length + ( value.length === 1 ? ' image' : ' images' ) } ) : null,
+			] ),
 		] );
 	}
 

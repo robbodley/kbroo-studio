@@ -5,6 +5,11 @@
  *   (see frontend.css) until they scroll into view, then play once.
  * - Carousels (.kbroo-carousel): arrows, dots or a counter, autoplay and
  *   looping on top of a scroll-snap strip that works without this script.
+ * - Forms (.kbroo-form): send without reloading and show field errors.
+ * - Lightbox: links with data-kbroo-lightbox="<group>" open their image in
+ *   a full-screen dialog, with previous/next through the group.
+ * - Videos: an image overlay (.kbroo-video__overlay) is swapped for the
+ *   player on click, so nothing loads from YouTube or Vimeo before then.
  *
  * The editor calls KbrooStudio.initCarousels( canvas, { autoplay: false } )
  * after drawing the canvas.
@@ -308,6 +313,134 @@
 		} );
 	}
 
+	/* Lightbox ----------------------------------------------------------- */
+
+	var lightbox = null;
+
+	function icon( path ) {
+		return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+	}
+
+	function openLightbox( link ) {
+		var group = link.getAttribute( 'data-kbroo-lightbox' );
+		var links = Array.prototype.filter.call( document.querySelectorAll( 'a[data-kbroo-lightbox]' ), function ( other ) {
+			return other.getAttribute( 'data-kbroo-lightbox' ) === group;
+		} );
+		var index = Math.max( 0, links.indexOf( link ) );
+
+		if ( ! lightbox ) {
+			lightbox = document.createElement( 'dialog' );
+			lightbox.className = 'kbroo-lightbox';
+			lightbox.setAttribute( 'aria-label', 'Image viewer' );
+			lightbox.innerHTML =
+				'<figure class="kbroo-lightbox__figure"><img class="kbroo-lightbox__image" alt="" /><figcaption class="kbroo-lightbox__caption"></figcaption></figure>' +
+				'<span class="kbroo-lightbox__counter" aria-live="polite"></span>' +
+				'<button type="button" class="kbroo-lightbox__button kbroo-lightbox__prev" aria-label="Previous image">' + icon( 'M15 5l-7 7 7 7' ) + '</button>' +
+				'<button type="button" class="kbroo-lightbox__button kbroo-lightbox__next" aria-label="Next image">' + icon( 'M9 5l7 7-7 7' ) + '</button>' +
+				'<button type="button" class="kbroo-lightbox__button kbroo-lightbox__close" aria-label="Close">' + icon( 'M6 6l12 12M18 6L6 18' ) + '</button>';
+			document.body.appendChild( lightbox );
+			lightbox.querySelector( '.kbroo-lightbox__close' ).addEventListener( 'click', function () {
+				lightbox.close();
+			} );
+			lightbox.addEventListener( 'click', function ( e ) {
+				if ( e.target === lightbox || e.target.classList.contains( 'kbroo-lightbox__figure' ) ) {
+					lightbox.close();
+				}
+			} );
+			lightbox.addEventListener( 'keydown', function ( e ) {
+				if ( e.key === 'ArrowRight' || e.key === 'ArrowLeft' ) {
+					e.preventDefault();
+					lightbox.kbrooStep( e.key === 'ArrowRight' ? 1 : -1 );
+				}
+			} );
+			lightbox.querySelector( '.kbroo-lightbox__prev' ).addEventListener( 'click', function () {
+				lightbox.kbrooStep( -1 );
+			} );
+			lightbox.querySelector( '.kbroo-lightbox__next' ).addEventListener( 'click', function () {
+				lightbox.kbrooStep( 1 );
+			} );
+			lightbox.addEventListener( 'close', function () {
+				if ( lightbox.kbrooOpener ) {
+					lightbox.kbrooOpener.focus();
+				}
+			} );
+		}
+
+		function show() {
+			var current = links[ index ];
+			var image = lightbox.querySelector( '.kbroo-lightbox__image' );
+			var inner = current.querySelector( 'img' );
+			image.src = current.href;
+			image.alt = inner ? inner.alt : '';
+			lightbox.querySelector( '.kbroo-lightbox__caption' ).textContent = current.getAttribute( 'data-kbroo-caption' ) || '';
+			lightbox.querySelector( '.kbroo-lightbox__counter' ).textContent = links.length > 1 ? index + 1 + ' / ' + links.length : '';
+			lightbox.querySelector( '.kbroo-lightbox__prev' ).hidden = links.length < 2;
+			lightbox.querySelector( '.kbroo-lightbox__next' ).hidden = links.length < 2;
+		}
+
+		lightbox.kbrooStep = function ( direction ) {
+			index = ( index + direction + links.length ) % links.length;
+			show();
+		};
+		lightbox.kbrooOpener = link;
+		show();
+		if ( typeof lightbox.showModal === 'function' ) {
+			lightbox.showModal();
+		} else {
+			lightbox.setAttribute( 'open', '' );
+		}
+		lightbox.querySelector( '.kbroo-lightbox__close' ).focus();
+	}
+
+	/* Videos ------------------------------------------------------------- */
+
+	function playVideo( overlay ) {
+		var wrapper = document.createElement( 'div' );
+		wrapper.innerHTML = overlay.getAttribute( 'data-kbroo-video' );
+		var player = wrapper.firstElementChild;
+		if ( ! player ) {
+			return;
+		}
+		overlay.parentNode.replaceChild( player, overlay );
+		if ( player.tagName === 'VIDEO' ) {
+			player.play().catch( function () {} );
+		}
+		player.focus();
+	}
+
+	/** Phones: no autoplay where the widget says so (play_on_mobile off). */
+	function stopMobileAutoplay() {
+		if ( ! window.matchMedia || ! window.matchMedia( '(max-width: 767px)' ).matches ) {
+			return;
+		}
+		Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-video--no-mobile-autoplay .kbroo-video__player' ), function ( player ) {
+			if ( player.tagName === 'VIDEO' ) {
+				player.autoplay = false;
+				player.pause();
+			} else if ( /[?&]autoplay=1/.test( player.src ) ) {
+				player.src = player.src.replace( /([?&]autoplay=)1/, '$10' );
+			}
+		} );
+	}
+
+	function initClicks() {
+		document.addEventListener( 'click', function ( e ) {
+			if ( e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
+				return;
+			}
+			var link = e.target.closest && e.target.closest( 'a[data-kbroo-lightbox]' );
+			if ( link ) {
+				e.preventDefault();
+				openLightbox( link );
+				return;
+			}
+			var overlay = e.target.closest && e.target.closest( '.kbroo-video__overlay' );
+			if ( overlay ) {
+				playVideo( overlay );
+			}
+		} );
+	}
+
 	window.KbrooStudio = window.KbrooStudio || {};
 	window.KbrooStudio.initCarousels = initCarousels;
 
@@ -315,6 +448,8 @@
 		initAnimations();
 		if ( ! window.KbrooStudio.editor ) {
 			initCarousels( document );
+			initClicks();
+			stopMobileAutoplay();
 		}
 		Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-form' ), initForm );
 	}

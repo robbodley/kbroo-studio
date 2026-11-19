@@ -20,6 +20,8 @@
  *               may use {{CURRENT_ITEM}}, the item's .kbroo-repeater-item-<id>.
  *               multiselect: a list of option keys (Elementor's select2 with
  *               multiple), shown as checkboxes.
+ *               gallery: a list of { id, url } images (Elementor's shape).
+ *   media_type  media: 'image' (default) or 'video', for the Media Library.
  *   fields      repeater: control definitions for each item.
  *   title_field repeater: field shown as each item's name in the panel.
  *   label       Shown in the panel.
@@ -112,6 +114,7 @@ final class Controls {
 				);
 			case 'repeater':
 			case 'multiselect':
+			case 'gallery':
 				return array();
 			default:
 				return '';
@@ -312,6 +315,27 @@ final class Controls {
 			);
 		}
 
+		if ( 'gallery' === $type ) {
+			if ( ! is_array( $value ) ) {
+				return $default;
+			}
+			$clean = array();
+			foreach ( array_slice( array_values( $value ), 0, self::MAX_GALLERY ) as $item ) {
+				if ( ! is_array( $item ) ) {
+					continue;
+				}
+				$id  = absint( $item['id'] ?? 0 );
+				$url = self::sanitize_url( $item['url'] ?? '', array( 'http', 'https' ) );
+				if ( $id || '' !== $url ) {
+					$clean[] = array(
+						'id'  => $id ? $id : '',
+						'url' => $url,
+					);
+				}
+			}
+			return $clean;
+		}
+
 		if ( 'url' === $type ) {
 			if ( ! is_array( $value ) ) {
 				return $default;
@@ -402,6 +426,9 @@ final class Controls {
 
 	/** Most items a repeater keeps. */
 	const MAX_ITEMS = 100;
+
+	/** Most images a gallery control keeps. */
+	const MAX_GALLERY = 200;
 
 	/**
 	 * Repeater items, each sanitized against the control's fields, with a
