@@ -29,6 +29,12 @@ final class Registry {
 		return $this->widgets;
 	}
 
+	public function flush_controls(): void {
+		foreach ( $this->widgets as $widget ) {
+			$widget->flush_controls();
+		}
+	}
+
 	public function register_core_widgets(): void {
 		$this->register( new Heading() );
 		$this->register( new TextEditor() );
@@ -39,6 +45,7 @@ final class Registry {
 		$this->register( new Html() );
 		$this->register( new Shortcode() );
 		$this->register( new MenuAnchor() );
+		$this->register( new ElementorFallback() );
 
 		/**
 		 * Register additional widgets.

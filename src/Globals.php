@@ -131,7 +131,7 @@ final class Globals {
 					'title' => mb_substr( sanitize_text_field( (string) ( $item['title'] ?? '' ) ), 0, 60 ),
 				);
 				if ( 'colors' === $kind ) {
-					$entry['color'] = (string) sanitize_hex_color( (string) ( $item['color'] ?? '' ) );
+					$entry['color'] = Controls::sanitize_color( $item['color'] ?? '' );
 				} else {
 					$entry += Controls::sanitize( $controls, $item );
 				}

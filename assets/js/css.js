@@ -56,7 +56,7 @@
 	function replacements( control, value ) {
 		switch ( control.type ) {
 			case 'color':
-				return /^#([0-9a-f]{3}){1,2}$/i.test( value || '' ) ? { '{{VALUE}}': value } : null;
+				return /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test( value || '' ) ? { '{{VALUE}}': value } : null;
 
 			case 'select':
 				if ( typeof value !== 'string' || value === '' || ! control.options || ! ( value in control.options ) ) {
@@ -164,7 +164,7 @@
 	function globalsRules( globals, typographyControls ) {
 		var rules = { desktop: [], tablet: [], mobile: [] };
 		( globals.colors || [] ).forEach( function ( c ) {
-			if ( /^#([0-9a-f]{3}){1,2}$/i.test( c.color || '' ) ) {
+			if ( /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test( c.color || '' ) ) {
 				rules.desktop.push( ':root{' + variable( 'colors', c._id ) + ':' + c.color + ';}' );
 			}
 		} );

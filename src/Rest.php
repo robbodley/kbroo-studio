@@ -213,6 +213,7 @@ final class Rest {
 		$layout = Layout::sanitize( $request->get_param( 'layout' ), $this->widgets );
 		$status = $request->get_param( 'status' );
 
+		Elementor\Migration::backup_content( $post );
 		Document::save_layout( $post->ID, $layout );
 
 		// Keep a plain HTML copy in post_content, so the content still shows

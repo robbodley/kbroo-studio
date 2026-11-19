@@ -838,6 +838,21 @@
 
 		resetHistory();
 		renderAll();
+
+		if ( config.conversion ) {
+			// Converted from Elementor on opening: nothing is saved until Save.
+			state.dirty = true;
+			renderTopbar();
+			toast(
+				'Converted from Elementor. ' +
+					( config.conversion.fallbacks
+						? config.conversion.fallbacks + ' part(s) could not be converted yet and show as they were. '
+						: 'Everything converted. ' ) +
+					'Save to switch this page to Kbroo Studio.',
+				false,
+				9000
+			);
+		}
 	}
 
 	function renderAll() {
@@ -846,13 +861,13 @@
 		renderCanvas();
 	}
 
-	function toast( message, isError ) {
+	function toast( message, isError, duration ) {
 		ui.toast.textContent = message;
 		ui.toast.className = 'kb-toast is-visible' + ( isError ? ' is-error' : '' );
 		clearTimeout( toast.timer );
 		toast.timer = setTimeout( function () {
 			ui.toast.className = 'kb-toast';
-		}, isError ? 6000 : 2500 );
+		}, duration || ( isError ? 6000 : 2500 ) );
 	}
 
 	/* ------------------------------------------------------------------ *
@@ -1080,6 +1095,9 @@
 		var grid = el( 'div', { class: 'kb-widget-grid' } );
 		Object.keys( config.widgets ).forEach( function ( type ) {
 			var widget = config.widgets[ type ];
+			if ( widget.panel === false ) {
+				return;
+			}
 			grid.appendChild(
 				el(
 					'button',
@@ -1149,7 +1167,7 @@
 
 		var tabsPresent = Object.keys( TABS ).filter( function ( tab ) {
 			return Object.keys( controls ).some( function ( key ) {
-				return controls[ key ].tab === tab;
+				return controls[ key ].tab === tab && ! controls[ key ].hidden;
 			} );
 		} );
 		if ( tabsPresent.indexOf( state.tab ) === -1 ) {
@@ -1175,10 +1193,14 @@
 		} );
 
 		var body = el( 'div', { class: 'kb-panel-body' } );
+		var notice = node.elType === 'widget' && config.widgets[ node.widgetType ].notice;
+		if ( notice && state.tab === tabsPresent[ 0 ] ) {
+			body.appendChild( el( 'p', { class: 'kb-panel-notice', text: notice } ) );
+		}
 		var currentSection = null;
 		Object.keys( controls ).forEach( function ( key ) {
 			var control = controls[ key ];
-			if ( control.tab !== state.tab || ! Css.conditionMet( control, node.settings ) ) {
+			if ( control.hidden || control.tab !== state.tab || ! Css.conditionMet( control, node.settings ) ) {
 				return;
 			}
 			if ( control.section && control.section !== currentSection ) {
@@ -1386,7 +1408,7 @@
 
 		switch ( control.type ) {
 			case 'textarea':
-				input = el( 'textarea', { id: id, rows: 6 } );
+				input = el( 'textarea', { id: id, rows: control.rows || 6 } );
 				input.value = value;
 				input.addEventListener( 'input', function () {
 					update( input.value, true );
@@ -1457,7 +1479,7 @@
 					] );
 				} else {
 					var picker = el( 'input', { type: 'color', id: id } );
-					picker.value = /^#[0-9a-f]{6}$/i.test( value || '' ) ? value : '#000000';
+					picker.value = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test( value || '' ) ? value.slice( 0, 7 ) : '#000000';
 					var clear = el( 'button', { type: 'button', class: 'kb-link', text: value ? 'Clear' : 'Default' } );
 					picker.addEventListener( 'input', function () {
 						clear.textContent = 'Clear';
@@ -1820,7 +1842,7 @@
 				globalsChanged( false );
 			} );
 			var picker = el( 'input', { type: 'color', 'aria-label': ( color.title || color._id ) + ' colour', disabled: ! editable, 'data-global-color': color._id } );
-			picker.value = /^#[0-9a-f]{6}$/i.test( color.color || '' ) ? color.color : '#000000';
+			picker.value = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test( color.color || '' ) ? color.color.slice( 0, 7 ) : '#000000';
 			picker.addEventListener( 'input', function () {
 				color.color = picker.value;
 				globalsChanged( false );

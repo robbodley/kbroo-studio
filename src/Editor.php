@@ -82,7 +82,21 @@ final class Editor {
 	}
 
 	private function editor_config( WP_Post $post, $type ): array {
+		// An Elementor page opened before it was converted: start from a
+		// conversion (saved only when the user saves).
+		$layout     = Document::get_layout( $post );
+		$conversion = null;
+		if ( ! Document::is_built_with_kbroo( $post ) && ! $layout['elements'] && Elementor\Migration::is_elementor( $post ) ) {
+			$result     = ( new Elementor\Converter( $this->widgets ) )->convert( Elementor\Converter::post_data( $post->ID ), $post->ID );
+			$layout     = $result['layout'];
+			$conversion = array(
+				'fallbacks' => count( $result['report']['fallbacks'] ),
+				'toolsUrl'  => admin_url( 'tools.php?page=' . Elementor\Migration::PAGE ),
+			);
+		}
+
 		return array(
+			'conversion'     => $conversion,
 			'postId'         => $post->ID,
 			'title'          => get_the_title( $post ),
 			'status'         => $post->post_status,
@@ -93,7 +107,7 @@ final class Editor {
 			'wpEditUrl'      => get_edit_post_link( $post, 'raw' ),
 			'restUrl'        => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID ) ),
 			'nonce'          => wp_create_nonce( 'wp_rest' ),
-			'layout'         => Document::get_layout( $post ),
+			'layout'         => $layout,
 			'widgets'        => $this->widgets->to_editor_config(),
 			'sectionControls' => Controls::for_editor( Layout::section_controls() ),
 			'containerControls' => Controls::for_editor( Layout::container_controls() ),

@@ -222,6 +222,15 @@
 	scroll-margin-top: var(--kbroo-anchor-offset, 0px);
 }
 
+/* Elementor widgets not converted yet (see ElementorFallback). */
+.kbroo-fallback--missing {
+	padding: 12px 16px;
+	border: 1px dashed #d97706;
+	background: #fffbeb;
+	color: #92400e;
+	font: 14px/1.4 system-ui, sans-serif;
+}
+
 /* Hide per device. Not applied inside the editor, which shows these faded. */
 @media (min-width: 1025px) {
 	.kbroo-page:not(.kb-canvas) .kbroo-hidden-desktop {

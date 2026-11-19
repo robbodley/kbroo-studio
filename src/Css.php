@@ -105,8 +105,8 @@ final class Css {
 	public static function replacements( array $control, $value ): ?array {
 		switch ( $control['type'] ?? 'text' ) {
 			case 'color':
-				$hex = is_string( $value ) ? sanitize_hex_color( $value ) : null;
-				return $hex ? array( '{{VALUE}}' => $hex ) : null;
+				$hex = Controls::sanitize_color( $value );
+				return '' !== $hex ? array( '{{VALUE}}' => $hex ) : null;
 
 			case 'select':
 				if ( ! is_string( $value ) || '' === $value || ! array_key_exists( $value, $control['options'] ?? array() ) ) {

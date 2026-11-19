@@ -317,8 +317,8 @@ final class Controls {
 				if ( '' === $value ) {
 					return '';
 				}
-				$hex = sanitize_hex_color( $value );
-				return $hex ? $hex : $default;
+				$hex = self::sanitize_color( $value );
+				return '' !== $hex ? $hex : $default;
 
 			case 'number':
 				if ( '' === $value && 'desktop' !== $device ) {
@@ -350,6 +350,37 @@ final class Controls {
 				}
 				return $value;
 		}
+	}
+
+	/**
+	 * A colour as hex: #rgb, #rgba, #rrggbb or #rrggbbaa. rgb() and rgba()
+	 * values (common in Elementor data) become #rrggbbaa. Anything else is ''.
+	 *
+	 * @param mixed $value Raw value.
+	 */
+	public static function sanitize_color( $value ): string {
+		if ( ! is_string( $value ) ) {
+			return '';
+		}
+		$value = strtolower( trim( $value ) );
+		if ( preg_match( '/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/', $value ) ) {
+			return $value;
+		}
+		if ( preg_match( '/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([0-9.]+%?)\s*)?\)$/', $value, $m ) ) {
+			$hex = '#';
+			for ( $i = 1; $i <= 3; $i++ ) {
+				$hex .= sprintf( '%02x', min( 255, (int) $m[ $i ] ) );
+			}
+			if ( isset( $m[4] ) && '' !== $m[4] ) {
+				$alpha = '%' === substr( $m[4], -1 ) ? (float) $m[4] / 100 : (float) $m[4];
+				$alpha = max( 0, min( 1, $alpha ) );
+				if ( $alpha < 1 ) {
+					$hex .= sprintf( '%02x', (int) round( $alpha * 255 ) );
+				}
+			}
+			return $hex;
+		}
+		return '';
 	}
 
 	/**
