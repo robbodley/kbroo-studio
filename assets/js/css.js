@@ -113,6 +113,35 @@
 		return url.replace( /[^a-z0-9\-~+_.?#=!&;,\/:%@$|*'()\[\]\u0080-\uffff]/gi, '' );
 	}
 
+	/** Twin of Css::repeater_rules(). */
+	function repeaterRules( control, items, wrapper ) {
+		var rules = { desktop: [], tablet: [], mobile: [] };
+		var fields = control.fields || {};
+		var styled = Object.keys( fields ).some( function ( k ) {
+			return !! fields[ k ].selectors;
+		} );
+		if ( ! Array.isArray( items ) || ! styled ) {
+			return rules;
+		}
+		items.forEach( function ( item ) {
+			var defaults = {};
+			Object.keys( fields ).forEach( function ( k ) {
+				var deviceKeys = keys( k, fields[ k ] );
+				Object.keys( deviceKeys ).forEach( function ( d ) {
+					defaults[ deviceKeys[ d ] ] = d === 'desktop' ? fields[ k ].default : fields[ k ][ 'default_' + d ];
+				} );
+			} );
+			var cls = '.kbroo-repeater-item-' + String( ( item && item._id ) || '' ).replace( /[^A-Za-z0-9]/g, '' );
+			var r = elementRules( fields, Object.assign( defaults, item ), wrapper );
+			DEVICES.forEach( function ( d ) {
+				r[ d ].forEach( function ( rule ) {
+					rules[ d ].push( rule.split( '{{CURRENT_ITEM}}' ).join( cls ) );
+				} );
+			} );
+		} );
+		return rules;
+	}
+
 	/** Twin of Css::device_value(). */
 	function deviceValue( control, settings, key, device ) {
 		var list = DEVICES.slice( 0, DEVICES.indexOf( device ) + 1 ).reverse();
@@ -275,6 +304,13 @@
 		var rules = { desktop: [], tablet: [], mobile: [] };
 		Object.keys( controls ).forEach( function ( key ) {
 			var control = controls[ key ];
+			if ( control.type === 'repeater' ) {
+				var r = repeaterRules( control, settings[ key ], wrapper );
+				DEVICES.forEach( function ( d ) {
+					rules[ d ] = rules[ d ].concat( r[ d ] );
+				} );
+				return;
+			}
 			if ( ! control.selectors ) {
 				return;
 			}

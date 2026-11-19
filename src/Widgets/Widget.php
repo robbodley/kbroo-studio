@@ -42,6 +42,21 @@ abstract class Widget {
 	 * Forget the built controls, so options that changed (fonts added by
 	 * the Elementor converter) are picked up.
 	 */
+	/** @var string Id of the element being rendered ('' in editor previews). */
+	protected $element_id = '';
+
+	/** @var int Post whose layout is being rendered. */
+	protected $post_id = 0;
+
+	/**
+	 * Which element and post the next render() is for. Set by Renderer;
+	 * widgets that post back to the server (forms) need it.
+	 */
+	public function set_context( string $element_id, int $post_id ): void {
+		$this->element_id = $element_id;
+		$this->post_id    = $post_id;
+	}
+
 	public function flush_controls(): void {
 		$this->controls = null;
 	}

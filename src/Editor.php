@@ -70,7 +70,8 @@ final class Editor {
 
 		wp_enqueue_script( 'kbroo-widgets', KBROO_STUDIO_URL . 'assets/js/widgets.js', array(), KBROO_STUDIO_VERSION, true );
 		wp_enqueue_script( 'kbroo-css', KBROO_STUDIO_URL . 'assets/js/css.js', array(), KBROO_STUDIO_VERSION, true );
-		wp_enqueue_script( 'kbroo-editor', KBROO_STUDIO_URL . 'assets/js/editor.js', array( 'kbroo-widgets', 'kbroo-css' ), KBROO_STUDIO_VERSION, true );
+		wp_enqueue_script( 'kbroo-frontend', KBROO_STUDIO_URL . 'assets/js/frontend.js', array(), KBROO_STUDIO_VERSION, true );
+		wp_enqueue_script( 'kbroo-editor', KBROO_STUDIO_URL . 'assets/js/editor.js', array( 'kbroo-widgets', 'kbroo-css', 'kbroo-frontend' ), KBROO_STUDIO_VERSION, true );
 
 		$type = get_post_type_object( $post->post_type );
 
@@ -120,6 +121,7 @@ final class Editor {
 			'globalTypographyControls' => Controls::for_editor( Globals::typography_controls() ),
 			'systemGlobalIds' => Globals::SYSTEM_IDS,
 			'fonts'          => Fonts::all(),
+			'iconsUrl'         => esc_url_raw( add_query_arg( 'v', KBROO_STUDIO_VERSION, rest_url( Rest::NAMESPACE . '/icons' ) ) ),
 			'widgetPreviewUrl' => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/widget-preview' ) ),
 			'canUnfilteredHtml' => current_user_can( 'unfiltered_html' ),
 			'revisionsUrl'   => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/revisions' ) ),

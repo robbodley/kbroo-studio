@@ -22,6 +22,9 @@ final class Renderer {
 	/** @var array<string,string[]> CSS rules collected while rendering, by device. */
 	private $rules = array();
 
+	/** @var int Post being rendered. */
+	private $post_id = 0;
+
 	/** @var bool Whether any element has an entrance animation. */
 	private $animated = false;
 
@@ -32,6 +35,7 @@ final class Renderer {
 	public function render( array $layout, int $post_id = 0 ): string {
 		$this->rules    = array_fill_keys( Controls::DEVICES, array() );
 		$this->animated = false;
+		$this->post_id  = $post_id;
 
 		$html = $this->render_children( (array) ( $layout['elements'] ?? array() ) );
 
@@ -291,6 +295,7 @@ final class Renderer {
 			return '';
 		}
 		$settings = $this->prepare( $widget, $instance->get_controls() );
+		$instance->set_context( $this->element_id( $widget ), $this->post_id );
 
 		return sprintf(
 			'<div%1$s>%2$s</div>',
