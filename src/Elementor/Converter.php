@@ -304,6 +304,12 @@ final class Converter {
 		if ( $widget && 'elementor-fallback' !== $type ) {
 			$settings = $this->common( $settings );
 			$settings = $this->legacy_icons( $type, $settings );
+			if ( 'posts' === $type ) {
+				$settings = $this->posts( $settings );
+			}
+			if ( 'form' === $type ) {
+				$settings = $this->form( $settings );
+			}
 			if ( 'divider' === $type && 'line_icon' === ( $settings['look'] ?? '' ) ) {
 				$settings['look'] = 'line';
 				$this->drop( 'divider icon' );
@@ -346,6 +352,75 @@ final class Converter {
 				'snapshot'       => ElementorFallback::render_with_elementor( $json, $this->source_post ),
 			),
 		);
+	}
+
+	/**
+	 * Elementor's posts widget prefixes most settings with its skin
+	 * (classic_columns, cards_meta_data); Kbroo Studio's does not.
+	 */
+	private function posts( array $settings ): array {
+		$skin  = in_array( $settings['_skin'] ?? '', array( 'classic', 'cards' ), true ) ? $settings['_skin'] : 'classic';
+		$clean = array( '_skin' => $skin );
+		foreach ( $settings as $key => $value ) {
+			if ( preg_match( '/^(classic|cards|full_content)_(.+)$/', $key, $m ) ) {
+				if ( $m[1] === $skin ) {
+					$clean[ $m[2] ] = $value;
+				}
+				continue; // Another skin's settings were never shown.
+			}
+			$clean[ $key ] = $value;
+		}
+		// Elementor's defaults where they differ from Kbroo Studio's.
+		$clean += array(
+			'meta_data'      => array( 'date', 'comments' ),
+			'meta_separator' => 'cards' === $skin ? '•' : '///',
+		);
+		if ( 'cards' === $skin && isset( $clean['show_image'] ) ) {
+			$clean['thumbnail'] = 'yes' === $clean['show_image'] ? 'top' : 'none';
+		}
+		unset( $clean['show_image'] );
+		if ( ! in_array( 'terms', (array) ( $clean['posts_include'] ?? array() ), true ) ) {
+			unset( $clean['posts_include_term_ids'] );
+		}
+		if ( ! in_array( 'terms', (array) ( $clean['posts_exclude'] ?? array() ), true ) ) {
+			unset( $clean['posts_exclude_term_ids'] );
+		}
+		unset( $clean['posts_include'], $clean['posts_exclude'], $clean['text'], $clean['load_more_no_posts_custom_message'] );
+		$type = (string) ( $clean['pagination_type'] ?? '' );
+		if ( 0 === strpos( $type, 'load_more' ) ) {
+			$clean['pagination_type'] = 'numbers';
+			$this->drop( 'posts "load more" button (shown as page numbers)' );
+		}
+		foreach ( array( 'pagination_prev_label', 'pagination_next_label', 'read_more_text' ) as $key ) {
+			if ( isset( $clean[ $key ] ) && is_string( $clean[ $key ] ) ) {
+				$clean[ $key ] = html_entity_decode( $clean[ $key ], ENT_QUOTES, 'UTF-8' );
+			}
+		}
+		return $clean;
+	}
+
+	/**
+	 * Elementor's form stores ticked boxes in fields as "true".
+	 */
+	private function form( array $settings ): array {
+		foreach ( (array) ( $settings['form_fields'] ?? array() ) as $i => $field ) {
+			if ( ! is_array( $field ) ) {
+				continue;
+			}
+			foreach ( array( 'required', 'allow_multiple', 'inline_list' ) as $key ) {
+				if ( isset( $field[ $key ] ) ) {
+					$field[ $key ] = in_array( $field[ $key ], array( 'true', 'yes', true ), true ) ? 'yes' : '';
+				}
+			}
+			unset( $field['inline_list'] );
+			$settings['form_fields'][ $i ] = $field + array( 'field_type' => 'text' );
+		}
+		$actions = $settings['submit_actions'] ?? array( 'email' );
+		if ( is_array( $actions ) && ! in_array( 'email', $actions, true ) ) {
+			$this->drop( 'form without an email action (Kbroo Studio emails every form)' );
+		}
+		unset( $settings['submit_actions'], $settings['email_content_2'], $settings['step_next_label'], $settings['step_previous_label'] );
+		return $settings;
 	}
 
 	/**

@@ -816,6 +816,10 @@
 		ui.panel = el( 'aside', { class: 'kb-panel', 'aria-label': 'Kbroo Studio panel' } );
 		ui.styles = el( 'style', { id: 'kb-canvas-css' } );
 		ui.canvas = el( 'div', { class: 'kbroo kbroo-page kb-canvas' } );
+		// Forms in the canvas are previews: never send them.
+		ui.canvas.addEventListener( 'submit', function ( e ) {
+			e.preventDefault();
+		} );
 		ui.canvasWrap = el( 'main', { class: 'kb-canvas-wrap' }, [ ui.canvas ] );
 		ui.toast = el( 'div', { class: 'kb-toast', role: 'status', 'aria-live': 'polite' } );
 
@@ -1559,6 +1563,26 @@
 
 			case 'repeater':
 				input = renderRepeater( node, key, control, id );
+				break;
+
+			case 'multiselect':
+				var picked = Array.isArray( value ) ? value.slice() : [];
+				var keys = Object.keys( control.options || {} );
+				input = el( 'div', { class: 'kb-multiselect', id: id, role: 'group' } );
+				if ( ! keys.length ) {
+					input.appendChild( el( 'p', { class: 'kb-control-note', text: 'Nothing to choose from yet.' } ) );
+				}
+				keys.forEach( function ( optionValue ) {
+					var box = el( 'input', { type: 'checkbox', value: optionValue } );
+					box.checked = picked.indexOf( optionValue ) > -1;
+					box.addEventListener( 'change', function () {
+						var next = keys.filter( function ( k ) {
+							return k === optionValue ? box.checked : picked.indexOf( k ) > -1;
+						} );
+						update( next, false );
+					} );
+					input.appendChild( el( 'label', { class: 'kb-check' }, [ box, el( 'span', { text: control.options[ optionValue ] } ) ] ) );
+				} );
 				break;
 
 			case 'slider':

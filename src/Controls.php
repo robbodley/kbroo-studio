@@ -18,6 +18,8 @@
  *               repeater: a list of items, each with its own settings from
  *               `fields` (control definitions) and an `_id`. Field selectors
  *               may use {{CURRENT_ITEM}}, the item's .kbroo-repeater-item-<id>.
+ *               multiselect: a list of option keys (Elementor's select2 with
+ *               multiple), shown as checkboxes.
  *   fields      repeater: control definitions for each item.
  *   title_field repeater: field shown as each item's name in the panel.
  *   label       Shown in the panel.
@@ -109,6 +111,7 @@ final class Controls {
 					'library' => '',
 				);
 			case 'repeater':
+			case 'multiselect':
 				return array();
 			default:
 				return '';
@@ -326,6 +329,15 @@ final class Controls {
 
 		if ( 'repeater' === $type ) {
 			return self::sanitize_repeater( $control, $value );
+		}
+
+		if ( 'multiselect' === $type ) {
+			if ( ! is_array( $value ) ) {
+				return $default;
+			}
+			$options = array_map( 'strval', array_keys( $control['options'] ?? array() ) );
+			$picked  = array_map( 'strval', array_filter( $value, 'is_scalar' ) );
+			return array_values( array_unique( array_intersect( $picked, $options ) ) );
 		}
 
 		if ( is_array( $value ) || is_object( $value ) ) {

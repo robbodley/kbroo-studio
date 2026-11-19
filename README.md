@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -40,6 +40,12 @@ In the editor:
 - Advanced has margin, padding, CSS ID and classes, **Motion effects** (an entrance animation such as fade in up, played once when the element scrolls into view, with a duration and delay), and hide on desktop / tablet / mobile. Hidden elements show faded in the editor. Animations are skipped for visitors who ask their system for reduced motion.
 - **Icons** come from Font Awesome Free (solid, regular and brands), bundled with the plugin as SVG: pages load only the icons they use, with no icon font or outside request. The icon picker searches by name and keyword.
 - Lists such as slides and social icons are edited item by item in the panel: add, open, reorder, duplicate or remove each one.
+- **Posts** shows a grid of posts (classic or cards), picked by post type, categories or tags to include or leave out, order and offset, with numbered and/or previous/next pages. The editor previews the real posts.
+- **Form** builds a contact form from fields (text, email, textarea, phone, number, URL, date, time, select, radio, checkboxes, acceptance, hidden). Each message is emailed (to the site admin address unless the form names another, with Reply-To set to the sender) and saved under Tools > **Form messages**. Spam protection is built in with no outside service: a hidden trap field, a minimum time before sending, and a limit of 5 messages per visitor in 10 minutes. Forms send without reloading the page and still work with JavaScript off. Developers can hook `kbroo_studio_form_submitted`.
+
+![A converted Elementor form showing a field error](docs/screenshots/form-errors.png)
+![Saved form messages under Tools](docs/screenshots/form-messages.png)
+
 - Buttons and images have a **hover animation** (grow, float, sink, rotate...), and images have CSS filters (brightness, contrast, saturation, blur, hue), normal and on hover.
 - **Copy and paste**: right-click any element for Duplicate, Copy, Paste, Paste style and Delete, or use Ctrl+C / Ctrl+V (Ctrl+Shift+V pastes style only). Copied elements go on the system clipboard, so they paste into another page or another site running Kbroo Studio.
 - **Navigator** (list icon in the top bar): the page as a tree. Click to select, drag to reorder (widgets between columns, columns between sections), double-click to rename.

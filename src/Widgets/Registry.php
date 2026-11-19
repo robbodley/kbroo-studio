@@ -48,6 +48,8 @@ final class Registry {
 		$this->register( new Icon() );
 		$this->register( new SocialIcons() );
 		$this->register( new TestimonialCarousel() );
+		$this->register( new Posts() );
+		$this->register( new Form() );
 		$this->register( new ElementorFallback() );
 
 		/**

@@ -217,6 +217,97 @@
 		} );
 	}
 
+	/* Forms -------------------------------------------------------------- */
+
+	function initForm( form ) {
+		if ( form.kbrooForm ) {
+			return;
+		}
+		form.kbrooForm = true;
+		var texts = {};
+		try {
+			texts = JSON.parse( form.getAttribute( 'data-kbroo-form' ) || '{}' );
+		} catch ( e ) {}
+		var message = form.querySelector( '.kbroo-form__message' );
+		var button = form.querySelector( '[type=submit]' );
+
+		function show( text, ok ) {
+			message.textContent = text || '';
+			message.classList.toggle( 'is-success', !! ok );
+			message.classList.toggle( 'is-error', ! ok );
+		}
+
+		function clearErrors() {
+			Array.prototype.forEach.call( form.querySelectorAll( '.kbroo-form__field.has-error' ), function ( field ) {
+				field.classList.remove( 'has-error' );
+				var error = field.querySelector( '.kbroo-form__error' );
+				error.hidden = true;
+				error.textContent = '';
+				Array.prototype.forEach.call( field.querySelectorAll( 'input, select, textarea' ), function ( input ) {
+					input.removeAttribute( 'aria-invalid' );
+				} );
+			} );
+		}
+
+		form.addEventListener( 'submit', function ( e ) {
+			if ( window.KbrooStudio.editor ) {
+				e.preventDefault(); // Never sent from the editor's preview.
+				return;
+			}
+			if ( ! window.fetch || ! window.FormData ) {
+				return; // Ordinary post and redirect.
+			}
+			e.preventDefault();
+			clearErrors();
+			var data = new FormData( form );
+			data.append( 'kbroo_ajax', '1' );
+			button.disabled = true;
+			form.classList.add( 'is-sending' );
+			// form.action would be the hidden input named "action".
+			fetch( form.getAttribute( 'action' ), { method: 'POST', body: data, credentials: 'same-origin' } )
+				.then( function ( response ) {
+					return response.json();
+				} )
+				.then( function ( result ) {
+					if ( result.success && result.redirect ) {
+						window.location.href = result.redirect;
+						return;
+					}
+					show( result.message, result.success );
+					if ( result.success ) {
+						form.reset();
+						return;
+					}
+					var first = null;
+					Object.keys( result.errors || {} ).forEach( function ( name ) {
+						var field = form.querySelector( '.kbroo-form__field[data-field="' + name.replace( /[^A-Za-z0-9_]/g, '' ) + '"]' );
+						if ( ! field ) {
+							return;
+						}
+						field.classList.add( 'has-error' );
+						var error = field.querySelector( '.kbroo-form__error' );
+						error.textContent = result.errors[ name ];
+						error.hidden = false;
+						var input = field.querySelector( 'input, select, textarea' );
+						if ( input ) {
+							input.setAttribute( 'aria-invalid', 'true' );
+							first = first || input;
+						}
+					} );
+					if ( first ) {
+						first.focus();
+					}
+				} )
+				.catch( function () {
+					show( texts.error, false );
+				} )
+				.then( function () {
+					button.disabled = false;
+					form.classList.remove( 'is-sending' );
+				} );
+		} );
+	}
+
 	window.KbrooStudio = window.KbrooStudio || {};
 	window.KbrooStudio.initCarousels = initCarousels;
 
@@ -225,6 +316,7 @@
 		if ( ! window.KbrooStudio.editor ) {
 			initCarousels( document );
 		}
+		Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-form' ), initForm );
 	}
 
 	if ( document.readyState === 'loading' ) {
