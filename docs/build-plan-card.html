@@ -1,0 +1,236 @@
+<title>Kbroo Studio Build Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one reading column; phases stack as sections, each feature a row with a 3-way choice on the right (stacks under on phones). */
+:root{
+  --bg:#f5f7f6; --surface:#ffffff; --fg:#17201d; --muted:#5b6964; --line:#dde4e1;
+  --accent:#2c6e5f; --accent-soft:#e1efeb;
+  --now:#2c6e5f; --now-soft:#dcefe9;
+  --later:#a36a12; --later-soft:#f6ead6;
+  --skip:#6b7470; --skip-soft:#eceeed;
+  --display:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --body:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#172019; --fg:#e6ece9; --muted:#97a6a0; --line:#2a3632;
+  --accent:#6cc2ad; --accent-soft:#1d3530;
+  --now:#6cc2ad; --now-soft:#1d3530; --later:#e0a94f; --later-soft:#3a2e19; --skip:#a3aca8; --skip-soft:#262d2a;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#172019; --fg:#e6ece9; --muted:#97a6a0; --line:#2a3632;
+  --accent:#6cc2ad; --accent-soft:#1d3530;
+  --now:#6cc2ad; --now-soft:#1d3530; --later:#e0a94f; --later-soft:#3a2e19; --skip:#a3aca8; --skip-soft:#262d2a;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:34px;line-height:1.1}
+h2{font-size:20px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.lede{color:var(--muted);max-width:62ch;margin:8px 0 0}
+header{display:flex;flex-direction:column;gap:6px}
+.summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;border:1px solid var(--line);background:var(--surface)}
+.chip b{font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%}
+.status{font-size:13px;color:var(--muted)}
+section.phase{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.phase-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.phase-head .num{font-family:var(--display);font-size:13px;font-weight:600;color:var(--accent)}
+.phase-head p{margin:0;color:var(--muted);font-size:14px;flex-basis:100%}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;padding:14px 18px;border-top:1px solid var(--line);align-items:start}
+.row:first-of-type{border-top:0}
+.row .name{font-weight:600}
+.row .desc{color:var(--muted);font-size:14px;margin:2px 0 0}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.hint strong{font-weight:600;color:var(--fg)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;align-self:start}
+.seg button{font:inherit;font-size:13px;font-weight:500;padding:6px 11px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button:hover{color:var(--fg)}
+.seg button:focus-visible,.note-toggle:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg button[aria-pressed="true"][data-v="now"]{background:var(--now-soft);color:var(--now)}
+.seg button[aria-pressed="true"][data-v="later"]{background:var(--later-soft);color:var(--later)}
+.seg button[aria-pressed="true"][data-v="skip"]{background:var(--skip-soft);color:var(--skip)}
+.seg button:disabled{cursor:default}
+.note-area{grid-column:1/-1;display:flex;flex-direction:column;gap:4px}
+.note-toggle{align-self:start;font:inherit;font-size:13px;color:var(--accent);background:none;border:0;padding:0;cursor:pointer}
+input.note,textarea{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+textarea{min-height:120px;resize:vertical}
+.general{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.general p{margin:0;color:var(--muted);font-size:14px}
+.saved{font-size:12px;color:var(--muted);min-height:1em}
+.ro{background:var(--later-soft);color:var(--fg);border-radius:8px;padding:10px 14px;font-size:14px}
+@media (max-width:620px){
+  h1{font-size:28px}
+  .row{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Kbroo Studio · WordPress visual page builder</div>
+    <h1>What we build first</h1>
+    <p class="lede">Every feature planned for Kbroo Studio, grouped into build phases. Mark each one <b>Need now</b>, <b>Later</b> or <b>Not needed</b>, and add a note wherever you want to explain. Claude reads your choices and uses them to set the scope of version 1.</p>
+    <div class="summary" id="summary"></div>
+    <div class="status" id="status">Connecting…</div>
+    <div class="ro" id="ro" hidden>Your choices can't be saved from this view. You can still read the plan.</div>
+  </header>
+  <div id="phases"></div>
+  <section class="general">
+    <h2>Anything else?</h2>
+    <p>Sites you'll move over first, widgets you use all the time in Elementor, things that annoy you about Elementor, or features missing from this list.</p>
+    <label for="general-notes" class="eyebrow">Your notes</label>
+    <textarea id="general-notes" placeholder="e.g. I use the Elementor slider on every homepage, and my client sites all use a sticky header…"></textarea>
+    <div class="saved" id="general-saved"></div>
+  </section>
+</div>
+
+<script>
+const PHASES=[
+ {n:"Phase 1",t:"Foundation",d:"The editor itself: building layouts, editing settings, previewing on every screen size.",items:[
+  ["layout","Sections, columns and containers","Flexible layout blocks you nest and arrange, like Elementor's flexbox containers.","now"],
+  ["dragdrop","Drag-and-drop editor with live preview","Edit the page as it really looks, dragging widgets from a side panel.","now"],
+  ["panel","Settings panel with Content, Style and Advanced tabs","Every element's text, colours, fonts, spacing, borders and backgrounds.","now"],
+  ["responsive","Desktop, tablet and mobile editing","Switch device view and set different sizes, spacing or visibility per device.","now"],
+  ["undo","Undo and redo","Step backwards and forwards through changes while editing.","now"],
+  ["navigator","Navigator (layer tree)","A list of every section and widget on the page for quick selecting and reordering.","later"],
+  ["copypaste","Copy, paste and duplicate","Copy an element or its style, including between pages.","now"],
+  ["revisions","Revision history","Go back to an earlier saved version of a page.","later"],
+  ["updates","Auto-updates from GitHub releases","Your sites pick up new versions from the WordPress Updates screen, like Cheri Gallery does.","now"]]},
+ {n:"Phase 2",t:"Core widgets and global styles",d:"The building blocks most pages are made from.",items:[
+  ["w-basic","Heading, text, image, button, spacer, divider","The essentials found on almost every page.","now"],
+  ["w-media","Video, image gallery, image carousel","YouTube or Vimeo embeds, grids of photos and sliders.","now"],
+  ["w-icons","Icon, icon list, icon box, image box","Feature lists and service boxes.","now"],
+  ["w-content","Tabs, accordion, testimonials, counters, progress bars","Interactive and content-heavy widgets.","later"],
+  ["w-misc","Google map, social icons, star rating","Contact page and footer extras.","later"],
+  ["w-html","HTML and shortcode widget","Drop in custom code or another plugin's shortcode.","now"],
+  ["globals","Global colours and fonts","Set the site's palette and type once and use it everywhere.","now"],
+  ["motion","Entrance animations and hover effects","Fade or slide elements in as you scroll; hover states for buttons and images.","later"],
+  ["bg","Background images, gradients, overlays and video backgrounds","Hero sections with photos behind text.","now"]]},
+ {n:"Phase 3",t:"Moving over from Elementor",d:"Convert existing sites without starting again.",items:[
+  ["import-pages","Convert Elementor pages","Rebuild each page from Elementor's saved data, keeping layout and styling.","now"],
+  ["import-templates","Import Elementor template files","Load any exported Elementor template (.json) straight into Kbroo Studio.","now"],
+  ["import-kit","Import Site Kit colours and fonts","Bring each site's global styles across.","now"],
+  ["fallback","Fallback blocks and a conversion report","Anything that can't be converted still displays, and you get a list of what to rebuild.","now"],
+  ["rollback","Run side by side and roll back","Convert page by page, preview, switch over, and undo if needed. Elementor data is never deleted.","now"]]},
+ {n:"Phase 4",t:"Templates",d:"Start pages from a template rather than a blank page.",items:[
+  ["tpl-library","Template library","Save any page or section as a template and insert it anywhere.","now"],
+  ["tpl-starter","Starter templates","Ready-made pages to start from: photography, small business, landing page, contact.","later"],
+  ["tpl-share","Share templates between your sites","Export from one site and import on another, or pull from a shared library.","later"]]},
+ {n:"Phase 5",t:"Pro features",d:"The bigger Elementor Pro features, added once the core is solid.",items:[
+  ["theme-builder","Header and footer builder","Design site-wide headers and footers, including sticky headers.","later"],
+  ["forms","Forms with email notifications","Contact and enquiry forms, spam protection and email alerts.","later"],
+  ["popups","Popups","Offers, newsletter sign-ups and announcements.","later"],
+  ["archives","Blog post and archive templates","Design how single posts and blog listings look.","later"],
+  ["dynamic","Dynamic content","Show the post title, featured image or custom fields inside widgets.","later"],
+  ["cheri","Cheri Gallery widgets","Drop client galleries, login and gallery lists onto pages.","later"],
+  ["woo","WooCommerce widgets","Product grids, cart and checkout styling.","skip"]]}
+];
+const LABEL={now:"Need now",later:"Later",skip:"Not needed"};
+const picks={}; // id -> {pick, note}
+let db=null, canWrite=true;
+const $=s=>document.querySelector(s);
+
+function render(){
+  const root=$("#phases"); root.textContent="";
+  for(const ph of PHASES){
+    const sec=document.createElement("section"); sec.className="phase";
+    sec.innerHTML=`<div class="phase-head"><span class="num"></span><h2></h2><p></p></div>`;
+    sec.querySelector(".num").textContent=ph.n;
+    sec.querySelector("h2").textContent=ph.t;
+    sec.querySelector("p").textContent=ph.d;
+    for(const [id,name,desc,sug] of ph.items){
+      const r=document.createElement("div"); r.className="row"; r.dataset.id=id;
+      r.innerHTML=`<div><div class="name"></div><p class="desc"></p><div class="hint">Claude suggests: <strong></strong></div></div>
+        <div class="seg" role="group"></div>
+        <div class="note-area"><button class="note-toggle" type="button"></button><input class="note" id="note-${id}" hidden placeholder="Add a note"></div>`;
+      r.querySelector(".name").textContent=name;
+      r.querySelector(".desc").textContent=desc;
+      r.querySelector(".hint strong").textContent=LABEL[sug];
+      const seg=r.querySelector(".seg"); seg.setAttribute("aria-label","Choice for "+name);
+      for(const v of ["now","later","skip"]){
+        const b=document.createElement("button"); b.type="button"; b.dataset.v=v; b.textContent=LABEL[v];
+        b.addEventListener("click",()=>choose(id,v)); seg.append(b);
+      }
+      const tog=r.querySelector(".note-toggle"), inp=r.querySelector("input.note");
+      tog.addEventListener("click",()=>{inp.hidden=!inp.hidden; if(!inp.hidden) inp.focus(); paintRow(id);});
+      inp.addEventListener("change",()=>saveNote(id,inp.value.trim()));
+      sec.append(r);
+    }
+    root.append(sec);
+  }
+  paintAll();
+}
+function paintRow(id){
+  const r=document.querySelector(`.row[data-id="${id}"]`); if(!r) return;
+  const p=picks[id]||{};
+  r.querySelectorAll(".seg button").forEach(b=>{b.setAttribute("aria-pressed",String(p.pick===b.dataset.v)); b.disabled=!canWrite;});
+  const inp=r.querySelector("input.note"), tog=r.querySelector(".note-toggle");
+  if(document.activeElement!==inp) inp.value=p.note||"";
+  if(p.note) inp.hidden=false;
+  inp.disabled=!canWrite;
+  tog.hidden=!!p.note || !canWrite && !p.note;
+  tog.textContent=inp.hidden?"Add a note":"Hide note";
+}
+function paintAll(){
+  for(const ph of PHASES) for(const it of ph.items) paintRow(it[0]);
+  const all=PHASES.flatMap(p=>p.items.map(i=>i[0]));
+  const c={now:0,later:0,skip:0,open:0};
+  for(const id of all){const v=picks[id]?.pick; if(v) c[v]++; else c.open++;}
+  const s=$("#summary"); s.textContent="";
+  for(const [k,lab,col] of [["now","Need now","var(--now)"],["later","Later","var(--later)"],["skip","Not needed","var(--skip)"],["open","Still to decide","var(--line)"]]){
+    const ch=document.createElement("span"); ch.className="chip";
+    ch.innerHTML=`<span class="dot"></span><b></b><span></span>`;
+    ch.querySelector(".dot").style.background=col;
+    ch.querySelector("b").textContent=c[k];
+    ch.querySelector("span:last-child").textContent=lab;
+    s.append(ch);
+  }
+}
+const busy={};
+async function write(id,patch){
+  if(!db||!canWrite) return;
+  picks[id]={...(picks[id]||{}),...patch}; paintAll();
+  if(busy[id]){busy[id].again=true; return;}
+  busy[id]={};
+  try{
+    do{ busy[id].again=false; await db.doc("picks/"+id).set({...picks[id],updatedAt:new Date().toISOString()}); }
+    while(busy[id].again);
+    $("#status").textContent="Saved";
+  }catch(e){ $("#status").textContent="Couldn't save that change: "+(e?.message||"try again in a moment."); }
+  finally{ delete busy[id]; }
+}
+function choose(id,v){ write(id,{pick:(picks[id]?.pick===v)?null:v}); }
+function saveNote(id,note){ write(id,{note}); }
+
+let generalBusy=false;
+$("#general-notes").addEventListener("change",async e=>{
+  if(!db||!canWrite||generalBusy) return; generalBusy=true;
+  try{ await db.doc("notes/general").set({text:e.target.value,updatedAt:new Date().toISOString()}); $("#general-saved").textContent="Notes saved"; }
+  catch(err){ $("#general-saved").textContent="Couldn't save your notes. Copy them somewhere safe and try again."; }
+  finally{ generalBusy=false; }
+});
+
+render();
+(async()=>{
+  const timer=setTimeout(()=>{$("#status").textContent="Still connecting. Your choices will appear once the plan loads.";},10000);
+  db=window.claude ? await window.claude.use("db") : null;
+  if(!db){ clearTimeout(timer); canWrite=false; $("#status").textContent=""; $("#ro").hidden=false; $("#general-notes").disabled=true; paintAll(); return; }
+  try{ const user=await window.claude.use("user"); if(user && user.can && user.can("data.write")===false){ canWrite=false; $("#ro").hidden=false; $("#general-notes").disabled=true; } }catch(e){}
+  db.collection("picks").onSnapshot(snap=>{
+    clearTimeout(timer);
+    for(const d of snap.docs){ if(!busy[d.id]){ const x=d.data()||{}; picks[d.id]={pick:x.pick||null,note:x.note||""}; } }
+    $("#status").textContent=snap.empty?"Nothing chosen yet. Start with Phase 1.":"Your choices are saved as you make them.";
+    paintAll();
+  },err=>{ clearTimeout(timer); $("#status").textContent="Couldn't load saved choices. Reload the page to try again."; });
+  db.doc("notes/general").onSnapshot(d=>{
+    const ta=$("#general-notes"); if(document.activeElement!==ta && d.exists) ta.value=d.data().text||"";
+  },()=>{});
+})();
+</script>
