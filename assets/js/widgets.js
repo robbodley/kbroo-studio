@@ -19,20 +19,6 @@
 			.replace( /'/g, '&#039;' );
 	}
 
-	function isHexColor( value ) {
-		return /^#([0-9a-f]{3}){1,2}$/i.test( value || '' );
-	}
-
-	function styleAttr( rules ) {
-		var css = '';
-		Object.keys( rules ).forEach( function ( prop ) {
-			if ( rules[ prop ] !== '' && rules[ prop ] != null ) {
-				css += prop + ':' + rules[ prop ] + ';';
-			}
-		} );
-		return css ? ' style="' + esc( css ) + '"' : '';
-	}
-
 	/**
 	 * Close-enough preview of WordPress's wpautop(): blank lines become
 	 * paragraphs and single newlines become line breaks, unless the content
@@ -54,32 +40,20 @@
 			.join( '\n' );
 	}
 
-	var ALIGN = [ 'left', 'center', 'right', 'justify' ];
-	var HEADING_TAGS = [ 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'p' ];
+	var HEADING_TAGS = [ 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'p' ];
+
+	// Styling comes from each control's `selectors` (see css.js), so the
+	// markup carries no inline styles, exactly like the PHP renderers.
 
 	renderers.heading = function ( s ) {
-		var tag = HEADING_TAGS.indexOf( s.tag ) > -1 ? s.tag : 'h2';
-		return (
-			'<' + tag + ' class="kbroo-heading"' +
-			styleAttr( {
-				'text-align': ALIGN.indexOf( s.align ) > -1 ? s.align : '',
-				color: isHexColor( s.color ) ? s.color : '',
-			} ) +
-			'>' + esc( s.text ) + '</' + tag + '>'
-		);
+		var tag = HEADING_TAGS.indexOf( s.header_size ) > -1 ? s.header_size : 'h2';
+		return '<' + tag + ' class="kbroo-heading">' + esc( s.title ) + '</' + tag + '>';
 	};
 
-	renderers.text = function ( s ) {
+	renderers[ 'text-editor' ] = function ( s ) {
 		// The author's own HTML, previewed as typed. The server runs it
 		// through wp_kses_post() when the layout is saved and rendered.
-		return (
-			'<div class="kbroo-text"' +
-			styleAttr( {
-				'text-align': ALIGN.indexOf( s.align ) > -1 ? s.align : '',
-				color: isHexColor( s.color ) ? s.color : '',
-			} ) +
-			'>' + autop( s.content ) + '</div>'
-		);
+		return '<div class="kbroo-text">' + autop( s.editor ) + '</div>';
 	};
 
 	window.KbrooStudio = window.KbrooStudio || {};

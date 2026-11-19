@@ -1,4 +1,5 @@
-/* Kbroo Studio: layout styles shared by the front end and the editor canvas. */
+/* Kbroo Studio: base layout styles shared by the front end and the editor canvas.
+   Per-element styles are generated from each element's settings (src/Css.php). */
 
 .kbroo-page {
 	box-sizing: border-box;
@@ -16,43 +17,45 @@
 }
 
 /* Block themes add margins between post content children; sections own their spacing. */
-.kbroo-page > .kbroo-section {
+.kbroo-page > .kbroo-section,
+.kbroo-page .kbroo-section {
 	margin-block-start: 0;
 	margin-block-end: 0;
 }
 
 .kbroo-section {
+	--kbroo-gap: 10px;
 	position: relative;
 	width: 100%;
-	padding-left: 20px;
-	padding-right: 20px;
 }
 
 .kbroo-section--boxed > .kbroo-container {
-	max-width: var(--kbroo-boxed-width, 1140px);
+	max-width: 1140px;
 	margin-left: auto;
 	margin-right: auto;
 }
 
 .kbroo-row {
 	display: flex;
-	flex-wrap: nowrap;
-	gap: var(--kbroo-gap, 20px);
+	flex-wrap: wrap;
 	align-items: stretch;
 }
 
-/* Columns share the row in proportion to their width setting. */
+/* The gap is padding around each column, as in Elementor. */
 .kbroo-column {
 	position: relative;
-	flex: var(--kbroo-col-width, 100) 1 0;
+	display: flex;
+	width: 100%;
 	min-width: 0;
+	padding: var(--kbroo-gap);
 }
 
 .kbroo-column-inner {
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
-	height: 100%;
+	width: 100%;
+	min-width: 0;
 }
 
 .kbroo-widget {
@@ -71,13 +74,21 @@
 	margin-bottom: 0;
 }
 
-/* Stack columns on small screens. */
-@media (max-width: 767px) {
-	.kbroo-row {
-		flex-direction: column;
+/* Hide per device. Not applied inside the editor, which shows these faded. */
+@media (min-width: 1025px) {
+	.kbroo-page:not(.kb-canvas) .kbroo-hidden-desktop {
+		display: none !important;
 	}
+}
 
-	.kbroo-column {
-		flex-basis: auto;
+@media (min-width: 768px) and (max-width: 1024px) {
+	.kbroo-page:not(.kb-canvas) .kbroo-hidden-tablet {
+		display: none !important;
+	}
+}
+
+@media (max-width: 767px) {
+	.kbroo-page:not(.kb-canvas) .kbroo-hidden-mobile {
+		display: none !important;
 	}
 }

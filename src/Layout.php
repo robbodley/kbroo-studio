@@ -41,51 +41,175 @@ final class Layout {
 	}
 
 	/**
-	 * Controls for sections. Same schema as widget controls.
+	 * Controls for sections. Names follow Elementor's section settings.
 	 */
 	public static function section_controls(): array {
-		return array(
-			'content_width'    => array(
-				'type'    => 'select',
-				'label'   => __( 'Content width', 'kbroo-studio' ),
-				'default' => 'boxed',
-				'options' => array(
-					'boxed' => __( 'Boxed', 'kbroo-studio' ),
-					'full'  => __( 'Full width', 'kbroo-studio' ),
+		$layout = array( 'section' => __( 'Layout', 'kbroo-studio' ) );
+
+		return array_merge(
+			array(
+				'layout'           => $layout + array(
+					'type'    => 'select',
+					'label'   => __( 'Content width', 'kbroo-studio' ),
+					'default' => 'boxed',
+					'options' => array(
+						'boxed'      => __( 'Boxed', 'kbroo-studio' ),
+						'full_width' => __( 'Full width', 'kbroo-studio' ),
+					),
+				),
+				'content_width'    => $layout + array(
+					'type'       => 'slider',
+					'label'      => __( 'Max width', 'kbroo-studio' ),
+					'units'      => array( 'px', 'vw', '%' ),
+					'default'    => array(
+						'unit' => 'px',
+						'size' => '',
+					),
+					'responsive' => true,
+					'condition'  => array( 'layout' => 'boxed' ),
+					'selectors'  => array( '{{WRAPPER}} > .kbroo-container' => 'max-width: {{SIZE}}{{UNIT}};' ),
+				),
+				'gap'              => $layout + array(
+					'type'                 => 'select',
+					'label'                => __( 'Columns gap', 'kbroo-studio' ),
+					'default'              => 'default',
+					'options'              => array(
+						'default'  => __( 'Default', 'kbroo-studio' ),
+						'no'       => __( 'No gap', 'kbroo-studio' ),
+						'narrow'   => __( 'Narrow', 'kbroo-studio' ),
+						'extended' => __( 'Extended', 'kbroo-studio' ),
+						'wide'     => __( 'Wide', 'kbroo-studio' ),
+						'wider'    => __( 'Wider', 'kbroo-studio' ),
+					),
+					'selectors_dictionary' => array(
+						'default'  => '10px',
+						'no'       => '0px',
+						'narrow'   => '5px',
+						'extended' => '15px',
+						'wide'     => '20px',
+						'wider'    => '30px',
+					),
+					'selectors'            => array( '{{WRAPPER}}' => '--kbroo-gap: {{VALUE}};' ),
+				),
+				'min_height'       => $layout + array(
+					'type'       => 'slider',
+					'label'      => __( 'Minimum height', 'kbroo-studio' ),
+					'units'      => array( 'px', 'vh' ),
+					'responsive' => true,
+					'selectors'  => array( '{{WRAPPER}} > .kbroo-container > .kbroo-row' => 'min-height: {{SIZE}}{{UNIT}};' ),
+				),
+				'content_position' => $layout + array(
+					'type'                 => 'select',
+					'label'                => __( 'Vertical align', 'kbroo-studio' ),
+					'default'              => '',
+					'options'              => array(
+						''       => __( 'Default', 'kbroo-studio' ),
+						'top'    => __( 'Top', 'kbroo-studio' ),
+						'middle' => __( 'Middle', 'kbroo-studio' ),
+						'bottom' => __( 'Bottom', 'kbroo-studio' ),
+					),
+					'selectors_dictionary' => array(
+						'top'    => 'flex-start',
+						'middle' => 'center',
+						'bottom' => 'flex-end',
+					),
+					'selectors'            => array( '{{WRAPPER}} > .kbroo-container > .kbroo-row' => 'align-items: {{VALUE}};' ),
+				),
+				'html_tag'         => $layout + array(
+					'type'    => 'select',
+					'label'   => __( 'HTML tag', 'kbroo-studio' ),
+					'default' => 'section',
+					'options' => array(
+						'section' => 'section',
+						'header'  => 'header',
+						'footer'  => 'footer',
+						'main'    => 'main',
+						'article' => 'article',
+						'aside'   => 'aside',
+						'div'     => 'div',
+					),
 				),
 			),
-			'background_color' => array(
-				'type'    => 'color',
-				'label'   => __( 'Background color', 'kbroo-studio' ),
-				'default' => '',
-			),
-			'padding'          => array(
-				'type'    => 'number',
-				'label'   => __( 'Vertical padding (px)', 'kbroo-studio' ),
-				'default' => 40,
-				'min'     => 0,
-				'max'     => 400,
-			),
-			'gap'              => array(
-				'type'    => 'number',
-				'label'   => __( 'Column gap (px)', 'kbroo-studio' ),
-				'default' => 20,
-				'min'     => 0,
-				'max'     => 200,
-			),
+			ControlGroups::background( '{{WRAPPER}}' ),
+			ControlGroups::border( '{{WRAPPER}}' ),
+			ControlGroups::advanced(
+				'',
+				'{{WRAPPER}}',
+				array(
+					'unit'     => 'px',
+					'top'      => 40,
+					'right'    => 0,
+					'bottom'   => 40,
+					'left'     => 0,
+					'isLinked' => false,
+				)
+			)
 		);
 	}
 
+	/**
+	 * Controls for columns. Names follow Elementor's column settings.
+	 */
 	public static function column_controls(): array {
-		return array(
-			'width' => array(
-				'type'    => 'number',
-				'label'   => __( 'Width (%)', 'kbroo-studio' ),
-				'default' => 100,
-				'min'     => 5,
-				'max'     => 100,
+		$layout = array( 'section' => __( 'Layout', 'kbroo-studio' ) );
+		$inner  = '{{WRAPPER}} > .kbroo-column-inner';
+
+		return array_merge(
+			array(
+				'_inline_size'          => $layout + array(
+					'type'           => 'number',
+					'label'          => __( 'Width (%)', 'kbroo-studio' ),
+					'default'        => 100,
+					'default_mobile' => 100,
+					'min'            => 2,
+					'max'            => 100,
+					'responsive'     => true,
+					'selectors'      => array( '{{WRAPPER}}' => 'width: {{VALUE}}%;' ),
+				),
+				'content_position'      => $layout + array(
+					'type'                 => 'select',
+					'label'                => __( 'Vertical align', 'kbroo-studio' ),
+					'default'              => '',
+					'options'              => array(
+						''       => __( 'Default', 'kbroo-studio' ),
+						'top'    => __( 'Top', 'kbroo-studio' ),
+						'center' => __( 'Middle', 'kbroo-studio' ),
+						'bottom' => __( 'Bottom', 'kbroo-studio' ),
+					),
+					'selectors_dictionary' => array(
+						'top'    => 'flex-start',
+						'center' => 'center',
+						'bottom' => 'flex-end',
+					),
+					'selectors'            => array( $inner => 'justify-content: {{VALUE}};' ),
+				),
+				'space_between_widgets' => $layout + array(
+					'type'      => 'slider',
+					'label'     => __( 'Widgets space', 'kbroo-studio' ),
+					'units'     => array( 'px' ),
+					'selectors' => array( $inner => 'gap: {{SIZE}}{{UNIT}};' ),
+				),
 			),
+			ControlGroups::background( $inner ),
+			ControlGroups::border( $inner ),
+			ControlGroups::advanced( '', $inner )
 		);
+	}
+
+	/**
+	 * Controls for any element in the tree.
+	 */
+	public static function controls_for( array $element, Registry $widgets ): array {
+		switch ( $element['elType'] ?? '' ) {
+			case 'section':
+				return self::section_controls();
+			case 'column':
+				return self::column_controls();
+			case 'widget':
+				$widget = $widgets->get( (string) ( $element['widgetType'] ?? '' ) );
+				return $widget ? $widget->get_controls() : array();
+		}
+		return array();
 	}
 
 	/**

@@ -588,3 +588,208 @@ body.kbroo-editor-body {
 		--kb-panel-width: 240px;
 	}
 }
+
+/* ---- Device preview, undo / redo -------------------------------------- */
+
+.kb-segmented {
+	display: inline-flex;
+	gap: 2px;
+	padding: 2px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.kb-topbar .kb-icon-btn.is-active {
+	background: rgba(255, 255, 255, 0.18);
+	color: #fff;
+}
+
+.kb-icon-btn:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.kb-canvas {
+	margin: 0 auto;
+	transition: max-width 0.2s ease;
+}
+
+.kb-canvas-wrap[data-device="tablet"],
+.kb-canvas-wrap[data-device="mobile"] {
+	background: #e2e8f0;
+}
+
+/* Elements hidden on the device being previewed stay visible, faded. */
+.kb-hidden-here {
+	opacity: 0.35;
+	background-image: repeating-linear-gradient(-45deg, transparent 0 8px, rgba(100, 116, 139, 0.12) 8px 16px);
+}
+
+/* ---- Settings tabs and controls --------------------------------------- */
+
+.kb-tabs {
+	display: flex;
+	border-bottom: 1px solid var(--kb-border);
+	flex: 0 0 auto;
+}
+
+.kb-tab {
+	flex: 1 1 0;
+	padding: 10px 6px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--kb-muted);
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.kb-tab.is-active {
+	border-bottom-color: var(--kb-accent);
+	color: var(--kb-text);
+}
+
+.kb-control-section {
+	margin: 18px 0 10px;
+	padding-top: 12px;
+	border-top: 1px solid var(--kb-border);
+	color: var(--kb-muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.kb-panel-body > .kb-control-section:first-child {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
+}
+
+.kb-control label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.kb-device-badge {
+	display: inline-flex;
+	color: var(--kb-muted);
+}
+
+.kb-device-badge .dashicons {
+	width: 14px;
+	height: 14px;
+	font-size: 14px;
+}
+
+.kb-input-unit {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.kb-control .kb-input-unit input[type="number"] {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.kb-control select.kb-unit {
+	flex: 0 0 auto;
+	width: auto;
+	padding: 6px 4px;
+}
+
+span.kb-unit {
+	color: var(--kb-muted);
+	font-size: 12px;
+}
+
+.kb-input-dimensions {
+	align-items: flex-start;
+}
+
+.kb-dimensions {
+	display: flex;
+	flex: 1 1 auto;
+	gap: 4px;
+	min-width: 0;
+}
+
+.kb-dimension {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	flex: 1 1 0;
+	min-width: 0;
+}
+
+.kb-control .kb-dimension input[type="number"] {
+	padding: 6px 4px;
+	text-align: center;
+	-moz-appearance: textfield;
+}
+
+.kb-dimension input::-webkit-outer-spin-button,
+.kb-dimension input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.kb-dimension span {
+	margin-top: 2px;
+	color: var(--kb-muted);
+	font-size: 10px;
+	text-transform: uppercase;
+}
+
+.kb-link-sides {
+	align-self: flex-start;
+	color: var(--kb-muted);
+}
+
+.kb-link-sides.is-active {
+	color: var(--kb-accent);
+}
+
+.kb-control-switcher {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.kb-control-switcher label {
+	margin-bottom: 0;
+}
+
+.kb-switch {
+	appearance: none;
+	position: relative;
+	width: 36px;
+	height: 20px;
+	margin: 0;
+	border-radius: 999px;
+	background: #cbd5e1;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.kb-switch::after {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #fff;
+	transition: transform 0.15s;
+}
+
+.kb-switch:checked {
+	background: var(--kb-accent);
+}
+
+.kb-switch:checked::after {
+	transform: translateX(16px);
+}

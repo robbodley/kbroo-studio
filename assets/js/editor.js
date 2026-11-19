@@ -10,26 +10,41 @@
 
 	var config = window.kbrooConfig;
 	var renderers = window.KbrooStudio.widgetRenderers;
-	var esc = window.KbrooStudio.esc;
+	var Css = window.KbrooStudio.css;
 
 	var STRUCTURES = [
 		{ label: '100', widths: [ 100 ] },
 		{ label: '50 / 50', widths: [ 50, 50 ] },
-		{ label: '33 / 33 / 33', widths: [ 33, 33, 34 ] },
-		{ label: '66 / 33', widths: [ 66, 34 ] },
-		{ label: '33 / 66', widths: [ 34, 66 ] },
+		{ label: '33 / 33 / 33', widths: [ 33.33, 33.33, 33.34 ] },
+		{ label: '66 / 33', widths: [ 66.66, 33.34 ] },
+		{ label: '33 / 66', widths: [ 33.34, 66.66 ] },
 		{ label: '25 x 4', widths: [ 25, 25, 25, 25 ] },
 	];
+
+	var DEVICES = {
+		desktop: { label: 'Desktop', icon: 'dashicons-desktop', width: null },
+		tablet: { label: 'Tablet', icon: 'dashicons-tablet', width: 768 },
+		mobile: { label: 'Mobile', icon: 'dashicons-smartphone', width: 375 },
+	};
+
+	var TABS = { content: 'Content', style: 'Style', advanced: 'Advanced' };
+
+	var HISTORY_LIMIT = 100;
+	var MERGE_WINDOW = 1000; // ms: typing in one field becomes one undo step.
 
 	var state = {
 		layout: normalizeLayout( config.layout ),
 		selected: null, // { id, kind }
+		device: 'desktop',
+		tab: 'content',
 		status: config.status,
 		permalink: config.permalink,
 		dirty: false,
 		saving: false,
 		revision: 0,
 	};
+
+	var history = { stack: [], index: -1, mergeKey: null, mergeTime: 0, savedIndex: 0 };
 
 	var drag = null; // { kind: 'new', widgetType } | { kind: 'widget', id } | { kind: 'section', id }
 	var dropTarget = null;
@@ -85,10 +100,16 @@
 		return JSON.parse( JSON.stringify( value ) );
 	}
 
+	/** Defaults for every setting key, including tablet and mobile variants. */
 	function defaults( controls ) {
 		var out = {};
 		Object.keys( controls ).forEach( function ( key ) {
-			out[ key ] = controls[ key ].default;
+			var control = controls[ key ];
+			var keys = Css.keys( key, control );
+			Object.keys( keys ).forEach( function ( device ) {
+				var value = device === 'desktop' ? control.default : control[ 'default_' + device ];
+				out[ keys[ device ] ] = value === undefined ? '' : clone( value );
+			} );
 		} );
 		return out;
 	}
@@ -104,8 +125,19 @@
 		return layout;
 	}
 
-	function hexOrEmpty( value ) {
-		return /^#([0-9a-f]{3}){1,2}$/i.test( value || '' ) ? value : '';
+	function isSet( control, value ) {
+		if ( value == null || value === '' ) {
+			return false;
+		}
+		if ( control.type === 'slider' ) {
+			return value.size !== '' && value.size != null;
+		}
+		if ( control.type === 'dimensions' ) {
+			return [ 'top', 'right', 'bottom', 'left' ].some( function ( side ) {
+				return value[ side ] !== '' && value[ side ] != null;
+			} );
+		}
+		return true;
 	}
 
 	/* ------------------------------------------------------------------ *
@@ -123,7 +155,7 @@
 
 	function makeColumn( width ) {
 		var settings = defaults( config.columnControls );
-		settings.width = width;
+		settings._inline_size = width;
 		return { id: uid(), elType: 'column', settings: settings, elements: [] };
 	}
 
@@ -165,22 +197,14 @@
 		return node;
 	}
 
+	/** Share the desktop width evenly; tablet widths are reset to inherit. */
 	function evenWidths( section ) {
 		var count = section.elements.length;
+		var base = Math.floor( 10000 / count ) / 100;
 		section.elements.forEach( function ( column, i ) {
-			var base = Math.floor( 100 / count );
-			column.settings.width = i === count - 1 ? 100 - base * ( count - 1 ) : base;
+			column.settings._inline_size = i === count - 1 ? Math.round( ( 100 - base * ( count - 1 ) ) * 100 ) / 100 : base;
+			column.settings._inline_size_tablet = '';
 		} );
-	}
-
-	function changed( options ) {
-		state.dirty = true;
-		state.revision++;
-		renderCanvas();
-		if ( ! options || options.panel !== false ) {
-			renderPanel();
-		}
-		renderTopbar();
 	}
 
 	function removeElement( id ) {
@@ -229,15 +253,98 @@
 	}
 
 	/* ------------------------------------------------------------------ *
+	 * Change tracking and undo / redo
+	 * ------------------------------------------------------------------ */
+
+	function snapshot() {
+		return JSON.stringify( { layout: state.layout, selected: state.selected } );
+	}
+
+	function resetHistory() {
+		history.stack = [ snapshot() ];
+		history.index = 0;
+		history.savedIndex = 0;
+		history.mergeKey = null;
+	}
+
+	function record( mergeKey ) {
+		var now = Date.now();
+		if ( mergeKey && mergeKey === history.mergeKey && now - history.mergeTime < MERGE_WINDOW && history.index > history.savedIndex ) {
+			history.stack[ history.index ] = snapshot();
+		} else {
+			history.stack = history.stack.slice( 0, history.index + 1 );
+			history.stack.push( snapshot() );
+			if ( history.stack.length > HISTORY_LIMIT ) {
+				history.stack.shift();
+				history.savedIndex--;
+			}
+			history.index = history.stack.length - 1;
+		}
+		history.mergeKey = mergeKey || null;
+		history.mergeTime = now;
+	}
+
+	function restore( index ) {
+		var entry = JSON.parse( history.stack[ index ] );
+		history.index = index;
+		history.mergeKey = null;
+		state.layout = entry.layout;
+		state.selected = entry.selected && find( entry.selected.id ) ? entry.selected : null;
+		state.dirty = history.index !== history.savedIndex;
+		state.revision++;
+		renderAll();
+	}
+
+	function undo() {
+		if ( history.index > 0 ) {
+			restore( history.index - 1 );
+		}
+	}
+
+	function redo() {
+		if ( history.index < history.stack.length - 1 ) {
+			restore( history.index + 1 );
+		}
+	}
+
+	/**
+	 * Call after every change to the layout.
+	 *
+	 * @param {Object} options panel: false keeps the panel (and input focus);
+	 *                         mergeKey: consecutive changes with the same key
+	 *                         merge into one undo step.
+	 */
+	function changed( options ) {
+		options = options || {};
+		state.dirty = true;
+		state.revision++;
+		record( options.mergeKey );
+		renderCanvas();
+		if ( options.panel !== false ) {
+			renderPanel();
+		}
+		renderTopbar();
+	}
+
+	/* ------------------------------------------------------------------ *
 	 * Selection
 	 * ------------------------------------------------------------------ */
 
 	function select( id, kind, silent ) {
+		var previousKind = state.selected && state.selected.kind;
 		state.selected = id ? { id: id, kind: kind } : null;
+		if ( kind !== previousKind ) {
+			state.tab = 'content';
+		}
 		if ( ! silent ) {
 			renderCanvas();
 			renderPanel();
 		}
+	}
+
+	function setDevice( device ) {
+		state.device = device;
+		renderAll();
 	}
 
 	/* ------------------------------------------------------------------ *
@@ -250,10 +357,12 @@
 
 		ui.topbar = el( 'header', { class: 'kb-topbar' } );
 		ui.panel = el( 'aside', { class: 'kb-panel', 'aria-label': 'Kbroo Studio panel' } );
+		ui.styles = el( 'style', { id: 'kb-canvas-css' } );
 		ui.canvas = el( 'div', { class: 'kbroo kbroo-page kb-canvas' } );
 		ui.canvasWrap = el( 'main', { class: 'kb-canvas-wrap' }, [ ui.canvas ] );
 		ui.toast = el( 'div', { class: 'kb-toast', role: 'status', 'aria-live': 'polite' } );
 
+		document.head.appendChild( ui.styles );
 		app.appendChild( ui.topbar );
 		app.appendChild( el( 'div', { class: 'kb-main' }, [ ui.panel, ui.canvasWrap ] ) );
 		app.appendChild( ui.toast );
@@ -268,6 +377,11 @@
 			}
 		} );
 
+		resetHistory();
+		renderAll();
+	}
+
+	function renderAll() {
 		renderTopbar();
 		renderPanel();
 		renderCanvas();
@@ -290,6 +404,27 @@
 		var published = state.status === 'publish';
 		var saveLabel = state.saving ? 'Saving…' : published ? 'Update' : 'Save draft';
 
+		var devices = el( 'div', { class: 'kb-segmented', role: 'group', 'aria-label': 'Preview device' } );
+		Object.keys( DEVICES ).forEach( function ( device ) {
+			devices.appendChild(
+				el(
+					'button',
+					{
+						type: 'button',
+						class: 'kb-icon-btn' + ( state.device === device ? ' is-active' : '' ),
+						title: DEVICES[ device ].label,
+						'aria-label': DEVICES[ device ].label,
+						'aria-pressed': state.device === device ? 'true' : 'false',
+						'data-device': device,
+						onclick: function () {
+							setDevice( device );
+						},
+					},
+					[ icon( DEVICES[ device ].icon ) ]
+				)
+			);
+		} );
+
 		ui.topbar.innerHTML = '';
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-start' }, [
@@ -298,10 +433,39 @@
 					el( 'span', { class: 'kb-hide-sm', text: 'WordPress editor' } ),
 				] ),
 				el( 'span', { class: 'kb-brand', text: 'Kbroo Studio' } ),
+				el( 'div', { class: 'kb-segmented' }, [
+					el(
+						'button',
+						{
+							type: 'button',
+							class: 'kb-icon-btn',
+							title: 'Undo (Ctrl+Z)',
+							'aria-label': 'Undo',
+							'data-action': 'undo',
+							disabled: history.index <= 0,
+							onclick: undo,
+						},
+						[ icon( 'dashicons-undo' ) ]
+					),
+					el(
+						'button',
+						{
+							type: 'button',
+							class: 'kb-icon-btn',
+							title: 'Redo (Ctrl+Shift+Z)',
+							'aria-label': 'Redo',
+							'data-action': 'redo',
+							disabled: history.index >= history.stack.length - 1,
+							onclick: redo,
+						},
+						[ icon( 'dashicons-redo' ) ]
+					),
+				] ),
 			] )
 		);
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-title' }, [
+				devices,
 				el( 'span', { class: 'kb-doc-title', text: config.title || '(no title)' } ),
 				el( 'span', {
 					class: 'kb-badge' + ( published ? ' is-live' : '' ),
@@ -350,6 +514,9 @@
 	 * ------------------------------------------------------------------ */
 
 	function renderPanel() {
+		var scroll = ui.panel.querySelector( '.kb-panel-body' );
+		var scrollTop = scroll ? scroll.scrollTop : 0;
+
 		ui.panel.innerHTML = '';
 		var sel = state.selected && find( state.selected.id );
 		if ( sel ) {
@@ -357,6 +524,11 @@
 		} else {
 			state.selected = null;
 			renderWidgetsPanel();
+		}
+
+		var body = ui.panel.querySelector( '.kb-panel-body' );
+		if ( body ) {
+			body.scrollTop = scrollTop;
 		}
 	}
 
@@ -419,9 +591,45 @@
 		var controls = controlsFor( node );
 		node.settings = withDefaults( controls, node.settings );
 
+		var tabsPresent = Object.keys( TABS ).filter( function ( tab ) {
+			return Object.keys( controls ).some( function ( key ) {
+				return controls[ key ].tab === tab;
+			} );
+		} );
+		if ( tabsPresent.indexOf( state.tab ) === -1 ) {
+			state.tab = tabsPresent[ 0 ];
+		}
+
+		var tabs = el( 'div', { class: 'kb-tabs', role: 'tablist' } );
+		tabsPresent.forEach( function ( tab ) {
+			tabs.appendChild(
+				el( 'button', {
+					type: 'button',
+					role: 'tab',
+					class: 'kb-tab' + ( state.tab === tab ? ' is-active' : '' ),
+					'aria-selected': state.tab === tab ? 'true' : 'false',
+					'data-tab': tab,
+					text: TABS[ tab ],
+					onclick: function () {
+						state.tab = tab;
+						renderPanel();
+					},
+				} )
+			);
+		} );
+
 		var body = el( 'div', { class: 'kb-panel-body' } );
+		var currentSection = null;
 		Object.keys( controls ).forEach( function ( key ) {
-			body.appendChild( renderControl( node, key, controls[ key ] ) );
+			var control = controls[ key ];
+			if ( control.tab !== state.tab || ! Css.conditionMet( control, node.settings ) ) {
+				return;
+			}
+			if ( control.section && control.section !== currentSection ) {
+				currentSection = control.section;
+				body.appendChild( el( 'h3', { class: 'kb-control-section', text: control.section } ) );
+			}
+			body.appendChild( renderControl( node, key, control ) );
 		} );
 
 		body.appendChild(
@@ -455,6 +663,7 @@
 						type: 'button',
 						class: 'kb-icon-btn',
 						title: 'Back to widgets',
+						'data-action': 'back',
 						onclick: function () {
 							select( null );
 						},
@@ -464,17 +673,35 @@
 				el( 'h2', { text: 'Edit ' + elementLabel( node ) } ),
 			] )
 		);
+		ui.panel.appendChild( tabs );
 		ui.panel.appendChild( body );
 	}
 
+	/**
+	 * The value a responsive control falls back to on the current device:
+	 * the next larger device's value, or the desktop value.
+	 */
+	function inheritedValue( settings, key, control ) {
+		if ( state.device === 'mobile' && isSet( control, settings[ key + '_tablet' ] ) ) {
+			return settings[ key + '_tablet' ];
+		}
+		return settings[ key ];
+	}
+
 	function renderControl( node, key, control ) {
-		var id = 'kb-control-' + key;
-		var value = node.settings[ key ];
+		var device = control.responsive ? state.device : 'desktop';
+		var settingKey = Css.deviceKey( key, device );
+		var id = 'kb-control-' + settingKey;
+		var value = node.settings[ settingKey ];
+		var inherited = device !== 'desktop' ? inheritedValue( node.settings, key, control ) : null;
+		var mergeKey = node.id + ':' + settingKey;
 		var input;
 
-		function update( newValue ) {
-			node.settings[ key ] = newValue;
-			changed( { panel: false } );
+		function update( newValue, merge ) {
+			node.settings[ settingKey ] = newValue;
+			// Conditions may show or hide other controls, so redraw the panel
+			// for discrete choices; keep it (and focus) while typing.
+			changed( { panel: ! merge, mergeKey: merge ? mergeKey : null } );
 		}
 
 		switch ( control.type ) {
@@ -482,72 +709,215 @@
 				input = el( 'textarea', { id: id, rows: 6 } );
 				input.value = value;
 				input.addEventListener( 'input', function () {
-					update( input.value );
+					update( input.value, true );
 				} );
 				break;
 
 			case 'select':
 				input = el( 'select', { id: id } );
+				if ( device !== 'desktop' ) {
+					var inheritLabel = control.options[ inherited ] || ( control.options[ '' ] ) || 'Default';
+					input.appendChild( el( 'option', { value: '', text: 'Inherit (' + inheritLabel + ')' } ) );
+				}
 				Object.keys( control.options ).forEach( function ( optionValue ) {
+					if ( device !== 'desktop' && optionValue === '' ) {
+						return;
+					}
 					var option = el( 'option', { value: optionValue, text: control.options[ optionValue ] } );
 					option.selected = optionValue === value;
 					input.appendChild( option );
 				} );
 				input.addEventListener( 'change', function () {
-					update( input.value );
+					update( input.value, false );
 				} );
 				break;
 
 			case 'color':
 				var picker = el( 'input', { type: 'color', id: id } );
-				picker.value = hexOrEmpty( value ) || '#000000';
+				picker.value = /^#[0-9a-f]{6}$/i.test( value || '' ) ? value : '#000000';
 				var clear = el( 'button', { type: 'button', class: 'kb-link', text: value ? 'Clear' : 'Default' } );
 				picker.addEventListener( 'input', function () {
 					clear.textContent = 'Clear';
-					update( picker.value );
+					update( picker.value, true );
 				} );
 				clear.addEventListener( 'click', function () {
-					clear.textContent = 'Default';
-					update( '' );
+					update( '', false );
 				} );
 				input = el( 'div', { class: 'kb-color' }, [ picker, clear ] );
 				break;
 
 			case 'number':
-				input = el( 'input', { type: 'number', id: id, min: control.min, max: control.max, step: 1 } );
+				input = el( 'input', {
+					type: 'number',
+					id: id,
+					min: control.min,
+					max: control.max,
+					step: 'any',
+					placeholder: inherited != null && inherited !== '' ? String( inherited ) : '',
+				} );
 				input.value = value;
 				input.addEventListener( 'input', function () {
 					if ( input.value === '' ) {
+						update( device === 'desktop' ? control.default : '', true );
 						return;
 					}
-					var n = Math.round( Number( input.value ) );
+					var n = Number( input.value );
 					if ( control.min != null ) {
 						n = Math.max( control.min, n );
 					}
 					if ( control.max != null ) {
 						n = Math.min( control.max, n );
 					}
-					update( n );
+					update( n, true );
 				} );
+				break;
+
+			case 'switcher':
+				var box = el( 'input', { type: 'checkbox', id: id, class: 'kb-switch' } );
+				box.checked = value === 'yes';
+				box.addEventListener( 'change', function () {
+					update( box.checked ? 'yes' : '', false );
+				} );
+				input = box;
+				break;
+
+			case 'slider':
+				input = renderSlider( control, id, value, inherited, update );
+				break;
+
+			case 'dimensions':
+				input = renderDimensions( control, id, value, inherited, update );
 				break;
 
 			default:
 				input = el( 'input', { type: 'text', id: id } );
 				input.value = value;
 				input.addEventListener( 'input', function () {
-					update( input.value );
+					update( input.value, true );
 				} );
 		}
 
-		return el( 'div', { class: 'kb-control kb-control-' + control.type }, [
-			el( 'label', { for: id, text: control.label } ),
-			input,
+		var label = el( 'label', { for: id }, [
+			el( 'span', { text: control.label } ),
+			control.responsive
+				? el(
+						'span',
+						{ class: 'kb-device-badge', title: 'Editing the ' + DEVICES[ state.device ].label.toLowerCase() + ' value. Switch device in the top bar.' },
+						[ icon( DEVICES[ state.device ].icon ) ]
+				  )
+				: null,
+		] );
+
+		return el( 'div', { class: 'kb-control kb-control-' + control.type, 'data-control': key }, [ label, input ] );
+	}
+
+	function unitSelect( control, current, onChange ) {
+		var units = control.units || [ 'px' ];
+		if ( units.length < 2 ) {
+			return el( 'span', { class: 'kb-unit', text: units[ 0 ] } );
+		}
+		var select = el( 'select', { class: 'kb-unit', 'aria-label': 'Unit' } );
+		units.forEach( function ( u ) {
+			var option = el( 'option', { value: u, text: u } );
+			option.selected = u === current;
+			select.appendChild( option );
+		} );
+		select.addEventListener( 'change', function () {
+			onChange( select.value );
+		} );
+		return select;
+	}
+
+	function numberOrEmpty( raw ) {
+		return raw === '' || ! isFinite( raw ) ? '' : Number( raw );
+	}
+
+	function renderSlider( control, id, value, inherited, update ) {
+		value = Object.assign( { unit: ( control.units || [ 'px' ] )[ 0 ], size: '' }, value || {} );
+		var number = el( 'input', {
+			type: 'number',
+			id: id,
+			step: 'any',
+			placeholder: inherited && inherited.size !== '' && inherited.size != null ? String( inherited.size ) : '',
+		} );
+		number.value = value.size;
+		number.addEventListener( 'input', function () {
+			update( { unit: value.unit, size: numberOrEmpty( number.value ) }, true );
+		} );
+		return el( 'div', { class: 'kb-input-unit' }, [
+			number,
+			unitSelect( control, value.unit, function ( u ) {
+				update( { unit: u, size: numberOrEmpty( number.value ) }, false );
+			} ),
+		] );
+	}
+
+	function renderDimensions( control, id, value, inherited, update ) {
+		var SIDES = [ 'top', 'right', 'bottom', 'left' ];
+		value = Object.assign( { unit: ( control.units || [ 'px' ] )[ 0 ], top: '', right: '', bottom: '', left: '', isLinked: true }, value || {} );
+		var inputs = {};
+
+		function current( overrides ) {
+			var out = { unit: value.unit, isLinked: value.isLinked };
+			SIDES.forEach( function ( side ) {
+				out[ side ] = numberOrEmpty( inputs[ side ].value );
+			} );
+			return Object.assign( out, overrides || {} );
+		}
+
+		var row = el( 'div', { class: 'kb-dimensions' } );
+		SIDES.forEach( function ( side, i ) {
+			var input = el( 'input', {
+				type: 'number',
+				step: 'any',
+				id: i === 0 ? id : id + '-' + side,
+				'aria-label': side,
+				'data-side': side,
+				placeholder: inherited && inherited[ side ] !== '' && inherited[ side ] != null ? String( inherited[ side ] ) : '',
+			} );
+			input.value = value[ side ];
+			input.addEventListener( 'input', function () {
+				if ( value.isLinked ) {
+					SIDES.forEach( function ( other ) {
+						if ( other !== side ) {
+							inputs[ other ].value = input.value;
+						}
+					} );
+				}
+				update( current(), true );
+			} );
+			inputs[ side ] = input;
+			row.appendChild( el( 'div', { class: 'kb-dimension' }, [ input, el( 'span', { text: side } ) ] ) );
+		} );
+
+		var link = el(
+			'button',
+			{
+				type: 'button',
+				class: 'kb-icon-btn kb-link-sides' + ( value.isLinked ? ' is-active' : '' ),
+				title: value.isLinked ? 'Unlink values' : 'Link values',
+				'aria-pressed': value.isLinked ? 'true' : 'false',
+				onclick: function () {
+					update( current( { isLinked: ! value.isLinked } ), false );
+				},
+			},
+			[ icon( value.isLinked ? 'dashicons-admin-links' : 'dashicons-editor-unlink' ) ]
+		);
+		row.appendChild( link );
+
+		return el( 'div', { class: 'kb-input-unit kb-input-dimensions' }, [
+			row,
+			unitSelect( control, value.unit, function ( u ) {
+				update( current( { unit: u } ), false );
+			} ),
 		] );
 	}
 
 	/* ------------------------------------------------------------------ *
 	 * Canvas
 	 * ------------------------------------------------------------------ */
+
+	var cssRules;
 
 	function isSelected( id ) {
 		return state.selected && state.selected.id === id;
@@ -557,7 +927,9 @@
 		var bar = el( 'div', { class: 'kb-toolbar kb-toolbar-' + node.elType } );
 		bar.appendChild( el( 'span', { class: 'kb-toolbar-label', text: elementLabel( node ) } ) );
 		buttons.forEach( function ( b ) {
-			bar.appendChild( b );
+			if ( b ) {
+				bar.appendChild( b );
+			}
 		} );
 		return bar;
 	}
@@ -579,9 +951,47 @@
 		);
 	}
 
+	/**
+	 * Classes shared with the front end (src/Renderer.php), plus editor state.
+	 */
+	function elementClasses( node, settings, base, prefix ) {
+		var classes = base.concat( [ 'kbroo-el', 'kbroo-el-' + node.id, 'kb-el', 'kb-' + node.elType ] );
+		[ 'desktop', 'tablet', 'mobile' ].forEach( function ( device ) {
+			if ( settings[ 'hide_' + device ] === 'yes' ) {
+				classes.push( 'kbroo-hidden-' + device );
+				if ( device === state.device ) {
+					classes.push( 'kb-hidden-here' );
+				}
+			}
+		} );
+		String( settings[ prefix + 'css_classes' ] || '' )
+			.split( /\s+/ )
+			.forEach( function ( c ) {
+				if ( /^[A-Za-z0-9_-]+$/.test( c ) ) {
+					classes.push( c );
+				}
+			} );
+		if ( isSelected( node.id ) ) {
+			classes.push( 'is-selected' );
+		}
+		return classes.join( ' ' );
+	}
+
+	function collectCss( node, controls, settings ) {
+		var rules = Css.elementRules( controls, settings, Css.wrapper( node.id ) );
+		Css.DEVICES.forEach( function ( device ) {
+			cssRules[ device ] = cssRules[ device ].concat( rules[ device ] );
+		} );
+	}
+
 	function renderCanvas() {
 		var scroll = ui.canvasWrap.scrollTop;
+		cssRules = { desktop: [], tablet: [], mobile: [] };
 		ui.canvas.innerHTML = '';
+
+		var width = DEVICES[ state.device ].width;
+		ui.canvas.style.maxWidth = width ? width + 'px' : '';
+		ui.canvasWrap.setAttribute( 'data-device', state.device );
 
 		state.layout.elements.forEach( function ( section ) {
 			ui.canvas.appendChild( renderSection( section ) );
@@ -597,12 +1007,13 @@
 		}
 
 		ui.canvas.appendChild( renderAddSection() );
+		ui.styles.textContent = Css.forDevice( cssRules, state.device );
 		ui.canvasWrap.scrollTop = scroll;
 	}
 
 	function renderSection( section ) {
 		var s = withDefaults( config.sectionControls, section.settings );
-		var padding = ( parseInt( s.padding, 10 ) || 0 ) + 'px';
+		collectCss( section, config.sectionControls, s );
 
 		var handle = el(
 			'span',
@@ -635,17 +1046,12 @@
 			row.appendChild( renderColumn( column, section ) );
 		} );
 
+		var tag = config.sectionControls.html_tag.options[ s.html_tag ] ? s.html_tag : 'section';
 		var sectionEl = el(
-			'section',
+			tag,
 			{
-				class:
-					'kbroo-section kbroo-section--' + ( s.content_width === 'full' ? 'full' : 'boxed' ) +
-					' kb-el kb-section' + ( isSelected( section.id ) ? ' is-selected' : '' ),
+				class: elementClasses( section, s, [ 'kbroo-section', 'kbroo-section--' + ( s.layout === 'full_width' ? 'full' : 'boxed' ) ], '' ),
 				'data-id': section.id,
-				style:
-					( hexOrEmpty( s.background_color ) ? 'background-color:' + s.background_color + ';' : '' ) +
-					'padding-top:' + padding + ';padding-bottom:' + padding + ';' +
-					'--kbroo-gap:' + ( parseInt( s.gap, 10 ) || 0 ) + 'px;',
 			},
 			[
 				toolbar( section, [
@@ -664,7 +1070,7 @@
 						removeElement( section.id );
 						changed();
 					} ),
-				].filter( Boolean ) ),
+				] ),
 				el( 'div', { class: 'kbroo-container' }, [ row ] ),
 			]
 		);
@@ -672,9 +1078,10 @@
 	}
 
 	function renderColumn( column, section ) {
-		var width = Math.max( 5, Math.min( 100, parseInt( column.settings.width, 10 ) || 100 ) );
-		var inner = el( 'div', { class: 'kbroo-column-inner kb-dropzone' } );
+		var s = withDefaults( config.columnControls, column.settings );
+		collectCss( column, config.columnControls, s );
 
+		var inner = el( 'div', { class: 'kbroo-column-inner kb-dropzone' } );
 		column.elements.forEach( function ( widget ) {
 			var w = renderWidget( widget );
 			if ( w ) {
@@ -688,9 +1095,8 @@
 		return el(
 			'div',
 			{
-				class: 'kbroo-column kb-el kb-column' + ( isSelected( column.id ) ? ' is-selected' : '' ),
+				class: elementClasses( column, s, [ 'kbroo-column' ], '' ),
 				'data-id': column.id,
-				style: '--kbroo-col-width:' + width + ';',
 			},
 			[
 				toolbar( column, [
@@ -704,7 +1110,7 @@
 						removeElement( column.id );
 						changed();
 					} ),
-				].filter( Boolean ) ),
+				] ),
 				inner,
 			]
 		);
@@ -716,14 +1122,13 @@
 		if ( ! render || ! definition ) {
 			return null;
 		}
-		var settings = withDefaults( definition.controls, widget.settings );
+		var s = withDefaults( definition.controls, widget.settings );
+		collectCss( widget, definition.controls, s );
 
 		var node = el(
 			'div',
 			{
-				class:
-					'kbroo-widget kbroo-widget--' + widget.widgetType +
-					' kb-el kb-widget' + ( isSelected( widget.id ) ? ' is-selected' : '' ),
+				class: elementClasses( widget, s, [ 'kbroo-widget', 'kbroo-widget--' + widget.widgetType ], '_' ),
 				'data-id': widget.id,
 				draggable: 'true',
 				ondragstart: function ( e ) {
@@ -745,7 +1150,13 @@
 				] ),
 			]
 		);
-		node.appendChild( el( 'div', { class: 'kb-widget-content', html: render( settings ) } ) );
+		// Insert the preview markup directly so selectors such as
+		// "{{WRAPPER}} > .kbroo-heading" match the same tree as the front end.
+		var holder = document.createElement( 'div' );
+		holder.innerHTML = render( s );
+		while ( holder.firstChild ) {
+			node.appendChild( holder.firstChild );
+		}
 		return node;
 	}
 
@@ -999,16 +1410,28 @@
 	function bindKeyboard() {
 		document.addEventListener( 'keydown', function ( e ) {
 			var typing = e.target.closest && e.target.closest( 'input, textarea, select, [contenteditable]' );
+			var mod = e.ctrlKey || e.metaKey;
+			var key = e.key.toLowerCase();
 
-			if ( ( e.ctrlKey || e.metaKey ) && e.key.toLowerCase() === 's' ) {
+			if ( mod && key === 's' ) {
 				e.preventDefault();
 				save();
 				return;
 			}
 			if ( typing ) {
-				return;
+				return; // Fields keep their own undo while you type.
 			}
-			if ( e.key === 'Escape' ) {
+			if ( mod && key === 'z' ) {
+				e.preventDefault();
+				if ( e.shiftKey ) {
+					redo();
+				} else {
+					undo();
+				}
+			} else if ( mod && key === 'y' ) {
+				e.preventDefault();
+				redo();
+			} else if ( e.key === 'Escape' ) {
 				select( null );
 			} else if ( ( e.key === 'Delete' || e.key === 'Backspace' ) && state.selected ) {
 				e.preventDefault();
@@ -1054,14 +1477,19 @@
 				state.status = data.status;
 				state.permalink = data.permalink;
 				config.title = data.title;
-				// Adopt the server's sanitized copy unless the user kept editing meanwhile.
+				// Adopt the server's sanitized copy unless the user kept editing
+				// meanwhile. Undo history stays; this point becomes "saved".
 				if ( state.revision === revision ) {
 					state.layout = normalizeLayout( data.layout );
+					history.stack[ history.index ] = snapshot();
+					history.savedIndex = history.index;
+					history.mergeKey = null;
 					state.dirty = false;
 					if ( state.selected && ! find( state.selected.id ) ) {
 						state.selected = null;
 					}
 					renderCanvas();
+					renderPanel();
 				}
 				toast( status === 'publish' ? 'Published' : 'Saved' );
 			} )
@@ -1087,6 +1515,11 @@
 		getLayout: function () {
 			return clone( state.layout );
 		},
+		getCss: function () {
+			return ui.styles.textContent;
+		},
 		save: save,
+		undo: undo,
+		redo: redo,
 	};
 } )();

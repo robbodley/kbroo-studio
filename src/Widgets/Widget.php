@@ -11,9 +11,15 @@
 
 namespace KbrooStudio\Widgets;
 
+use KbrooStudio\ControlGroups;
+use KbrooStudio\Controls;
+
 defined( 'ABSPATH' ) || exit;
 
 abstract class Widget {
+
+	/** @var array|null */
+	private $controls = null;
 
 	/** Unique machine name, e.g. "heading". */
 	abstract public function get_name(): string;
@@ -27,13 +33,25 @@ abstract class Widget {
 	}
 
 	/**
-	 * Control definitions keyed by setting name.
+	 * The widget's own control definitions, keyed by setting name. See
+	 * KbrooStudio\Controls for the schema. The Advanced tab is added for you.
 	 */
-	abstract public function get_controls(): array;
+	abstract protected function widget_controls(): array;
+
+	/**
+	 * All controls: the widget's own plus the shared Advanced tab.
+	 */
+	final public function get_controls(): array {
+		if ( null === $this->controls ) {
+			$this->controls = array_merge( $this->widget_controls(), ControlGroups::advanced( '_' ) );
+		}
+		return $this->controls;
+	}
 
 	/**
 	 * Render the widget's inner HTML. Settings are already sanitized and
-	 * have defaults filled in; output must still be escaped.
+	 * have defaults filled in; output must still be escaped. Styling comes
+	 * from the controls' `selectors`, so markup should not inline styles.
 	 */
 	abstract public function render( array $settings ): string;
 
@@ -45,39 +63,7 @@ abstract class Widget {
 			'name'     => $this->get_name(),
 			'title'    => $this->get_title(),
 			'icon'     => $this->get_icon(),
-			'controls' => $this->get_controls(),
+			'controls' => Controls::for_editor( $this->get_controls() ),
 		);
-	}
-
-	/**
-	 * Shared alignment control.
-	 */
-	protected static function align_control( string $default = 'left' ): array {
-		return array(
-			'type'    => 'select',
-			'label'   => __( 'Alignment', 'kbroo-studio' ),
-			'default' => $default,
-			'options' => array(
-				'left'    => __( 'Left', 'kbroo-studio' ),
-				'center'  => __( 'Center', 'kbroo-studio' ),
-				'right'   => __( 'Right', 'kbroo-studio' ),
-				'justify' => __( 'Justified', 'kbroo-studio' ),
-			),
-		);
-	}
-
-	/**
-	 * Build a style attribute from already-validated values.
-	 *
-	 * @param array<string,string> $rules CSS property => value. Empty values are skipped.
-	 */
-	protected static function style_attr( array $rules ): string {
-		$css = '';
-		foreach ( $rules as $property => $value ) {
-			if ( '' !== (string) $value ) {
-				$css .= $property . ':' . $value . ';';
-			}
-		}
-		return '' === $css ? '' : ' style="' . esc_attr( $css ) . '"';
 	}
 }

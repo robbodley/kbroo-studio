@@ -68,7 +68,8 @@ final class Editor {
 		wp_enqueue_style( 'kbroo-editor', KBROO_STUDIO_URL . 'assets/css/editor.css', array( 'dashicons', 'kbroo-frontend' ), KBROO_STUDIO_VERSION );
 
 		wp_enqueue_script( 'kbroo-widgets', KBROO_STUDIO_URL . 'assets/js/widgets.js', array(), KBROO_STUDIO_VERSION, true );
-		wp_enqueue_script( 'kbroo-editor', KBROO_STUDIO_URL . 'assets/js/editor.js', array( 'kbroo-widgets' ), KBROO_STUDIO_VERSION, true );
+		wp_enqueue_script( 'kbroo-css', KBROO_STUDIO_URL . 'assets/js/css.js', array(), KBROO_STUDIO_VERSION, true );
+		wp_enqueue_script( 'kbroo-editor', KBROO_STUDIO_URL . 'assets/js/editor.js', array( 'kbroo-widgets', 'kbroo-css' ), KBROO_STUDIO_VERSION, true );
 
 		$type = get_post_type_object( $post->post_type );
 
@@ -93,9 +94,10 @@ final class Editor {
 			'nonce'          => wp_create_nonce( 'wp_rest' ),
 			'layout'         => Document::get_layout( $post ),
 			'widgets'        => $this->widgets->to_editor_config(),
-			'sectionControls' => Layout::section_controls(),
-			'columnControls' => Layout::column_controls(),
+			'sectionControls' => Controls::for_editor( Layout::section_controls() ),
+			'columnControls' => Controls::for_editor( Layout::column_controls() ),
 			'maxColumns'     => Layout::MAX_COLUMNS,
+			'breakpoints'    => Css::BREAKPOINTS,
 		);
 	}
 

@@ -31,7 +31,7 @@ final class Registry {
 
 	public function register_core_widgets(): void {
 		$this->register( new Heading() );
-		$this->register( new Text() );
+		$this->register( new TextEditor() );
 
 		/**
 		 * Register additional widgets.
