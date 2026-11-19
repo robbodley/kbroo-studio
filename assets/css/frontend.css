@@ -1,0 +1,94 @@
+/* Kbroo Studio: base layout styles shared by the front end and the editor canvas.
+   Per-element styles are generated from each element's settings (src/Css.php). */
+
+.kbroo-page {
+	box-sizing: border-box;
+}
+
+/* Block themes size .alignfull with negative margins; never cap it. */
+.kbroo-page.alignfull {
+	max-width: none;
+}
+
+.kbroo-page *,
+.kbroo-page *::before,
+.kbroo-page *::after {
+	box-sizing: inherit;
+}
+
+/* Block themes add margins between post content children; sections own their spacing. */
+.kbroo-page > .kbroo-section,
+.kbroo-page .kbroo-section {
+	margin-block-start: 0;
+	margin-block-end: 0;
+}
+
+.kbroo-section {
+	--kbroo-gap: 10px;
+	position: relative;
+	width: 100%;
+}
+
+.kbroo-section--boxed > .kbroo-container {
+	max-width: 1140px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.kbroo-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: stretch;
+}
+
+/* The gap is padding around each column, as in Elementor. */
+.kbroo-column {
+	position: relative;
+	display: flex;
+	width: 100%;
+	min-width: 0;
+	padding: var(--kbroo-gap);
+}
+
+.kbroo-column-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	width: 100%;
+	min-width: 0;
+}
+
+.kbroo-widget {
+	position: relative;
+}
+
+.kbroo-heading {
+	margin: 0;
+}
+
+.kbroo-text > :first-child {
+	margin-top: 0;
+}
+
+.kbroo-text > :last-child {
+	margin-bottom: 0;
+}
+
+/* Hide per device. Not applied inside the editor, which shows these faded. */
+@media (min-width: 1025px) {
+	.kbroo-page:not(.kb-canvas) .kbroo-hidden-desktop {
+		display: none !important;
+	}
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+	.kbroo-page:not(.kb-canvas) .kbroo-hidden-tablet {
+		display: none !important;
+	}
+}
+
+@media (max-width: 767px) {
+	.kbroo-page:not(.kb-canvas) .kbroo-hidden-mobile {
+		display: none !important;
+	}
+}
