@@ -53,7 +53,7 @@ final class Css {
 				}
 				foreach ( $control['selectors'] as $selector => $template ) {
 					$selector               = str_replace( '{{WRAPPER}}', $wrapper, $selector );
-					$declaration            = strtr( $template, $replacements );
+					$declaration            = strtr( $template, $replacements + array( '{{DEVICE}}' => $device ) );
 					$rules[ $device ][]     = $selector . '{' . $declaration . '}';
 				}
 			}

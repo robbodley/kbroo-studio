@@ -224,7 +224,8 @@
 				}
 				Object.keys( control.selectors ).forEach( function ( selector ) {
 					rules[ device ].push(
-						selector.split( '{{WRAPPER}}' ).join( wrapper ) + '{' + fill( control.selectors[ selector ], map ) + '}'
+						selector.split( '{{WRAPPER}}' ).join( wrapper ) +
+							'{' + fill( control.selectors[ selector ], Object.assign( { '{{DEVICE}}': device }, map ) ) + '}'
 					);
 				} );
 			} );

@@ -51,7 +51,7 @@
 
 	var history = { stack: [], index: -1, mergeKey: null, mergeTime: 0, savedIndex: 0 };
 
-	var drag = null; // { kind: 'new', widgetType } | { kind: 'widget', id } | { kind: 'section', id }
+	var drag = null; // { kind: 'new', widgetType } | { kind: 'new', elType } | { kind: 'move', id }
 	var dropTarget = null;
 	var placeholder = el( 'div', { class: 'kb-placeholder' } );
 
@@ -179,6 +179,142 @@
 		return { id: uid(), elType: 'column', settings: settings, elements: [] };
 	}
 
+	function emptyDimensions() {
+		return { unit: 'px', top: '', right: '', bottom: '', left: '', isLinked: true };
+	}
+
+	/** An inner section: two columns, no padding of its own. */
+	function makeInnerSection() {
+		var section = makeSection( [ 50, 50 ] );
+		section.isInner = true;
+		section.settings.padding = emptyDimensions();
+		return section;
+	}
+
+	function makeContainer() {
+		return { id: uid(), elType: 'container', isInner: false, settings: defaults( config.containerControls ), elements: [] };
+	}
+
+	/** Twin of Layout::allowed_children(). */
+	function allowedChildren( parentType, inInner ) {
+		switch ( parentType ) {
+			case 'page':
+				return [ 'section', 'container' ];
+			case 'section':
+				return [ 'column' ];
+			case 'column':
+				return inInner ? [ 'widget', 'container' ] : [ 'widget', 'section', 'container' ];
+			case 'container':
+				return [ 'widget', 'container' ];
+		}
+		return [];
+	}
+
+	/** Nodes from the top of the page down to the element (inclusive). */
+	function pathTo( id, list, trail ) {
+		list = list || state.layout.elements;
+		trail = trail || [];
+		for ( var i = 0; i < list.length; i++ ) {
+			var here = trail.concat( [ list[ i ] ] );
+			if ( list[ i ].id === id ) {
+				return here;
+			}
+			if ( list[ i ].elements ) {
+				var found = pathTo( id, list[ i ].elements, here );
+				if ( found ) {
+					return found;
+				}
+			}
+		}
+		return null;
+	}
+
+	function insideInnerSection( id ) {
+		return ( pathTo( id ) || [] ).some( function ( n ) {
+			return n.elType === 'section' && n.isInner;
+		} );
+	}
+
+	function hasInnerSection( node ) {
+		return ( node.elements || [] ).some( function ( child ) {
+			return ( child.elType === 'section' && child.isInner ) || hasInnerSection( child );
+		} );
+	}
+
+	/**
+	 * Whether `holder` (a node, or null for the page) may take `node` (or a
+	 * new element of type `elType`) as a child.
+	 */
+	function canHold( holder, elType, node ) {
+		var parentType = holder ? holder.elType : 'page';
+		var inInner = !! holder && holder.elType === 'column' && insideInnerSection( holder.id );
+		if ( allowedChildren( parentType, inInner ).indexOf( elType ) === -1 ) {
+			return false;
+		}
+		if ( holder && node && ( node.id === holder.id || find( holder.id, node.elements || [] ) ) ) {
+			return false; // Not into itself.
+		}
+		if ( holder && elType === 'section' && node && hasInnerSection( node ) ) {
+			return false; // Inner sections nest one level only.
+		}
+		if ( holder && elType === 'column' && holder.elements.length >= config.maxColumns && ! ( node && find( node.id, holder.elements ) ) ) {
+			return false;
+		}
+		return true;
+	}
+
+	/** Sections and containers record whether they sit inside something. */
+	function setParent( node, holder ) {
+		if ( node.elType === 'section' || node.elType === 'container' ) {
+			node.isInner = !! holder;
+		}
+	}
+
+	/**
+	 * Put a node next to (or into) the target element: into the target when
+	 * it can hold it, otherwise after the nearest element whose parent can.
+	 * A widget with nowhere to go starts a new section at the end.
+	 */
+	function insertNode( node, targetId ) {
+		var cur = targetId ? find( targetId ) : null;
+		while ( cur ) {
+			var holder = cur.node;
+			if ( holder.elType === 'section' && node.elType !== 'column' && node.elType !== 'section' && holder.elements.length ) {
+				holder = holder.elements[ 0 ]; // A section takes widgets into its first column.
+			}
+			if ( holder.elType !== 'widget' && canHold( holder, node.elType, node ) ) {
+				setParent( node, holder );
+				holder.elements.push( node );
+				if ( node.elType === 'column' ) {
+					evenWidths( holder );
+				}
+				return;
+			}
+			if ( canHold( cur.parent, node.elType, node ) ) {
+				setParent( node, cur.parent );
+				cur.list.splice( cur.index + 1, 0, node );
+				if ( node.elType === 'column' ) {
+					evenWidths( cur.parent );
+				}
+				return;
+			}
+			cur = cur.parent ? find( cur.parent.id ) : null;
+		}
+		if ( node.elType === 'section' || node.elType === 'container' ) {
+			setParent( node, null );
+			state.layout.elements.push( node );
+			return;
+		}
+		var wrapper = makeSection( [ 100 ] );
+		if ( node.elType === 'column' ) {
+			node.settings._inline_size = 100;
+			wrapper.elements = [ node ];
+		} else {
+			wrapper.elements[ 0 ].elements.push( node );
+		}
+		state.layout.elements.push( wrapper );
+	}
+
 	function makeWidget( type ) {
 		return {
 			id: uid(),
@@ -289,13 +425,14 @@
 	}
 
 	/** A copied element rebuilt from untrusted JSON, or null. */
-	function cleanElement( node, expected ) {
-		if ( ! node || typeof node !== 'object' || ( expected && node.elType !== expected ) ) {
+	function cleanElement( node, allowed, inInner, depth ) {
+		allowed = allowed || [ 'section', 'column', 'container', 'widget' ];
+		depth = depth || 0;
+		if ( ! node || typeof node !== 'object' || allowed.indexOf( node.elType ) === -1 || depth > 12 ) {
 			return null;
 		}
 		var settings = node.settings && typeof node.settings === 'object' && ! Array.isArray( node.settings ) ? node.settings : {};
 		var out = { id: uid(), elType: node.elType, settings: clone( settings ) };
-		var child = { section: 'column', column: 'widget' }[ node.elType ];
 		if ( node.elType === 'widget' ) {
 			if ( ! config.widgets[ node.widgetType ] ) {
 				return null;
@@ -303,12 +440,14 @@
 			out.widgetType = node.widgetType;
 			return out;
 		}
-		if ( ! child ) {
-			return null;
+		if ( node.elType === 'section' || node.elType === 'container' ) {
+			out.isInner = !! node.isInner;
 		}
+		var childInner = inInner || ( node.elType === 'section' && out.isInner );
+		var childAllowed = allowedChildren( node.elType, childInner );
 		out.elements = ( Array.isArray( node.elements ) ? node.elements : [] )
 			.map( function ( c ) {
-				return cleanElement( c, child );
+				return cleanElement( c, childAllowed, childInner, depth + 1 );
 			} )
 			.filter( Boolean );
 		if ( node.elType === 'section' ) {
@@ -358,51 +497,13 @@
 		toast( elementLabel( found.node ) + ' copied. Paste it here or on another page.' );
 	}
 
-	/** The section an element sits in. */
-	function sectionOf( id ) {
-		var found = find( id );
-		while ( found && found.node.elType !== 'section' ) {
-			found = found.parent ? find( found.parent.id ) : null;
-		}
-		return found;
-	}
-
 	/**
-	 * Insert a copied element next to (or into) the target element: widgets
-	 * go after a widget or into a column, columns after a column, sections
-	 * after the target's section. With no target they go at the end.
+	 * Insert a copied element next to (or into) the target element (see
+	 * insertNode()). With no target it goes at the end of the page.
 	 */
 	function pasteElement( element, targetId ) {
-		var target = targetId ? find( targetId ) : null;
 		var copy = withNewIds( element );
-
-		if ( copy.elType === 'section' ) {
-			var section = target ? sectionOf( target.node.id ) : null;
-			state.layout.elements.splice( section ? section.index + 1 : state.layout.elements.length, 0, copy );
-		} else if ( copy.elType === 'column' ) {
-			var host = target ? sectionOf( target.node.id ) : null;
-			if ( host && host.node.elements.length < config.maxColumns ) {
-				var at = target.node.elType === 'column' ? target.index + 1 : target.node.elType === 'widget' ? find( target.parent.id ).index + 1 : host.node.elements.length;
-				host.node.elements.splice( at, 0, copy );
-				evenWidths( host.node );
-			} else {
-				var wrapper = makeSection( [ 100 ] );
-				copy.settings._inline_size = 100;
-				wrapper.elements = [ copy ];
-				state.layout.elements.splice( host ? host.index + 1 : state.layout.elements.length, 0, wrapper );
-			}
-		} else if ( target && target.node.elType === 'widget' ) {
-			target.list.splice( target.index + 1, 0, copy );
-		} else if ( target && target.node.elType === 'column' ) {
-			target.node.elements.push( copy );
-		} else if ( target && target.node.elType === 'section' ) {
-			target.node.elements[ 0 ].elements.push( copy );
-		} else {
-			var fresh = makeSection( [ 100 ] );
-			fresh.elements[ 0 ].elements.push( copy );
-			state.layout.elements.push( fresh );
-		}
-
+		insertNode( copy, targetId );
 		select( copy.id, copy.elType, true );
 		changed();
 	}
@@ -944,7 +1045,38 @@
 		}
 	}
 
+	var LAYOUT_TILES = [
+		{ elType: 'container', title: 'Container', icon: 'dashicons-grid-view' },
+		{ elType: 'section', title: 'Inner section', icon: 'dashicons-columns' },
+	];
+
 	function renderWidgetsPanel() {
+		var layoutGrid = el( 'div', { class: 'kb-widget-grid' } );
+		LAYOUT_TILES.forEach( function ( tile ) {
+			layoutGrid.appendChild(
+				el(
+					'button',
+					{
+						type: 'button',
+						class: 'kb-widget-tile',
+						draggable: 'true',
+						'data-element': tile.elType,
+						title: 'Drag onto the page, or click to add',
+						ondragstart: function ( e ) {
+							startDrag( e, { kind: 'new', elType: tile.elType } );
+						},
+						ondragend: endDrag,
+						onclick: function () {
+							var node = tile.elType === 'container' ? makeContainer() : makeInnerSection();
+							insertNode( node, state.selected && state.selected.id );
+							select( node.id, node.elType, true );
+							changed();
+						},
+					},
+					[ icon( tile.icon ), el( 'span', { text: tile.title } ) ]
+				)
+			);
+		} );
 		var grid = el( 'div', { class: 'kb-widget-grid' } );
 		Object.keys( config.widgets ).forEach( function ( type ) {
 			var widget = config.widgets[ type ];
@@ -973,6 +1105,9 @@
 		ui.panel.appendChild( el( 'div', { class: 'kb-panel-header' }, [ el( 'h2', { text: 'Widgets' } ) ] ) );
 		ui.panel.appendChild(
 			el( 'div', { class: 'kb-panel-body' }, [
+				el( 'h3', { class: 'kb-control-section', text: 'Layout' } ),
+				layoutGrid,
+				el( 'h3', { class: 'kb-control-section', text: 'Widgets' } ),
 				grid,
 				el( 'p', {
 					class: 'kb-hint',
@@ -989,7 +1124,10 @@
 		if ( node.elType === 'widget' ) {
 			return config.widgets[ node.widgetType ] ? config.widgets[ node.widgetType ].title : node.widgetType;
 		}
-		return node.elType === 'section' ? 'Section' : 'Column';
+		if ( node.elType === 'section' ) {
+			return node.isInner ? 'Inner section' : 'Section';
+		}
+		return node.elType === 'container' ? 'Container' : 'Column';
 	}
 
 	function controlsFor( node ) {
@@ -998,6 +1136,9 @@
 		}
 		if ( node.elType === 'column' ) {
 			return config.columnControls;
+		}
+		if ( node.elType === 'container' ) {
+			return config.containerControls;
 		}
 		return config.widgets[ node.widgetType ].controls;
 	}
@@ -1966,7 +2107,7 @@
 	var navDrag = null; // { id, elType }
 	var navTarget = null; // { id, position: 'before' | 'after' | 'inside' }
 
-	var NAV_ICONS = { section: 'dashicons-editor-table', column: 'dashicons-columns' };
+	var NAV_ICONS = { section: 'dashicons-editor-table', column: 'dashicons-columns', container: 'dashicons-grid-view' };
 
 	/** A short preview of a widget's text, for its Navigator row. */
 	function widgetSnippet( node ) {
@@ -2172,12 +2313,20 @@
 		var rect = row.getBoundingClientRect();
 		var after = e.clientY > rect.top + rect.height / 2;
 
-		if ( node.elType === navDrag.elType ) {
+		var dragged = find( navDrag.id );
+		var here = find( node.id );
+		if ( ! dragged || ! here ) {
+			return;
+		}
+		// Inside a column or container (or a section, for a column), else
+		// next to the row when its parent can take the dragged element.
+		var into = node.elType !== 'widget' && canHold( node, dragged.node.elType, dragged.node );
+		var beside = canHold( here.parent, dragged.node.elType, dragged.node ) || here.parent === dragged.parent;
+		var middle = Math.abs( e.clientY - ( rect.top + rect.height / 2 ) ) < rect.height / 4;
+		if ( into && ( middle || ! beside ) ) {
+			position = 'inside';
+		} else if ( beside ) {
 			position = after ? 'after' : 'before';
-		} else if ( navDrag.elType === 'widget' && node.elType === 'column' ) {
-			position = 'inside';
-		} else if ( navDrag.elType === 'column' && node.elType === 'section' && node.elements.length < config.maxColumns ) {
-			position = 'inside';
 		}
 		if ( ! position ) {
 			return;
@@ -2232,6 +2381,7 @@
 		}
 
 		var node = source.list.splice( source.index, 1 )[ 0 ];
+		setParent( node, newParent );
 		if ( position === 'inside' ) {
 			target.node.elements.push( node );
 		} else {
@@ -2334,8 +2484,11 @@
 		Css.setGlobals( state.globals, config.globalTypographyControls );
 		ui.canvasWrap.classList.toggle( 'is-previewing', !! state.preview );
 
-		layout.elements.forEach( function ( section ) {
-			ui.canvas.appendChild( renderSection( section ) );
+		layout.elements.forEach( function ( node ) {
+			var rendered = renderElement( node );
+			if ( rendered ) {
+				ui.canvas.appendChild( rendered );
+			}
 		} );
 
 		if ( ! layout.elements.length ) {
@@ -2356,35 +2509,66 @@
 		renderNavigator();
 	}
 
-	function renderSection( section ) {
-		var s = withDefaults( config.sectionControls, section.settings );
-		collectCss( section, config.sectionControls, s );
+	function renderElement( node ) {
+		switch ( node.elType ) {
+			case 'section':
+				return renderSection( node );
+			case 'container':
+				return renderContainer( node );
+			case 'widget':
+				return renderWidget( node );
+		}
+		return null;
+	}
 
-		var handle = el(
+	/** Children of a column or container, inside its drop zone. */
+	function renderChildren( holder, zone, emptyText ) {
+		holder.elements.forEach( function ( child ) {
+			var rendered = renderElement( child );
+			if ( rendered ) {
+				zone.appendChild( rendered );
+			}
+		} );
+		if ( ! holder.elements.length ) {
+			zone.appendChild( el( 'div', { class: 'kb-column-empty' }, [ icon( 'dashicons-plus' ), el( 'span', { text: emptyText } ) ] ) );
+		}
+		return zone;
+	}
+
+	/** Drag handle for sections and containers. */
+	function dragHandle( node, getElement ) {
+		return el(
 			'span',
 			{
 				class: 'kb-tool kb-handle',
-				title: 'Drag to move section',
+				title: 'Drag to move',
 				draggable: 'true',
 				// Keep the toolbar (and so this handle) rendered while the
-				// pointer leaves the section, or the browser cancels the drag.
+				// pointer leaves the element, or the browser cancels the drag.
 				onmousedown: function () {
-					sectionEl.classList.add( 'kb-toolbar-pinned' );
+					var target = getElement();
+					target.classList.add( 'kb-toolbar-pinned' );
 					document.addEventListener(
 						'mouseup',
 						function () {
-							sectionEl.classList.remove( 'kb-toolbar-pinned' );
+							target.classList.remove( 'kb-toolbar-pinned' );
 						},
 						{ once: true }
 					);
 				},
 				ondragstart: function ( e ) {
-					startDrag( e, { kind: 'section', id: section.id }, sectionEl );
+					e.stopPropagation();
+					startDrag( e, { kind: 'move', id: node.id }, getElement() );
 				},
 				ondragend: endDrag,
 			},
 			[ icon( 'dashicons-move' ) ]
 		);
+	}
+
+	function renderSection( section ) {
+		var s = withDefaults( config.sectionControls, section.settings );
+		collectCss( section, config.sectionControls, s );
 
 		var row = el( 'div', { class: 'kbroo-row' } );
 		section.elements.forEach( function ( column ) {
@@ -2392,26 +2576,32 @@
 		} );
 
 		var tag = config.sectionControls.html_tag.options[ s.html_tag ] ? s.html_tag : 'section';
+		var classes = [ 'kbroo-section', 'kbroo-section--' + ( s.layout === 'full_width' ? 'full' : 'boxed' ) ];
+		if ( section.isInner ) {
+			classes.push( 'kbroo-section--inner' );
+		}
 		var sectionEl = el(
 			tag,
 			{
-				class: elementClasses( section, s, [ 'kbroo-section', 'kbroo-section--' + ( s.layout === 'full_width' ? 'full' : 'boxed' ) ], '' ),
+				class: elementClasses( section, s, classes, '' ),
 				'data-id': section.id,
 			},
 			[
 				toolbar( section, [
-					handle,
+					dragHandle( section, function () {
+						return sectionEl;
+					} ),
 					section.elements.length < config.maxColumns
 						? toolButton( 'dashicons-columns', 'Add column', function () {
 								addColumn( section.id );
 								changed();
 						  } )
 						: null,
-					toolButton( 'dashicons-admin-page', 'Duplicate section', function () {
+					toolButton( 'dashicons-admin-page', 'Duplicate', function () {
 						duplicateElement( section.id );
 						changed();
 					} ),
-					toolButton( 'dashicons-trash', 'Delete section', function () {
+					toolButton( 'dashicons-trash', 'Delete', function () {
 						removeElement( section.id );
 						changed();
 					} ),
@@ -2426,16 +2616,7 @@
 		var s = withDefaults( config.columnControls, column.settings );
 		collectCss( column, config.columnControls, s );
 
-		var inner = el( 'div', { class: 'kbroo-column-inner kb-dropzone' } );
-		column.elements.forEach( function ( widget ) {
-			var w = renderWidget( widget );
-			if ( w ) {
-				inner.appendChild( w );
-			}
-		} );
-		if ( ! column.elements.length ) {
-			inner.appendChild( el( 'div', { class: 'kb-column-empty' }, [ icon( 'dashicons-plus' ), el( 'span', { text: 'Drag widget here' } ) ] ) );
-		}
+		var inner = renderChildren( column, el( 'div', { class: 'kbroo-column-inner kb-dropzone', 'data-holder': column.id } ), 'Drag widget here' );
 
 		return el(
 			'div',
@@ -2459,6 +2640,49 @@
 				inner,
 			]
 		);
+	}
+
+	function renderContainer( container ) {
+		var s = withDefaults( config.containerControls, container.settings );
+		collectCss( container, config.containerControls, s );
+
+		var classes = [ 'kbroo-con', 'kbroo-con--' + ( s.content_width === 'full' ? 'full' : 'boxed' ) ];
+		if ( container.isInner ) {
+			classes.push( 'kbroo-con--child' );
+		}
+		var tag = config.containerControls.html_tag.options[ s.html_tag ] ? s.html_tag : 'div';
+		var zone = renderChildren( container, el( 'div', { class: 'kbroo-con-inner kb-dropzone', 'data-holder': container.id } ), 'Drag widget or container here' );
+		var node = el(
+			tag,
+			{
+				class: elementClasses( container, s, classes, '' ),
+				'data-id': container.id,
+			},
+			[
+				toolbar( container, [
+					dragHandle( container, function () {
+						return node;
+					} ),
+					toolButton( 'dashicons-plus-alt2', 'Add container inside', function () {
+						var child = makeContainer();
+						setParent( child, container );
+						container.elements.push( child );
+						select( child.id, 'container', true );
+						changed();
+					} ),
+					toolButton( 'dashicons-admin-page', 'Duplicate', function () {
+						duplicateElement( container.id );
+						changed();
+					} ),
+					toolButton( 'dashicons-trash', 'Delete', function () {
+						removeElement( container.id );
+						changed();
+					} ),
+				] ),
+				zone,
+			]
+		);
+		return node;
 	}
 
 	/* Widgets only WordPress can render (shortcodes) are previewed with HTML
@@ -2532,7 +2756,7 @@
 				draggable: 'true',
 				ondragstart: function ( e ) {
 					e.stopPropagation();
-					startDrag( e, { kind: 'widget', id: widget.id }, node );
+					startDrag( e, { kind: 'move', id: widget.id }, node );
 				},
 				ondragend: endDrag,
 			},
@@ -2605,28 +2829,7 @@
 
 	function addWidgetByClick( type ) {
 		var widget = makeWidget( type );
-		var target = null;
-
-		if ( state.selected ) {
-			var found = find( state.selected.id );
-			if ( found && found.node.elType === 'column' ) {
-				target = found.node;
-			} else if ( found && found.node.elType === 'widget' ) {
-				found.list.splice( found.index + 1, 0, widget );
-				select( widget.id, 'widget', true );
-				changed();
-				return;
-			} else if ( found && found.node.elType === 'section' ) {
-				target = found.node.elements[ 0 ];
-			}
-		}
-
-		if ( ! target ) {
-			var section = makeSection( [ 100 ] );
-			state.layout.elements.push( section );
-			target = section.elements[ 0 ];
-		}
-		target.elements.push( widget );
+		insertNode( widget, state.selected && state.selected.id );
 		select( widget.id, 'widget', true );
 		changed();
 	}
@@ -2664,6 +2867,18 @@
 		} );
 	}
 
+	/** What is being dragged: { elType, node } (node is null for a new element). */
+	function dragInfo() {
+		if ( ! drag ) {
+			return null;
+		}
+		if ( drag.kind === 'new' ) {
+			return { elType: drag.widgetType ? 'widget' : drag.elType, node: null };
+		}
+		var found = find( drag.id );
+		return found ? { elType: found.node.elType, node: found.node } : null;
+	}
+
 	function startDrag( e, payload, dragImage ) {
 		drag = payload;
 		e.dataTransfer.effectAllowed = payload.kind === 'new' ? 'copy' : 'move';
@@ -2672,7 +2887,8 @@
 		if ( dragImage && e.dataTransfer.setDragImage ) {
 			e.dataTransfer.setDragImage( dragImage, 20, 20 );
 		}
-		ui.canvas.classList.add( 'is-dragging-' + ( payload.kind === 'section' ? 'section' : 'widget' ) );
+		var info = dragInfo();
+		ui.canvas.classList.add( 'is-dragging-' + ( info && info.elType !== 'widget' ? 'section' : 'widget' ) );
 		if ( dragImage ) {
 			// Defer, so the drag image is captured before it is dimmed.
 			setTimeout( function () {
@@ -2701,14 +2917,18 @@
 	 * Index among `children` (ignoring the placeholder and the element being
 	 * dragged) where the pointer at `y` should insert.
 	 */
-	function insertIndex( children, y ) {
+	function insertIndex( children, e, horizontal ) {
 		for ( var i = 0; i < children.length; i++ ) {
 			var rect = children[ i ].getBoundingClientRect();
-			if ( y < rect.top + rect.height / 2 ) {
+			if ( horizontal ? e.clientX < rect.left + rect.width / 2 : e.clientY < rect.top + rect.height / 2 ) {
 				return i;
 			}
 		}
 		return children.length;
+	}
+
+	function isRow( zone ) {
+		return /^row/.test( window.getComputedStyle( zone ).flexDirection ) && zone.classList.contains( 'kbroo-con-inner' );
 	}
 
 	function childrenOf( container, selector ) {
@@ -2729,28 +2949,38 @@
 	}
 
 	function onDragOver( e ) {
-		if ( ! drag || state.preview ) {
+		var info = dragInfo();
+		if ( ! info || state.preview ) {
 			return;
 		}
 		e.preventDefault();
 		e.dataTransfer.dropEffect = drag.kind === 'new' ? 'copy' : 'move';
 
-		var column = drag.kind === 'section' ? null : e.target.closest( '.kb-column' );
+		// The innermost column or container under the pointer that can take
+		// the dragged element.
+		var zone = e.target.closest ? e.target.closest( '.kb-dropzone' ) : null;
+		while ( zone ) {
+			var holder = find( zone.getAttribute( 'data-holder' ) );
+			if ( holder && canHold( holder.node, info.elType, info.node ) ) {
+				break;
+			}
+			zone = zone.parentElement ? zone.parentElement.closest( '.kb-dropzone' ) : null;
+		}
 
-		if ( column ) {
-			var zone = column.querySelector( '.kb-dropzone' );
-			var widgets = childrenOf( zone, '.kb-widget' );
-			var index = insertIndex( widgets, e.clientY );
-			dropTarget = { type: 'column', columnId: column.getAttribute( 'data-id' ), index: index };
-			placePlaceholder( zone, widgets, index, 'widget' );
+		if ( zone ) {
+			var children = childrenOf( zone, '.kb-el' );
+			var row = isRow( zone );
+			var index = insertIndex( children, e, row );
+			dropTarget = { holderId: zone.getAttribute( 'data-holder' ), index: index };
+			placePlaceholder( zone, children, index, row ? 'row' : 'widget' );
 			return;
 		}
 
-		// Between sections: move a section, or wrap a widget in a new section.
-		var sections = childrenOf( ui.canvas, '.kb-section' );
-		var sectionIndex = insertIndex( sections, e.clientY );
-		dropTarget = { type: 'section', index: sectionIndex };
-		placePlaceholder( ui.canvas, sections, sectionIndex, 'section' );
+		// The page: between top-level sections and containers.
+		var top = childrenOf( ui.canvas, '.kb-el' );
+		var topIndex = insertIndex( top, e, false );
+		dropTarget = { holderId: null, index: topIndex };
+		placePlaceholder( ui.canvas, top, topIndex, 'section' );
 	}
 
 	function onDrop( e ) {
@@ -2764,20 +2994,18 @@
 		var target = dropTarget;
 		endDrag();
 
-		var node;
-		if ( payload.kind === 'section' ) {
-			var from = find( payload.id );
-			if ( ! from ) {
-				return;
-			}
-			node = from.list.splice( from.index, 1 )[ 0 ];
-			state.layout.elements.splice( target.index, 0, node );
-			changed();
+		var holder = target.holderId ? find( target.holderId ) : null;
+		if ( target.holderId && ! holder ) {
 			return;
 		}
 
+		var node;
 		if ( payload.kind === 'new' ) {
-			node = makeWidget( payload.widgetType );
+			if ( payload.widgetType ) {
+				node = makeWidget( payload.widgetType );
+			} else {
+				node = payload.elType === 'container' ? makeContainer() : makeInnerSection();
+			}
 		} else {
 			var source = find( payload.id );
 			if ( ! source ) {
@@ -2786,19 +3014,20 @@
 			node = source.list.splice( source.index, 1 )[ 0 ];
 		}
 
-		if ( target.type === 'column' ) {
-			var column = find( target.columnId );
-			if ( ! column ) {
-				return;
-			}
-			column.node.elements.splice( target.index, 0, node );
+		if ( holder ) {
+			setParent( node, holder.node );
+			holder.node.elements.splice( target.index, 0, node );
 		} else {
-			var section = makeSection( [ 100 ] );
-			section.elements[ 0 ].elements.push( node );
-			state.layout.elements.splice( target.index, 0, section );
+			var topNode = node;
+			if ( node.elType === 'widget' ) {
+				topNode = makeSection( [ 100 ] );
+				topNode.elements[ 0 ].elements.push( node );
+			}
+			setParent( topNode, null );
+			state.layout.elements.splice( target.index, 0, topNode );
 		}
 
-		select( node.id, 'widget', true );
+		select( node.id, node.elType, true );
 		changed();
 	}
 

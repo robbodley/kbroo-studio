@@ -29,12 +29,7 @@ final class Renderer {
 	public function render( array $layout, int $post_id = 0 ): string {
 		$this->rules = array_fill_keys( Controls::DEVICES, array() );
 
-		$html = '';
-		foreach ( (array) ( $layout['elements'] ?? array() ) as $section ) {
-			if ( is_array( $section ) && 'section' === ( $section['elType'] ?? '' ) ) {
-				$html .= $this->render_section( $section );
-			}
-		}
+		$html = $this->render_children( (array) ( $layout['elements'] ?? array() ) );
 
 		$css = Css::stylesheet( $this->rules );
 		if ( '' !== $css ) {
@@ -102,46 +97,77 @@ final class Renderer {
 		return $attributes . ' data-id="' . esc_attr( $id ) . '"';
 	}
 
+	/**
+	 * Render a list of elements of any type. The layout was sanitized when
+	 * it was saved, so each element is where it may be.
+	 */
+	private function render_children( array $elements ): string {
+		$html = '';
+		foreach ( $elements as $element ) {
+			if ( ! is_array( $element ) ) {
+				continue;
+			}
+			switch ( $element['elType'] ?? '' ) {
+				case 'section':
+					$html .= $this->render_section( $element );
+					break;
+				case 'column':
+					$html .= $this->render_column( $element );
+					break;
+				case 'container':
+					$html .= $this->render_container( $element );
+					break;
+				case 'widget':
+					$html .= $this->render_widget( $element );
+					break;
+			}
+		}
+		return $html;
+	}
+
 	private function render_section( array $section ): string {
 		$settings = $this->prepare( $section, Layout::section_controls() );
 
-		$columns = '';
-		foreach ( (array) ( $section['elements'] ?? array() ) as $column ) {
-			if ( is_array( $column ) && 'column' === ( $column['elType'] ?? '' ) ) {
-				$columns .= $this->render_column( $column );
-			}
+		$tags    = array_keys( Layout::section_controls()['html_tag']['options'] );
+		$tag     = in_array( $settings['html_tag'], $tags, true ) ? $settings['html_tag'] : 'section';
+		$classes = array( 'kbroo-section', 'kbroo-section--' . ( 'full_width' === $settings['layout'] ? 'full' : 'boxed' ) );
+		if ( ! empty( $section['isInner'] ) ) {
+			$classes[] = 'kbroo-section--inner';
 		}
-
-		$tags = array_keys( Layout::section_controls()['html_tag']['options'] );
-		$tag  = in_array( $settings['html_tag'], $tags, true ) ? $settings['html_tag'] : 'section';
 
 		return sprintf(
 			'<%1$s%2$s><div class="kbroo-container"><div class="kbroo-row">%3$s</div></div></%1$s>',
 			$tag,
-			$this->attributes(
-				$section,
-				$settings,
-				array( 'kbroo-section', 'kbroo-section--' . ( 'full_width' === $settings['layout'] ? 'full' : 'boxed' ) ),
-				''
-			),
-			$columns
+			$this->attributes( $section, $settings, $classes, '' ),
+			$this->render_children( (array) ( $section['elements'] ?? array() ) )
 		);
 	}
 
 	private function render_column( array $column ): string {
 		$settings = $this->prepare( $column, Layout::column_controls() );
 
-		$widgets = '';
-		foreach ( (array) ( $column['elements'] ?? array() ) as $widget ) {
-			if ( is_array( $widget ) && 'widget' === ( $widget['elType'] ?? '' ) ) {
-				$widgets .= $this->render_widget( $widget );
-			}
-		}
-
 		return sprintf(
 			'<div%1$s><div class="kbroo-column-inner">%2$s</div></div>',
 			$this->attributes( $column, $settings, array( 'kbroo-column' ), '' ),
-			$widgets
+			$this->render_children( (array) ( $column['elements'] ?? array() ) )
+		);
+	}
+
+	private function render_container( array $container ): string {
+		$controls = Layout::container_controls();
+		$settings = $this->prepare( $container, $controls );
+
+		$tag     = array_key_exists( $settings['html_tag'], $controls['html_tag']['options'] ) ? $settings['html_tag'] : 'div';
+		$classes = array( 'kbroo-con', 'kbroo-con--' . ( 'full' === $settings['content_width'] ? 'full' : 'boxed' ) );
+		if ( ! empty( $container['isInner'] ) ) {
+			$classes[] = 'kbroo-con--child';
+		}
+
+		return sprintf(
+			'<%1$s%2$s><div class="kbroo-con-inner">%3$s</div></%1$s>',
+			$tag,
+			$this->attributes( $container, $settings, $classes, '' ),
+			$this->render_children( (array) ( $container['elements'] ?? array() ) )
 		);
 	}
 

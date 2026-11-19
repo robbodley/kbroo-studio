@@ -96,6 +96,7 @@ final class Editor {
 			'layout'         => Document::get_layout( $post ),
 			'widgets'        => $this->widgets->to_editor_config(),
 			'sectionControls' => Controls::for_editor( Layout::section_controls() ),
+			'containerControls' => Controls::for_editor( Layout::container_controls() ),
 			'columnControls' => Controls::for_editor( Layout::column_controls() ),
 			'maxColumns'     => Layout::MAX_COLUMNS,
 			'breakpoints'    => Css::BREAKPOINTS,
