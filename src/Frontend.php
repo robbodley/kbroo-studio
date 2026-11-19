@@ -45,19 +45,46 @@ final class Frontend {
 			return $content;
 		}
 
-		wp_enqueue_style( 'kbroo-frontend' );
-		return $this->renderer->render( Document::get_layout( $post ), $post->ID );
+		$layout = Document::get_layout( $post );
+		$this->enqueue_for( $layout );
+		return $this->renderer->render( $layout, $post->ID );
 	}
 
 	/**
-	 * Register the stylesheet everywhere, and enqueue it in the head when the
-	 * main post is a builder page. filter_content() also enqueues it, which
-	 * covers builder content shown elsewhere (it then prints in the footer).
+	 * Enqueue the styles in the head when the main post is a builder page.
+	 * filter_content() also enqueues them, which covers builder content shown
+	 * elsewhere (it then prints in the footer).
 	 */
 	public function enqueue(): void {
-		wp_register_style( 'kbroo-frontend', KBROO_STUDIO_URL . 'assets/css/frontend.css', array(), KBROO_STUDIO_VERSION );
 		if ( is_singular() && Document::is_built_with_kbroo( get_queried_object() ) ) {
-			wp_enqueue_style( 'kbroo-frontend' );
+			$this->enqueue_for( Document::get_layout( get_queried_object() ) );
+		}
+	}
+
+	/** @var bool Whether the global styles were added to the page. */
+	private $globals_added = false;
+
+	/**
+	 * Stylesheet, global colors and fonts, and the Google Fonts a layout uses.
+	 */
+	private function enqueue_for( array $layout ): void {
+		// Block themes render content before wp_enqueue_scripts runs, so this
+		// can be the first call: register here rather than in enqueue().
+		if ( ! wp_style_is( 'kbroo-frontend', 'registered' ) ) {
+			wp_register_style( 'kbroo-frontend', KBROO_STUDIO_URL . 'assets/css/frontend.css', array(), KBROO_STUDIO_VERSION );
+		}
+		wp_enqueue_style( 'kbroo-frontend' );
+
+		$globals = Globals::get();
+		if ( ! $this->globals_added ) {
+			$this->globals_added = true;
+			wp_add_inline_style( 'kbroo-frontend', Globals::css( $globals ) );
+		}
+
+		$url = Fonts::google_url( Globals::fonts_in_layout( $layout, $globals ) );
+		if ( '' !== $url ) {
+			// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- Google sets the version.
+			wp_enqueue_style( 'kbroo-fonts-' . substr( md5( $url ), 0, 8 ), $url, array(), null );
 		}
 	}
 

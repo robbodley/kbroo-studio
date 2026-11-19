@@ -98,6 +98,13 @@ final class Editor {
 			'columnControls' => Controls::for_editor( Layout::column_controls() ),
 			'maxColumns'     => Layout::MAX_COLUMNS,
 			'breakpoints'    => Css::BREAKPOINTS,
+			'globals'        => Globals::get(),
+			'globalsUrl'     => esc_url_raw( rest_url( Rest::NAMESPACE . '/globals' ) ),
+			'canEditGlobals' => current_user_can( Globals::CAPABILITY ),
+			'globalTypographyControls' => Controls::for_editor( Globals::typography_controls() ),
+			'systemGlobalIds' => Globals::SYSTEM_IDS,
+			'fonts'          => Fonts::all(),
+			'revisionsUrl'   => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/revisions' ) ),
 		);
 	}
 

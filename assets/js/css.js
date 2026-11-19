@@ -62,8 +62,11 @@
 				if ( typeof value !== 'string' || value === '' || ! control.options || ! ( value in control.options ) ) {
 					return null;
 				}
-				var css = control.selectors_dictionary && value in control.selectors_dictionary ? control.selectors_dictionary[ value ] : value;
-				return { '{{VALUE}}': String( css ).replace( /[^A-Za-z0-9_\-.%# ]/g, '' ) };
+				// Dictionary values come from code (font stacks hold quotes and commas).
+				if ( control.selectors_dictionary && value in control.selectors_dictionary ) {
+					return { '{{VALUE}}': String( control.selectors_dictionary[ value ] ) };
+				}
+				return { '{{VALUE}}': value.replace( /[^A-Za-z0-9_\-.%# ]/g, '' ) };
 
 			case 'number':
 				return isNumeric( value ) ? { '{{VALUE}}': String( Number( value ) ) } : null;
@@ -97,6 +100,104 @@
 		return null;
 	}
 
+	function globalId( settings, key ) {
+		var ref = settings.__globals__ && settings.__globals__[ key ];
+		var match = typeof ref === 'string' && ref.match( /\?id=([a-z0-9_-]{1,40})$/ );
+		return match ? match[ 1 ] : '';
+	}
+
+	function variable( kind, id, property ) {
+		return kind === 'colors' ? '--kbroo-global-color-' + id : '--kbroo-global-typography-' + id + '-' + property;
+	}
+
+	// The editor sets these so global links can be checked as in PHP.
+	var currentGlobals = null;
+	var currentTypographyControls = {};
+
+	function setGlobals( globals, typographyControls ) {
+		currentGlobals = globals;
+		currentTypographyControls = typographyControls || {};
+	}
+
+	/** Twin of Globals::defines(). */
+	function defines( kind, id, property ) {
+		var item = currentGlobals && ( currentGlobals[ kind ] || [] ).filter( function ( g ) {
+			return g._id === id;
+		} )[ 0 ];
+		if ( ! item ) {
+			return false;
+		}
+		if ( kind === 'colors' ) {
+			return !! item.color;
+		}
+		return Object.keys( currentTypographyControls ).some( function ( key ) {
+			var control = currentTypographyControls[ key ];
+			if ( control.global_property !== property ) {
+				return false;
+			}
+			var deviceKeys = keys( key, control );
+			return Object.keys( deviceKeys ).some( function ( device ) {
+				return !! replacements( control, item[ deviceKeys[ device ] ] );
+			} );
+		} );
+	}
+
+	/** Twin of Css::global_replacements(). */
+	function globalReplacements( control, settings, settingKey, device ) {
+		var id;
+		if ( control.type === 'color' ) {
+			id = globalId( settings, settingKey );
+			return id && defines( 'colors', id ) ? { '{{VALUE}}': 'var(' + variable( 'colors', id ) + ')' } : null;
+		}
+		if ( ! control.global_group || ! control.global_property || device !== 'desktop' ) {
+			return null;
+		}
+		id = globalId( settings, control.global_group );
+		if ( ! id || replacements( control, settings[ settingKey ] ) || ! defines( 'typography', id, control.global_property ) ) {
+			return null;
+		}
+		var v = 'var(' + variable( 'typography', id, control.global_property ) + ')';
+		return { '{{VALUE}}': v, '{{SIZE}}': v, '{{UNIT}}': '' };
+	}
+
+	/** Twin of Globals::css(), as rules by device. */
+	function globalsRules( globals, typographyControls ) {
+		var rules = { desktop: [], tablet: [], mobile: [] };
+		( globals.colors || [] ).forEach( function ( c ) {
+			if ( /^#([0-9a-f]{3}){1,2}$/i.test( c.color || '' ) ) {
+				rules.desktop.push( ':root{' + variable( 'colors', c._id ) + ':' + c.color + ';}' );
+			}
+		} );
+		( globals.typography || [] ).forEach( function ( preset ) {
+			var controls = {};
+			Object.keys( typographyControls ).forEach( function ( key ) {
+				var control = Object.assign( {}, typographyControls[ key ] );
+				var value = control.type === 'slider' ? '{{SIZE}}{{UNIT}}' : '{{VALUE}}';
+				control.selectors = { ':root': variable( 'typography', preset._id, control.global_property ) + ': ' + value + ';' };
+				controls[ key ] = control;
+			} );
+			var r = elementRules( controls, preset, ':root' );
+			DEVICES.forEach( function ( d ) {
+				rules[ d ] = rules[ d ].concat( r[ d ] );
+			} );
+		} );
+		return rules;
+	}
+
+	/** Twin of Fonts::google_url(). */
+	function googleUrl( names, fonts ) {
+		var families = [];
+		names.forEach( function ( name ) {
+			var font = fonts[ name ];
+			var family = font && font.google ? 'family=' + name.replace( / /g, '+' ) + ':wght@' + font.google : null;
+			if ( family && families.indexOf( family ) === -1 ) {
+				families.push( family );
+			}
+		} );
+		families.sort();
+		return families.length ? 'https://fonts.googleapis.com/css2?' + families.join( '&' ) + '&display=swap' : '';
+	}
+
 	function fill( template, map ) {
 		return template.replace( /\{\{[A-Z]+\}\}/g, function ( token ) {
 			return token in map ? map[ token ] : token;
@@ -115,7 +216,9 @@
 			}
 			var deviceKeys = keys( key, control );
 			Object.keys( deviceKeys ).forEach( function ( device ) {
-				var map = replacements( control, settings[ deviceKeys[ device ] ] );
+				var map =
+					globalReplacements( control, settings, deviceKeys[ device ], device ) ||
+					replacements( control, settings[ deviceKeys[ device ] ] );
 				if ( ! map ) {
 					return;
 				}
@@ -166,6 +269,10 @@
 		elementRules: elementRules,
 		stylesheet: stylesheet,
 		forDevice: forDevice,
+		globalId: globalId,
+		setGlobals: setGlobals,
+		globalsRules: globalsRules,
+		googleUrl: googleUrl,
 		wrapper: function ( id ) {
 			return '.kbroo-el-' + id;
 		},

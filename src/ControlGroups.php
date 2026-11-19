@@ -30,13 +30,24 @@ final class ControlGroups {
 			$base
 		);
 
-		return array(
+		$group    = $prefix . '_typography';
+		$controls = array(
+			$prefix . '_font_family'    => $base + array(
+				'type'                 => 'select',
+				'label'                => __( 'Font family', 'kbroo-studio' ),
+				'default'              => '',
+				'options'              => Fonts::options(),
+				'selectors_dictionary' => Fonts::stacks(),
+				'selectors'            => array( $selector => 'font-family: {{VALUE}};' ),
+				'global_property'      => 'font-family',
+			),
 			$prefix . '_font_size'      => $base + array(
 				'type'       => 'slider',
 				'label'      => __( 'Font size', 'kbroo-studio' ),
 				'units'      => array( 'px', 'em', 'rem', 'vw' ),
 				'responsive' => true,
 				'selectors'  => array( $selector => 'font-size: {{SIZE}}{{UNIT}};' ),
+				'global_property' => 'font-size',
 			),
 			$prefix . '_font_weight'    => $base + array(
 				'type'      => 'select',
@@ -54,6 +65,7 @@ final class ControlGroups {
 					'bold'   => __( 'Bold', 'kbroo-studio' ),
 				),
 				'selectors' => array( $selector => 'font-weight: {{VALUE}};' ),
+				'global_property' => 'font-weight',
 			),
 			$prefix . '_text_transform' => $base + array(
 				'type'      => 'select',
@@ -67,6 +79,7 @@ final class ControlGroups {
 					'none'       => __( 'Normal', 'kbroo-studio' ),
 				),
 				'selectors' => array( $selector => 'text-transform: {{VALUE}};' ),
+				'global_property' => 'text-transform',
 			),
 			$prefix . '_line_height'    => $base + array(
 				'type'       => 'slider',
@@ -74,6 +87,7 @@ final class ControlGroups {
 				'units'      => array( 'em', 'px' ),
 				'responsive' => true,
 				'selectors'  => array( $selector => 'line-height: {{SIZE}}{{UNIT}};' ),
+				'global_property' => 'line-height',
 			),
 			$prefix . '_letter_spacing' => $base + array(
 				'type'       => 'slider',
@@ -81,8 +95,16 @@ final class ControlGroups {
 				'units'      => array( 'px', 'em' ),
 				'responsive' => true,
 				'selectors'  => array( $selector => 'letter-spacing: {{SIZE}}{{UNIT}};' ),
+				'global_property' => 'letter-spacing',
 			),
 		);
+
+		// Every property can come from a global font linked under
+		// __globals__[ "<prefix>_typography" ]; the element's own values win.
+		foreach ( $controls as $key => $control ) {
+			$controls[ $key ]['global_group'] = $group;
+		}
+		return $controls;
 	}
 
 	/**

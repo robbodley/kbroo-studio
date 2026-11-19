@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, Heading and Text widgets, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, and desktop/tablet/mobile settings.
+In progress towards v1. Done so far: full-screen editor, sections and columns, Heading and Text widgets, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Install
 
@@ -27,6 +27,9 @@ In the editor:
 - Click any section, column or widget to edit its settings in the Content, Style and Advanced tabs. Hover toolbars duplicate, delete, add columns, and drag sections (move handle).
 - The device buttons in the top bar preview tablet and mobile widths. Settings marked with a device icon are saved per device: a blank tablet or mobile value inherits from the larger screen.
 - Advanced has margin, padding, CSS ID and classes, and hide on desktop / tablet / mobile. Hidden elements show faded in the editor.
+- **Navigator** (list icon in the top bar): the page as a tree. Click to select, drag to reorder (widgets between columns, columns between sections), double-click to rename.
+- **Revisions** (clock icon): every save is a WordPress revision with the layout attached. Click one to preview it read-only, then restore it (undoable) and save.
+- **Site colours and fonts** (globe icon): site-wide colours and font presets. Link any colour setting to a global with its globe button, and any typography section to a global font. Changing a global restyles every page that links to it. Editing them needs the `edit_theme_options` capability. Google Fonts are loaded only for fonts a page uses.
 - `Ctrl/Cmd+Z` undoes, `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y` redoes, `Ctrl/Cmd+S` saves, `Delete` removes the selected element, `Esc` deselects.
 
 ## How it works
@@ -40,6 +43,8 @@ In the editor:
 | CSS generated from settings (PHP and JS twins) | `src/Css.php`, `assets/js/css.js` |
 | Save endpoint `POST /wp-json/kbroo/v1/documents/<id>` | `src/Rest.php` |
 | Widgets (PHP render + JS preview) | `src/Widgets/*`, `assets/js/widgets.js` |
+| Global colours and fonts, font list | `src/Globals.php`, `src/Fonts.php` |
+| Revisions | `src/Revisions.php` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |
 
 The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree is `sections > columns > widgets`:
@@ -71,4 +76,6 @@ Every save is sanitized server side against each element's control definitions (
 1. Subclass `KbrooStudio\Widgets\Widget` (name, title, icon, `widget_controls()`, `render()`), and register it on the `kbroo_studio_register_widgets` action. The Advanced tab is added automatically; `ControlGroups` has typography, border, background and alignment sets.
 2. Register a matching preview with `KbrooStudio.registerWidget( name, settings => html )` in a script that loads after `kbroo-widgets` in the editor.
 
-Hooks: `kbroo_studio_post_types` (filter), `kbroo_studio_register_widgets` (action), `kbroo_studio_render` (filter).
+Global colours and fonts are stored in the `kbroo_global_styles` option in the shape of Elementor's kit (`colors` / `typography` lists with `_id` and `title`). Elements link to them through Elementor's `__globals__` setting, e.g. `"__globals__": { "title_color": "globals/colors?id=primary" }`, and the CSS uses `var(--kbroo-global-color-primary)`.
+
+Hooks: `kbroo_studio_fonts` (filter), `kbroo_studio_post_types` (filter), `kbroo_studio_register_widgets` (action), `kbroo_studio_render` (filter).
