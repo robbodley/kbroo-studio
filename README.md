@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, Heading and Text widgets, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor), copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Install
 
@@ -27,6 +27,7 @@ In the editor:
 - Click any section, column or widget to edit its settings in the Content, Style and Advanced tabs. Hover toolbars duplicate, delete, add columns, and drag sections (move handle).
 - The device buttons in the top bar preview tablet and mobile widths. Settings marked with a device icon are saved per device: a blank tablet or mobile value inherits from the larger screen.
 - Advanced has margin, padding, CSS ID and classes, and hide on desktop / tablet / mobile. Hidden elements show faded in the editor.
+- **Copy and paste**: right-click any element for Duplicate, Copy, Paste, Paste style and Delete, or use Ctrl+C / Ctrl+V (Ctrl+Shift+V pastes style only). Copied elements go on the system clipboard, so they paste into another page or another site running Kbroo Studio.
 - **Navigator** (list icon in the top bar): the page as a tree. Click to select, drag to reorder (widgets between columns, columns between sections), double-click to rename.
 - **Revisions** (clock icon): every save is a WordPress revision with the layout attached. Click one to preview it read-only, then restore it (undoable) and save.
 - **Site colours and fonts** (globe icon): site-wide colours and font presets. Link any colour setting to a global with its globe button, and any typography section to a global font. Changing a global restyles every page that links to it. Editing them needs the `edit_theme_options` capability. Google Fonts are loaded only for fonts a page uses.
@@ -74,7 +75,7 @@ Every save is sanitized server side against each element's control definitions (
 ### Adding a widget
 
 1. Subclass `KbrooStudio\Widgets\Widget` (name, title, icon, `widget_controls()`, `render()`), and register it on the `kbroo_studio_register_widgets` action. The Advanced tab is added automatically; `ControlGroups` has typography, border, background and alignment sets.
-2. Register a matching preview with `KbrooStudio.registerWidget( name, settings => html )` in a script that loads after `kbroo-widgets` in the editor.
+2. Register a matching preview with `KbrooStudio.registerWidget( name, settings => html )` in a script that loads after `kbroo-widgets` in the editor. Or return true from `server_preview()` and the editor shows HTML rendered by your PHP `render()` instead (used by the Shortcode widget).
 
 Global colours and fonts are stored in the `kbroo_global_styles` option in the shape of Elementor's kit (`colors` / `typography` lists with `_id` and `title`). Elements link to them through Elementor's `__globals__` setting, e.g. `"__globals__": { "title_color": "globals/colors?id=primary" }`, and the CSS uses `var(--kbroo-global-color-primary)`.
 

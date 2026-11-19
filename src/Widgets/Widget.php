@@ -56,6 +56,40 @@ abstract class Widget {
 	abstract public function render( array $settings ): string;
 
 	/**
+	 * Attributes for a link from a `url` control, or '' when it has no URL.
+	 * The JavaScript twin is KbrooStudio.linkAttributes() in widgets.js.
+	 *
+	 * @param mixed $link { url, is_external, nofollow }.
+	 */
+	protected static function link_attributes( $link ): string {
+		if ( ! is_array( $link ) || '' === ( $link['url'] ?? '' ) ) {
+			return '';
+		}
+		$attributes = ' href="' . esc_url( $link['url'] ) . '"';
+		$rel        = array();
+		if ( 'on' === ( $link['is_external'] ?? '' ) ) {
+			$attributes .= ' target="_blank"';
+			$rel[]       = 'noopener';
+		}
+		if ( 'on' === ( $link['nofollow'] ?? '' ) ) {
+			$rel[] = 'nofollow';
+		}
+		if ( $rel ) {
+			$attributes .= ' rel="' . esc_attr( implode( ' ', $rel ) ) . '"';
+		}
+		return $attributes;
+	}
+
+	/**
+	 * Whether the editor previews this widget with HTML rendered on the
+	 * server (for output only WordPress can produce, such as shortcodes)
+	 * instead of a JavaScript renderer.
+	 */
+	public function server_preview(): bool {
+		return false;
+	}
+
+	/**
 	 * Data sent to the editor.
 	 */
 	public function to_editor_config(): array {
@@ -64,6 +98,7 @@ abstract class Widget {
 			'title'    => $this->get_title(),
 			'icon'     => $this->get_icon(),
 			'controls' => Controls::for_editor( $this->get_controls() ),
+			'server'   => $this->server_preview(),
 		);
 	}
 }

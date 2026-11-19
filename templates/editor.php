@@ -26,6 +26,11 @@ defined( 'ABSPATH' ) || exit;
 	<div id="kbroo-app" class="kbroo-app">
 		<noscript><?php esc_html_e( 'Kbroo Studio needs JavaScript to run.', 'kbroo-studio' ); ?></noscript>
 	</div>
-	<?php wp_print_footer_scripts(); ?>
+	<?php
+	wp_print_footer_scripts();
+	if ( did_action( 'wp_enqueue_media' ) ) {
+		wp_print_media_templates();
+	}
+	?>
 </body>
 </html>

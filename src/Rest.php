@@ -101,6 +101,26 @@ final class Rest {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/documents/(?P<id>\d+)/widget-preview',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'widget_preview' ),
+				'permission_callback' => array( $this, 'can_edit' ),
+				'args'                => array(
+					'widgetType' => array(
+						'required' => true,
+						'type'     => 'string',
+					),
+					'settings'   => array(
+						'required' => false,
+						'type'     => 'object',
+					),
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/globals',
 			array(
 				array(
@@ -151,6 +171,34 @@ final class Rest {
 			return new WP_Error( 'kbroo_forbidden', __( 'You are not allowed to edit this post.', 'kbroo-studio' ), array( 'status' => rest_authorization_required_code() ) );
 		}
 		return true;
+	}
+
+	/**
+	 * HTML for a widget the editor cannot render itself (see
+	 * Widget::server_preview()), rendered as it would be on the page.
+	 *
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function widget_preview( WP_REST_Request $request ) {
+		$widget = $this->widgets->get( (string) $request->get_param( 'widgetType' ) );
+		if ( ! $widget || ! $widget->server_preview() ) {
+			return new WP_Error( 'kbroo_bad_widget', __( 'This widget has no server preview.', 'kbroo-studio' ), array( 'status' => 400 ) );
+		}
+		$controls = $widget->get_controls();
+		$settings = Controls::with_defaults( $controls, Controls::sanitize( $controls, $request->get_param( 'settings' ) ) );
+
+		// Shortcodes often read the current post, so render inside its loop.
+		global $post;
+		$previous = $post;
+		$post     = get_post( (int) $request['id'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		setup_postdata( $post );
+		$html = $widget->render( $settings );
+		$post = $previous; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		if ( $previous ) {
+			setup_postdata( $previous );
+		}
+
+		return rest_ensure_response( array( 'html' => $html ) );
 	}
 
 	public function get_document( WP_REST_Request $request ): WP_REST_Response {

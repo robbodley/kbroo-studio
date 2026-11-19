@@ -7,7 +7,12 @@
  * sanitization, and CSS generation (see Css).
  *
  * Definition keys:
- *   type        text | textarea | select | color | number | slider | dimensions | switcher
+ *   type        text | textarea | code | select | color | number | slider |
+ *               dimensions | switcher | media | url
+ *               code: raw HTML, kept as typed for users who may post
+ *               unfiltered HTML, filtered with wp_kses_post for others.
+ *               media: { id, url } of a Media Library image (Elementor's shape).
+ *               url: { url, is_external, nofollow } (Elementor's link shape).
  *   label       Shown in the panel.
  *   tab         content (default) | style | advanced
  *   section     Group heading inside the tab.
@@ -73,6 +78,17 @@ final class Controls {
 					'bottom'   => '',
 					'left'     => '',
 					'isLinked' => true,
+				);
+			case 'media':
+				return array(
+					'url' => '',
+					'id'  => '',
+				);
+			case 'url':
+				return array(
+					'url'         => '',
+					'is_external' => '',
+					'nofollow'    => '',
 				);
 			default:
 				return '';
@@ -254,11 +270,36 @@ final class Controls {
 			return $clean;
 		}
 
+		if ( 'media' === $type ) {
+			if ( ! is_array( $value ) ) {
+				return $default;
+			}
+			$id = absint( $value['id'] ?? 0 );
+			return array(
+				'url' => self::sanitize_url( $value['url'] ?? '', array( 'http', 'https' ) ),
+				'id'  => $id ? $id : '',
+			);
+		}
+
+		if ( 'url' === $type ) {
+			if ( ! is_array( $value ) ) {
+				return $default;
+			}
+			return array(
+				'url'         => self::sanitize_url( $value['url'] ?? '', array( 'http', 'https', 'mailto', 'tel' ) ),
+				'is_external' => 'on' === ( $value['is_external'] ?? '' ) ? 'on' : '',
+				'nofollow'    => 'on' === ( $value['nofollow'] ?? '' ) ? 'on' : '',
+			);
+		}
+
 		if ( is_array( $value ) || is_object( $value ) ) {
 			return $default;
 		}
 
 		switch ( $type ) {
+			case 'code':
+				return current_user_can( 'unfiltered_html' ) ? (string) $value : wp_kses_post( (string) $value );
+
 			case 'textarea':
 				return empty( $control['html'] )
 					? sanitize_textarea_field( (string) $value )
@@ -309,6 +350,27 @@ final class Controls {
 				}
 				return $value;
 		}
+	}
+
+	/**
+	 * A link or image address: full URLs with an allowed scheme, or a
+	 * site-relative path, #anchor or ?query. Anything else becomes ''.
+	 *
+	 * @param mixed    $url       Raw value.
+	 * @param string[] $protocols Allowed schemes.
+	 */
+	public static function sanitize_url( $url, array $protocols ): string {
+		if ( ! is_string( $url ) ) {
+			return '';
+		}
+		$url = trim( $url );
+		if ( '' === $url ) {
+			return '';
+		}
+		if ( ! in_array( $url[0], array( '/', '#', '?' ), true ) && ! preg_match( '#^[a-z][a-z0-9+.-]*:#i', $url ) ) {
+			$url = 'https://' . $url; // "example.com" typed without a scheme.
+		}
+		return esc_url_raw( $url, $protocols );
 	}
 
 	/**
