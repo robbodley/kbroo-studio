@@ -5,6 +5,7 @@
 	--kb-accent-soft: #ede9fe;
 	--kb-section: #2563eb;
 	--kb-column: #64748b;
+	--kb-container: #0891b2;
 	--kb-danger: #b91c1c;
 	--kb-bg: #f1f5f9;
 	--kb-panel-bg: #ffffff;
@@ -326,6 +327,17 @@ body.kbroo-editor-body {
 	outline-offset: -2px;
 }
 
+.kb-container:hover,
+.kb-container.is-selected {
+	outline: 1px dashed var(--kb-container);
+	outline-offset: -1px;
+}
+
+.kb-container.is-selected {
+	outline: 2px solid var(--kb-container);
+	outline-offset: -2px;
+}
+
 .kb-column:hover,
 .kb-column.is-selected {
 	outline: 1px dashed var(--kb-column);
@@ -371,6 +383,23 @@ body.kbroo-editor-body {
 	background: var(--kb-section);
 }
 
+.kb-toolbar-container {
+	top: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	background: var(--kb-container);
+}
+
+/* Nested sections and containers put their toolbar at the top right, clear
+   of their parent's. */
+.kbroo-section--inner > .kb-toolbar-section,
+.kbroo-con--child > .kb-toolbar-container {
+	left: auto;
+	right: 0;
+	transform: none;
+	border-radius: 0 0 0 6px;
+}
+
 .kb-toolbar-column {
 	top: 0;
 	left: 0;
@@ -391,9 +420,16 @@ body.kbroo-editor-body {
 	display: flex;
 }
 
-/* Only the innermost hovered element's toolbar when a widget is hovered. */
-.kb-column:has(.kb-widget:hover) > .kb-toolbar {
+/* Only the innermost hovered element's toolbar shows (top-level section
+   toolbars stay, as they sit apart from the others). */
+.kb-column:has(.kb-el:hover) > .kb-toolbar,
+.kb-container:has(.kb-el:hover) > .kb-toolbar,
+.kbroo-section--inner:has(.kb-el:hover) > .kb-toolbar {
 	display: none;
+}
+
+.kb-el.kb-el.kb-toolbar-pinned > .kb-toolbar {
+	display: flex;
 }
 
 /* Fade toolbars while dragging. Not display:none: hiding the section's drag
@@ -437,8 +473,13 @@ body.kbroo-editor-body {
 	cursor: grab;
 }
 
-.kb-column-inner.kb-dropzone {
+.kb-column-inner.kb-dropzone,
+.kbroo-con-inner.kb-dropzone {
 	min-height: 80px;
+}
+
+.kbroo-con-inner > .kb-column-empty {
+	flex: 1 1 100%;
 }
 
 .kb-column-empty {
@@ -483,6 +524,12 @@ body.kbroo-editor-body {
 .kb-placeholder-widget {
 	height: 4px;
 	margin: -2px 0;
+}
+
+.kb-placeholder-row {
+	width: 4px;
+	align-self: stretch;
+	margin: 0 -2px;
 }
 
 .kb-placeholder-section {
@@ -1267,4 +1314,20 @@ span.kb-unit {
 	clip-path: inset(50%);
 	border: 0;
 	word-wrap: normal !important;
+}
+
+/* ---- Containers previewed at tablet and phone width ------------------- *
+ * The canvas is narrower than the window, so frontend.css media queries do
+ * not fire; these mirror them. :where() keeps them as weak as the originals. */
+
+:where(.kb-canvas-wrap[data-device="tablet"]) .kbroo-con {
+	width: var(--kbroo-con-width-tablet, var(--kbroo-con-width-desktop, 100%));
+}
+
+:where(.kb-canvas-wrap[data-device="mobile"]) .kbroo-con {
+	width: var(--kbroo-con-width-mobile, 100%);
+}
+
+:where(.kb-canvas-wrap[data-device="mobile"]) .kbroo-con-inner {
+	flex-wrap: wrap;
 }

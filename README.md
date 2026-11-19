@@ -4,7 +4,17 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor), copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor), copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+
+## Moving from Elementor
+
+Tools > **Move from Elementor**:
+
+1. **Import colours and fonts** copies Elementor's Site Settings (global colours and fonts) into Kbroo Studio's, keeping their ids so converted pages stay linked to them. Fonts the pages use are added from Google Fonts.
+2. **Convert** each page (or use the *Convert to Kbroo Studio* row and bulk actions in the Pages list). Sections, inner sections, columns, containers and the widgets Kbroo Studio has keep their settings; widgets it does not have yet become fallback blocks that still show (live while Elementor is active, otherwise as they looked when converted). The report lists those blocks and any settings not carried over yet.
+3. **Switch back to Elementor** at any time. Elementor's data is never changed or deleted; switching back only turns the Kbroo Studio version off, and *Switch to Kbroo Studio* turns it on again.
+
+Opening an unconverted Elementor page in the Kbroo Studio editor converts it on the spot; nothing changes until you save. Exported Elementor template files (.json) import as new draft pages.
 
 ## Install
 
@@ -48,7 +58,7 @@ In the editor:
 | Revisions | `src/Revisions.php` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |
 
-The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree is `sections > columns > widgets`:
+The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree follows Elementor's: the page holds sections and containers, sections hold columns, columns hold widgets, inner sections and containers, and containers hold widgets and containers (see `Layout::allowed_children()`):
 
 ```json
 {

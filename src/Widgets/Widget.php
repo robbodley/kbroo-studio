@@ -39,6 +39,14 @@ abstract class Widget {
 	abstract protected function widget_controls(): array;
 
 	/**
+	 * Forget the built controls, so options that changed (fonts added by
+	 * the Elementor converter) are picked up.
+	 */
+	public function flush_controls(): void {
+		$this->controls = null;
+	}
+
+	/**
 	 * All controls: the widget's own plus the shared Advanced tab.
 	 */
 	final public function get_controls(): array {
@@ -89,6 +97,16 @@ abstract class Widget {
 		return false;
 	}
 
+	/** Whether the widget is offered in the editor's widgets panel. */
+	public function in_panel(): bool {
+		return true;
+	}
+
+	/** Text shown at the top of the widget's settings panel, or ''. */
+	public function panel_notice(): string {
+		return '';
+	}
+
 	/**
 	 * Data sent to the editor.
 	 */
@@ -99,6 +117,8 @@ abstract class Widget {
 			'icon'     => $this->get_icon(),
 			'controls' => Controls::for_editor( $this->get_controls() ),
 			'server'   => $this->server_preview(),
+			'panel'    => $this->in_panel(),
+			'notice'   => $this->panel_notice(),
 		);
 	}
 }

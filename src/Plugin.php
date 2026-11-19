@@ -42,6 +42,7 @@ final class Plugin {
 		( new Editor( $this->widgets ) )->hooks();
 		( new Frontend( $this->renderer ) )->hooks();
 		( new Revisions() )->hooks();
+		( new Elementor\Migration( $this->widgets, $this->renderer ) )->hooks();
 	}
 
 	public function widgets(): Registry {

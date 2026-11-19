@@ -58,8 +58,67 @@
 	min-width: 0;
 }
 
+.kbroo-section--inner {
+	width: 100%;
+}
+
+/* Flexbox containers, as Elementor's: the outer element carries padding,
+   background and border; the inner one lays out the children. A container
+   is a column of items unless set to a row. Width is a variable per device
+   (see Layout::container_controls()). */
+.kbroo-con {
+	position: relative;
+	display: flex;
+	flex: 0 1 auto;
+	width: var(--kbroo-con-width-desktop, 100%);
+	min-width: 0;
+	max-width: 100%;
+	padding: 10px;
+}
+
+.kbroo-con--child {
+	padding: 0;
+}
+
+.kbroo-con-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	width: 100%;
+	min-width: 0;
+	margin: 0 auto;
+}
+
+.kbroo-con--boxed > .kbroo-con-inner {
+	max-width: 1140px;
+}
+
+/* Nested boxed containers already sit inside a boxed parent. */
+.kbroo-con--child.kbroo-con--boxed > .kbroo-con-inner {
+	max-width: 100%;
+}
+
+@media (max-width: 1024px) {
+	.kbroo-con {
+		width: var(--kbroo-con-width-tablet, var(--kbroo-con-width-desktop, 100%));
+	}
+}
+
+/* Phones: rows wrap and nested containers go full width, unless the
+   container sets a mobile width (Elementor does the same). */
+@media (max-width: 767px) {
+	.kbroo-con-inner {
+		flex-wrap: wrap;
+	}
+
+	.kbroo-con {
+		width: var(--kbroo-con-width-mobile, 100%);
+	}
+}
+
 .kbroo-widget {
 	position: relative;
+	max-width: 100%;
 }
 
 .kbroo-heading {
@@ -161,6 +220,15 @@
 /* Menu anchor: sticky headers would cover the target, so leave room. */
 .kbroo-menu-anchor {
 	scroll-margin-top: var(--kbroo-anchor-offset, 0px);
+}
+
+/* Elementor widgets not converted yet (see ElementorFallback). */
+.kbroo-fallback--missing {
+	padding: 12px 16px;
+	border: 1px dashed #d97706;
+	background: #fffbeb;
+	color: #92400e;
+	font: 14px/1.4 system-ui, sans-serif;
 }
 
 /* Hide per device. Not applied inside the editor, which shows these faded. */

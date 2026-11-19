@@ -11,6 +11,9 @@ defined( 'ABSPATH' ) || exit;
 
 final class Fonts {
 
+	/** Fonts added for this site (by the Elementor converter): name => [ google, fallback ]. */
+	const SITE_OPTION = 'kbroo_site_fonts';
+
 	/**
 	 * System fonts: name => CSS stack.
 	 */
@@ -71,6 +74,16 @@ final class Fonts {
 				'google' => $font[1],
 			);
 		}
+		$site = get_option( self::SITE_OPTION, array() );
+		foreach ( is_array( $site ) ? $site : array() as $name => $font ) {
+			if ( is_string( $name ) && is_array( $font ) && ! isset( $fonts[ $name ] ) ) {
+				$fonts[ $name ] = array(
+					'stack'  => '"' . $name . '", ' . ( 'serif' === ( $font['fallback'] ?? '' ) ? 'serif' : 'sans-serif' ),
+					'google' => (string) ( $font['google'] ?? '' ),
+				);
+			}
+		}
+
 		/**
 		 * Filters the fonts the builder offers. Each entry is
 		 * name => [ 'stack' => CSS font-family value, 'google' => css2 weights or '' ].
@@ -95,6 +108,46 @@ final class Fonts {
 			);
 		}
 		return $clean;
+	}
+
+	/**
+	 * Make a font available on this site. Google Fonts are checked against
+	 * the Google Fonts API, weight by weight, so the stylesheet URL only
+	 * asks for weights that exist (one wrong weight fails the whole URL).
+	 * Other names are added as local fonts (for example a font the theme
+	 * or Elementor Pro's custom fonts loads).
+	 *
+	 * @return string 'exists', 'google', 'local' or 'invalid'.
+	 */
+	public static function add( string $name ): string {
+		$name = trim( $name );
+		if ( ! preg_match( '/^[A-Za-z0-9 \-]{1,60}$/', $name ) ) {
+			return 'invalid';
+		}
+		if ( isset( self::all()[ $name ] ) ) {
+			return 'exists';
+		}
+
+		$base    = 'https://fonts.googleapis.com/css2?family=' . str_replace( ' ', '+', $name );
+		$weights = array();
+		foreach ( array( 300, 400, 500, 600, 700 ) as $weight ) {
+			$response = wp_remote_get( $base . ':wght@' . $weight, array( 'timeout' => 8 ) );
+			if ( 200 === wp_remote_retrieve_response_code( $response ) ) {
+				$weights[] = $weight;
+			}
+		}
+		if ( ! $weights && 200 === wp_remote_retrieve_response_code( wp_remote_get( $base, array( 'timeout' => 8 ) ) ) ) {
+			$weights[] = 400;
+		}
+
+		$site          = get_option( self::SITE_OPTION, array() );
+		$site          = is_array( $site ) ? $site : array();
+		$site[ $name ] = array(
+			'google'   => implode( ';', $weights ),
+			'fallback' => 'sans-serif',
+		);
+		update_option( self::SITE_OPTION, $site );
+		return $weights ? 'google' : 'local';
 	}
 
 	/**

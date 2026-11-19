@@ -45,9 +45,42 @@
 	// Styling comes from each control's `selectors` (see css.js), so the
 	// markup carries no inline styles, exactly like the PHP renderers.
 
+	/** Twin of Heading::INLINE_HTML: keep these tags (and attributes), escape the rest. */
+	var INLINE = { br: [], span: [ 'class' ], strong: [], b: [], em: [], i: [], u: [], small: [], sup: [], sub: [], a: [ 'href', 'target', 'rel' ] };
+
+	function inlineHtml( html ) {
+		var doc = new DOMParser().parseFromString( '<body>' + String( html == null ? '' : html ) + '</body>', 'text/html' );
+		function walk( node ) {
+			var out = '';
+			node.childNodes.forEach( function ( child ) {
+				if ( child.nodeType === 3 ) {
+					out += esc( child.textContent );
+				} else if ( child.nodeType === 1 ) {
+					var tag = child.tagName.toLowerCase();
+					var inner = walk( child );
+					if ( ! INLINE[ tag ] ) {
+						out += inner;
+						return;
+					}
+					var attrs = INLINE[ tag ]
+						.filter( function ( a ) {
+							return child.hasAttribute( a ) && ! ( a === 'href' && /^\s*javascript:/i.test( child.getAttribute( a ) ) );
+						} )
+						.map( function ( a ) {
+							return ' ' + a + '="' + esc( child.getAttribute( a ) ) + '"';
+						} )
+						.join( '' );
+					out += tag === 'br' ? '<br />' : '<' + tag + attrs + '>' + inner + '</' + tag + '>';
+				}
+			} );
+			return out;
+		}
+		return walk( doc.body );
+	}
+
 	renderers.heading = function ( s ) {
 		var tag = HEADING_TAGS.indexOf( s.header_size ) > -1 ? s.header_size : 'h2';
-		return '<' + tag + ' class="kbroo-heading">' + esc( s.title ) + '</' + tag + '>';
+		return '<' + tag + ' class="kbroo-heading">' + inlineHtml( s.title ) + '</' + tag + '>';
 	};
 
 	renderers[ 'text-editor' ] = function ( s ) {
