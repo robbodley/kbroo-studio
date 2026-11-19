@@ -45,6 +45,9 @@ final class Registry {
 		$this->register( new Html() );
 		$this->register( new Shortcode() );
 		$this->register( new MenuAnchor() );
+		$this->register( new Icon() );
+		$this->register( new SocialIcons() );
+		$this->register( new TestimonialCarousel() );
 		$this->register( new ElementorFallback() );
 
 		/**

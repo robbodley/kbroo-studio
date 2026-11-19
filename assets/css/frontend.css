@@ -376,3 +376,260 @@
 		display: none !important;
 	}
 }
+
+/* Icons (inline SVG, see Icons). */
+.kbroo-icon {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	flex-shrink: 0;
+	vertical-align: -0.125em;
+}
+
+img.kbroo-icon--image {
+	object-fit: contain;
+}
+
+/* Icon widget: the icon element carries the colours; stacked and framed
+   views add a shape around it. */
+.kbroo-icon-wrapper {
+	line-height: 0;
+}
+
+.kbroo-icon-el {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 50px;
+	line-height: 1;
+	color: var(--kbroo-global-color-primary, #69727d);
+	text-decoration: none;
+	transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.3s;
+}
+
+.kbroo-icon-el:hover {
+	transform: var(--kbroo-hover-transform, none);
+}
+
+.kbroo-icon-view--stacked .kbroo-icon-el {
+	padding: 0.5em;
+	background-color: var(--kbroo-global-color-primary, #69727d);
+	color: #fff;
+}
+
+.kbroo-icon-view--framed .kbroo-icon-el {
+	padding: 0.5em;
+	border: 3px solid;
+}
+
+.kbroo-icon-view--stacked.kbroo-icon-shape--circle .kbroo-icon-el,
+.kbroo-icon-view--framed.kbroo-icon-shape--circle .kbroo-icon-el {
+	border-radius: 50%;
+}
+
+/* Social icons. */
+.kbroo-social-icons {
+	--kbroo-icon-size: 25px;
+	--kbroo-icon-padding: 0.5em;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 5px;
+	line-height: 0;
+}
+
+.kbroo-social-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--kbroo-icon-padding);
+	font-size: var(--kbroo-icon-size);
+	line-height: 1;
+	background-color: var(--kbroo-brand, #69727d);
+	color: #fff;
+	text-decoration: none;
+	transition: color 0.3s, background-color 0.3s, border-color 0.3s, transform 0.3s, opacity 0.3s;
+}
+
+.kbroo-social-icon:hover {
+	opacity: 0.9;
+	color: #fff;
+	transform: var(--kbroo-hover-transform, none);
+}
+
+.kbroo-social-icons--rounded .kbroo-social-icon { border-radius: 10%; }
+.kbroo-social-icons--circle .kbroo-social-icon { border-radius: 50%; }
+
+/* Carousels: a scroll-snap strip, with arrows and dots from frontend.js. */
+.kbroo-carousel {
+	--kbroo-per-view: 1;
+	--kbroo-slide-gap: 10px;
+	--kbroo-dot: #000;
+	position: relative;
+}
+
+.kbroo-carousel__viewport {
+	position: relative;
+}
+
+.kbroo-carousel__track {
+	display: flex;
+	gap: var(--kbroo-slide-gap);
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scroll-snap-type: x mandatory;
+	scroll-behavior: smooth;
+	scrollbar-width: none;
+}
+
+.kbroo-carousel__track::-webkit-scrollbar {
+	display: none;
+}
+
+.kbroo-carousel__track:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
+
+.kbroo-carousel__slide {
+	flex: 0 0 calc((100% - (var(--kbroo-per-view) - 1) * var(--kbroo-slide-gap)) / var(--kbroo-per-view));
+	min-width: 0;
+	scroll-snap-align: start;
+}
+
+.kbroo-carousel__arrow {
+	position: absolute;
+	top: 50%;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.6em;
+	height: 1.6em;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: rgba(0, 0, 0, 0.6);
+	font-size: 25px;
+	cursor: pointer;
+	transform: translateY(-50%);
+}
+
+.kbroo-carousel__arrow svg {
+	width: 1em;
+	height: 1em;
+}
+
+.kbroo-carousel__arrow[disabled] {
+	opacity: 0.3;
+	cursor: default;
+}
+
+.kbroo-carousel__arrow--prev { left: -0.4em; }
+.kbroo-carousel__arrow--next { right: -0.4em; }
+
+.kbroo-carousel:not(.is-ready) .kbroo-carousel__arrow,
+.kbroo-carousel.is-static .kbroo-carousel__arrow,
+.kbroo-carousel.is-static .kbroo-carousel__pagination {
+	display: none;
+}
+
+.kbroo-carousel__pagination {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 16px;
+	line-height: 1;
+}
+
+.kbroo-carousel__dot {
+	width: 8px;
+	height: 8px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: var(--kbroo-dot);
+	opacity: 0.2;
+	cursor: pointer;
+}
+
+.kbroo-carousel__dot[aria-current="true"] {
+	opacity: 1;
+}
+
+/* Testimonials. Layouts follow Elementor's: the photo beside or above
+   the name, or above, left or right of the whole testimonial. */
+.kbroo-testimonial {
+	--kbroo-image-gap: 15px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--kbroo-image-gap);
+	margin: 0;
+	padding: 0 2.5em;
+	text-align: center;
+}
+
+.kbroo-testimonial__body {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.kbroo-testimonial__content {
+	font-size: 1.3em;
+	line-height: 1.5;
+}
+
+.kbroo-testimonial__footer {
+	display: flex;
+	align-items: center;
+	justify-content: var(--kbroo-align, center);
+	gap: var(--kbroo-image-gap);
+}
+
+.kbroo-testimonial__cite {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-style: normal;
+	text-align: inherit;
+}
+
+.kbroo-testimonial__name {
+	font-weight: 700;
+}
+
+.kbroo-testimonial__title {
+	font-size: 0.85em;
+	opacity: 0.8;
+}
+
+.kbroo-testimonial__image img {
+	display: block;
+	width: 60px;
+	height: 60px;
+	border-radius: 50%;
+	object-fit: cover;
+}
+
+.kbroo-testimonial--image_above .kbroo-testimonial__image,
+.kbroo-testimonial--image_stacked .kbroo-testimonial__image {
+	display: flex;
+	justify-content: var(--kbroo-align, center);
+}
+
+.kbroo-testimonial--image_stacked .kbroo-testimonial__footer {
+	flex-direction: column;
+	align-items: var(--kbroo-align, center);
+}
+
+.kbroo-testimonial--image_left,
+.kbroo-testimonial--image_right {
+	flex-direction: row;
+	align-items: flex-start;
+}
+
+.kbroo-testimonial--image_right {
+	flex-direction: row-reverse;
+}

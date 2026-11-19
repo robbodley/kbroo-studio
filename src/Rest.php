@@ -101,6 +101,23 @@ final class Rest {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/icons',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => function () {
+					$response = rest_ensure_response( Icons::for_editor() );
+					// The icons only change with the plugin version (?v=).
+					$response->header( 'Cache-Control', 'private, max-age=31536000' );
+					return $response;
+				},
+				'permission_callback' => function () {
+					return current_user_can( 'edit_posts' );
+				},
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/documents/(?P<id>\d+)/widget-preview',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,

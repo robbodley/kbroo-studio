@@ -81,6 +81,33 @@ final class ControlGroups {
 				'selectors' => array( $selector => 'text-transform: {{VALUE}};' ),
 				'global_property' => 'text-transform',
 			),
+			$prefix . '_font_style'     => $base + array(
+				'type'            => 'select',
+				'label'           => __( 'Style', 'kbroo-studio' ),
+				'default'         => '',
+				'options'         => array(
+					''        => __( 'Default', 'kbroo-studio' ),
+					'normal'  => __( 'Normal', 'kbroo-studio' ),
+					'italic'  => __( 'Italic', 'kbroo-studio' ),
+					'oblique' => __( 'Oblique', 'kbroo-studio' ),
+				),
+				'selectors'       => array( $selector => 'font-style: {{VALUE}};' ),
+				'global_property' => 'font-style',
+			),
+			$prefix . '_text_decoration' => $base + array(
+				'type'            => 'select',
+				'label'           => __( 'Decoration', 'kbroo-studio' ),
+				'default'         => '',
+				'options'         => array(
+					''             => __( 'Default', 'kbroo-studio' ),
+					'underline'    => __( 'Underline', 'kbroo-studio' ),
+					'overline'     => __( 'Overline', 'kbroo-studio' ),
+					'line-through' => __( 'Line through', 'kbroo-studio' ),
+					'none'         => __( 'None', 'kbroo-studio' ),
+				),
+				'selectors'       => array( $selector => 'text-decoration: {{VALUE}};' ),
+				'global_property' => 'text-decoration',
+			),
 			$prefix . '_line_height'    => $base + array(
 				'type'       => 'slider',
 				'label'      => __( 'Line height', 'kbroo-studio' ),

@@ -45,7 +45,7 @@ final class Converter {
 	);
 
 	/** Elementor settings with no visible effect, left out of the report. */
-	const QUIET_SETTINGS = array( '_column_size', 'structure', 'typography_typography', 'background_background', 'pa_condition_repeater', '_skin' );
+	const QUIET_SETTINGS = array( '_column_size', 'structure', 'typography_typography', 'background_background', 'pa_condition_repeater', '_skin', 'slides_name' );
 
 	/** @var Registry */
 	private $widgets;
@@ -303,6 +303,7 @@ final class Converter {
 		$widget = $this->widgets->get( $type );
 		if ( $widget && 'elementor-fallback' !== $type ) {
 			$settings = $this->common( $settings );
+			$settings = $this->legacy_icons( $type, $settings );
 			if ( 'divider' === $type && 'line_icon' === ( $settings['look'] ?? '' ) ) {
 				$settings['look'] = 'line';
 				$this->drop( 'divider icon' );
@@ -345,6 +346,40 @@ final class Converter {
 				'snapshot'       => ElementorFallback::render_with_elementor( $json, $this->source_post ),
 			),
 		);
+	}
+
+	/**
+	 * Icons saved by older Elementor versions as a class string ("fa fa-star")
+	 * become the current { value, library } shape.
+	 */
+	private function legacy_icons( string $type, array $settings ): array {
+		$pairs = array(
+			'icon'         => array( 'icon', 'selected_icon' ),
+			'social-icons' => array( 'social', 'social_icon' ),
+		);
+		if ( ! isset( $pairs[ $type ] ) ) {
+			return $settings;
+		}
+		list( $old, $new ) = $pairs[ $type ];
+		$upgrade = function ( array $values ) use ( $old, $new ) {
+			if ( empty( $values[ $new ]['value'] ) && ! empty( $values[ $old ] ) && is_string( $values[ $old ] ) ) {
+				$values[ $new ] = array(
+					'value'   => $values[ $old ],
+					'library' => '',
+				);
+			}
+			unset( $values[ $old ] );
+			return $values;
+		};
+		if ( 'social-icons' === $type ) {
+			foreach ( (array) ( $settings['social_icon_list'] ?? array() ) as $i => $item ) {
+				if ( is_array( $item ) ) {
+					$settings['social_icon_list'][ $i ] = $upgrade( $item );
+				}
+			}
+			return $settings;
+		}
+		return $upgrade( $settings );
 	}
 
 	/**

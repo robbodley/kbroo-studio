@@ -13,6 +13,13 @@
  *               unfiltered HTML, filtered with wp_kses_post for others.
  *               media: { id, url } of a Media Library image (Elementor's shape).
  *               url: { url, is_external, nofollow } (Elementor's link shape).
+ *               icons: { value, library }, e.g. { "fas fa-star", "fa-solid" }
+ *               (Elementor's shape, see Icons).
+ *               repeater: a list of items, each with its own settings from
+ *               `fields` (control definitions) and an `_id`. Field selectors
+ *               may use {{CURRENT_ITEM}}, the item's .kbroo-repeater-item-<id>.
+ *   fields      repeater: control definitions for each item.
+ *   title_field repeater: field shown as each item's name in the panel.
  *   label       Shown in the panel.
  *   tab         content (default) | style | advanced
  *   section     Group heading inside the tab.
@@ -96,6 +103,13 @@ final class Controls {
 					'is_external' => '',
 					'nofollow'    => '',
 				);
+			case 'icons':
+				return array(
+					'value'   => '',
+					'library' => '',
+				);
+			case 'repeater':
+				return array();
 			default:
 				return '';
 		}
@@ -129,6 +143,9 @@ final class Controls {
 			}
 			if ( in_array( $controls[ $key ]['type'], array( 'slider', 'dimensions' ), true ) ) {
 				$controls[ $key ]['units'] = self::units( $control );
+			}
+			if ( 'repeater' === $controls[ $key ]['type'] ) {
+				$controls[ $key ]['fields'] = self::for_editor( $control['fields'] ?? array() );
 			}
 		}
 		return $controls;
@@ -240,6 +257,11 @@ final class Controls {
 					$settings[ $setting_key ] = self::default_for( $control, $device );
 				}
 			}
+			if ( 'repeater' === ( $control['type'] ?? '' ) && is_array( $settings[ $key ] ) ) {
+				foreach ( $settings[ $key ] as $i => $item ) {
+					$settings[ $key ][ $i ] = self::with_defaults( $control['fields'] ?? array(), $item );
+				}
+			}
 		}
 		return $settings;
 	}
@@ -296,6 +318,14 @@ final class Controls {
 				'is_external' => 'on' === ( $value['is_external'] ?? '' ) ? 'on' : '',
 				'nofollow'    => 'on' === ( $value['nofollow'] ?? '' ) ? 'on' : '',
 			);
+		}
+
+		if ( 'icons' === $type ) {
+			return Icons::sanitize( $value );
+		}
+
+		if ( 'repeater' === $type ) {
+			return self::sanitize_repeater( $control, $value );
 		}
 
 		if ( is_array( $value ) || is_object( $value ) ) {
@@ -356,6 +386,39 @@ final class Controls {
 				}
 				return $value;
 		}
+	}
+
+	/** Most items a repeater keeps. */
+	const MAX_ITEMS = 100;
+
+	/**
+	 * Repeater items, each sanitized against the control's fields, with a
+	 * unique `_id`.
+	 *
+	 * @param mixed $value Raw items.
+	 */
+	public static function sanitize_repeater( array $control, $value ): array {
+		if ( ! is_array( $value ) ) {
+			return self::default_for( $control );
+		}
+		$fields = $control['fields'] ?? array();
+		$items  = array();
+		$seen   = array();
+		foreach ( array_slice( array_values( $value ), 0, self::MAX_ITEMS ) as $raw ) {
+			if ( ! is_array( $raw ) ) {
+				continue;
+			}
+			$item = self::sanitize( $fields, $raw );
+			unset( $item['_title'] );
+			$id = is_string( $raw['_id'] ?? null ) ? preg_replace( '/[^A-Za-z0-9]/', '', $raw['_id'] ) : '';
+			$id = substr( $id, 0, 12 );
+			if ( '' === $id || isset( $seen[ $id ] ) ) {
+				$id = substr( md5( wp_json_encode( $raw ) . count( $items ) ), 0, 7 );
+			}
+			$seen[ $id ] = true;
+			$items[]     = array( '_id' => $id ) + $item;
+		}
+		return $items;
 	}
 
 	/**

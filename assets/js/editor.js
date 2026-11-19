@@ -1393,7 +1393,7 @@
 	function renderControl( node, key, control ) {
 		var device = control.responsive ? state.device : 'desktop';
 		var settingKey = Css.deviceKey( key, device );
-		var id = 'kb-control-' + settingKey;
+		var id = 'kb-control-' + ( node.idPrefix || '' ) + settingKey;
 		var value = node.settings[ settingKey ];
 		var inherited = device !== 'desktop' ? inheritedValue( node.settings, key, control ) : null;
 		var mergeKey = node.id + ':' + settingKey;
@@ -1553,6 +1553,14 @@
 				input = renderUrl( control, id, value || {}, update );
 				break;
 
+			case 'icons':
+				input = renderIcons( id, value || {}, update );
+				break;
+
+			case 'repeater':
+				input = renderRepeater( node, key, control, id );
+				break;
+
 			case 'slider':
 				input = renderSlider( control, id, value, inherited, update );
 				break;
@@ -1648,6 +1656,310 @@
 	}
 
 	/** Link: address, new tab and nofollow (Elementor's link shape). */
+	/* Icons: Font Awesome Free, loaded from the server the first time an
+	 * icon control is shown (see Icons::for_editor()). */
+	var iconData = null;
+	var iconRequest = null;
+	var ICON_PREFIX = { 'fa-solid': 'fas', 'fa-regular': 'far', 'fa-brands': 'fab' };
+	var ICON_LIBRARY_LABELS = { 'fa-solid': 'Solid', 'fa-regular': 'Regular', 'fa-brands': 'Brands' };
+
+	function loadIcons() {
+		if ( ! iconRequest ) {
+			iconRequest = fetch( config.iconsUrl, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } } )
+				.then( parseResponse )
+				.then( function ( data ) {
+					iconData = data;
+					return data;
+				} );
+		}
+		return iconRequest;
+	}
+
+	/** { library, name } for a stored value, if the icon is known. */
+	function findIcon( value ) {
+		var match = value && typeof value.value === 'string' && value.value.match( /^(fas|far|fab)\s+fa-([a-z0-9-]+)$/ );
+		if ( ! match || ! iconData ) {
+			return null;
+		}
+		var library = value.library && iconData.libraries[ value.library ] ? value.library : { fas: 'fa-solid', far: 'fa-regular', fab: 'fa-brands' }[ match[ 1 ] ];
+		return iconData.libraries[ library ] && iconData.libraries[ library ][ match[ 2 ] ] ? { library: library, name: match[ 2 ] } : null;
+	}
+
+	function iconSvg( library, name ) {
+		var data = iconData.libraries[ library ][ name ];
+		var ns = 'http://www.w3.org/2000/svg';
+		var svg = document.createElementNS( ns, 'svg' );
+		svg.setAttribute( 'viewBox', '0 0 ' + data[ 0 ] + ' ' + data[ 1 ] );
+		svg.setAttribute( 'aria-hidden', 'true' );
+		svg.setAttribute( 'fill', 'currentColor' );
+		var path = document.createElementNS( ns, 'path' );
+		path.setAttribute( 'd', data[ 2 ] );
+		svg.appendChild( path );
+		return svg;
+	}
+
+	function renderIcons( id, value, update ) {
+		var preview = el( 'button', { type: 'button', id: id, class: 'kb-icon-preview', title: 'Choose icon', onclick: openPicker } );
+		var name = el( 'span', { class: 'kb-icon-name' } );
+		function paint() {
+			preview.textContent = '';
+			var found = findIcon( value );
+			if ( found ) {
+				preview.appendChild( iconSvg( found.library, found.name ) );
+				name.textContent = found.name.replace( /-/g, ' ' );
+			} else if ( value.library === 'svg' && value.value && value.value.url ) {
+				preview.appendChild( el( 'img', { src: value.value.url, alt: '' } ) );
+				name.textContent = 'Uploaded SVG';
+			} else {
+				preview.appendChild( icon( 'dashicons-plus-alt2' ) );
+				name.textContent = value.value ? 'Loading…' : 'No icon';
+			}
+		}
+		function openPicker() {
+			loadIcons().then( function () {
+				iconPicker( function ( library, iconName ) {
+					update( { value: ICON_PREFIX[ library ] + ' fa-' + iconName, library: library }, false );
+				} );
+			} );
+		}
+		if ( iconData ) {
+			paint();
+		} else {
+			paint();
+			loadIcons().then( paint ).catch( function () {
+				name.textContent = 'Icons could not be loaded';
+			} );
+		}
+		return el( 'div', { class: 'kb-icons' }, [
+			preview,
+			el( 'div', { class: 'kb-icons-side' }, [
+				name,
+				el( 'button', { type: 'button', class: 'kb-btn kb-btn-secondary', text: value.value ? 'Change' : 'Choose icon', onclick: openPicker } ),
+				value.value
+					? el( 'button', {
+							type: 'button',
+							class: 'kb-link',
+							text: 'Remove',
+							onclick: function () {
+								update( { value: '', library: '' }, false );
+							},
+					  } )
+					: null,
+			] ),
+		] );
+	}
+
+	/** Modal with every icon: search, filter by library, click to choose. */
+	function iconPicker( onPick ) {
+		var LIMIT = 240;
+		var library = '';
+		var search = el( 'input', { type: 'search', class: 'kb-picker-search', placeholder: 'Search icons', 'aria-label': 'Search icons' } );
+		var grid = el( 'div', { class: 'kb-picker-grid', role: 'listbox' } );
+		var note = el( 'p', { class: 'kb-control-note' } );
+		var tabs = el( 'div', { class: 'kb-picker-tabs' } );
+		var overlay;
+
+		function close() {
+			overlay.remove();
+			document.removeEventListener( 'keydown', onKey, true );
+		}
+		function onKey( e ) {
+			if ( e.key === 'Escape' ) {
+				e.stopPropagation();
+				close();
+			}
+		}
+		function draw() {
+			grid.textContent = '';
+			var words = search.value.toLowerCase().trim().split( /\s+/ ).filter( Boolean );
+			var shown = 0;
+			var total = 0;
+			Object.keys( iconData.libraries ).forEach( function ( lib ) {
+				if ( library && lib !== library ) {
+					return;
+				}
+				Object.keys( iconData.libraries[ lib ] ).forEach( function ( name ) {
+					var haystack = name + ' ' + ( iconData.search[ name ] || '' );
+					if ( ! words.every( function ( w ) { return haystack.indexOf( w ) > -1; } ) ) {
+						return;
+					}
+					total++;
+					if ( shown >= LIMIT ) {
+						return;
+					}
+					shown++;
+					grid.appendChild(
+						el(
+							'button',
+							{
+								type: 'button',
+								class: 'kb-picker-icon',
+								title: name.replace( /-/g, ' ' ) + ' (' + ICON_LIBRARY_LABELS[ lib ] + ')',
+								'data-icon': ICON_PREFIX[ lib ] + ' fa-' + name,
+								onclick: function () {
+									close();
+									onPick( lib, name );
+								},
+							},
+							[ iconSvg( lib, name ), el( 'span', { text: name.replace( /-/g, ' ' ) } ) ]
+						)
+					);
+				} );
+			} );
+			note.textContent = total > shown ? 'Showing ' + shown + ' of ' + total + ' icons. Search to find more.' : total ? total + ' icons' : 'No icons match.';
+		}
+		[ [ '', 'All' ] ].concat( Object.keys( ICON_LIBRARY_LABELS ).map( function ( k ) { return [ k, ICON_LIBRARY_LABELS[ k ] ]; } ) ).forEach( function ( pair ) {
+			tabs.appendChild(
+				el( 'button', {
+					type: 'button',
+					class: 'kb-picker-tab' + ( pair[ 0 ] === library ? ' is-active' : '' ),
+					text: pair[ 1 ],
+					onclick: function ( e ) {
+						library = pair[ 0 ];
+						tabs.querySelectorAll( '.kb-picker-tab' ).forEach( function ( b ) {
+							b.classList.toggle( 'is-active', b === e.currentTarget );
+						} );
+						draw();
+					},
+				} )
+			);
+		} );
+		search.addEventListener( 'input', draw );
+		overlay = el(
+			'div',
+			{
+				class: 'kb-modal-overlay',
+				onclick: function ( e ) {
+					if ( e.target === overlay ) {
+						close();
+					}
+				},
+			},
+			[
+				el( 'div', { class: 'kb-modal kb-icon-picker', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Icon library' }, [
+					el( 'div', { class: 'kb-modal-head' }, [
+						el( 'h2', { text: 'Icon library' } ),
+						el( 'button', { type: 'button', class: 'kb-icon-btn', 'aria-label': 'Close', onclick: close }, [ icon( 'dashicons-no-alt' ) ] ),
+					] ),
+					el( 'div', { class: 'kb-picker-bar' }, [ search, tabs ] ),
+					grid,
+					note,
+				] ),
+			]
+		);
+		document.body.appendChild( overlay );
+		document.addEventListener( 'keydown', onKey, true );
+		draw();
+		search.focus();
+	}
+
+	/* Repeaters: a list of items, each with its own settings (slides,
+	 * form fields, social icons). Items are edited in place. */
+	var openItems = {};
+
+	function newItemId() {
+		return Math.random().toString( 16 ).slice( 2, 9 );
+	}
+
+	function itemTitle( control, item, index ) {
+		var value = control.title_field ? item[ control.title_field ] : '';
+		if ( value && typeof value === 'object' ) {
+			value = typeof value.value === 'string' ? value.value.replace( /^fa[a-z]? fa-/, '' ).replace( /-/g, ' ' ) : '';
+		}
+		value = String( value || '' ).replace( /<[^>]*>/g, '' ).trim();
+		return value ? value.slice( 0, 40 ) : ( control.item_label || 'Item' ) + ' ' + ( index + 1 );
+	}
+
+	function renderRepeater( node, key, control, id ) {
+		var items = Array.isArray( node.settings[ key ] ) ? node.settings[ key ] : ( node.settings[ key ] = [] );
+		var fields = control.fields || {};
+		var openKey = node.id + ':' + key;
+		var list = el( 'div', { class: 'kb-repeater', id: id } );
+
+		function move( from, to ) {
+			if ( to < 0 || to >= items.length ) {
+				return;
+			}
+			items.splice( to, 0, items.splice( from, 1 )[ 0 ] );
+			changed();
+		}
+
+		items.forEach( function ( item, index ) {
+			// Fill in defaults so conditions and placeholders work.
+			var withItemDefaults = withDefaults( fields, item );
+			Object.keys( withItemDefaults ).forEach( function ( k ) {
+				if ( ! ( k in item ) ) {
+					item[ k ] = withItemDefaults[ k ];
+				}
+			} );
+			if ( ! item._id ) {
+				item._id = newItemId();
+			}
+			var isOpen = openItems[ openKey ] === item._id;
+			var body = null;
+			if ( isOpen ) {
+				var pseudo = { id: node.id + ':' + key + ':' + item._id, settings: item, idPrefix: key + '-' + item._id + '-' };
+				body = el( 'div', { class: 'kb-repeater-body' } );
+				Object.keys( fields ).forEach( function ( fieldKey ) {
+					var field = fields[ fieldKey ];
+					if ( ! field.hidden && Css.conditionMet( field, item ) ) {
+						body.appendChild( renderControl( pseudo, fieldKey, field ) );
+					}
+				} );
+			}
+			list.appendChild(
+				el( 'div', { class: 'kb-repeater-item' + ( isOpen ? ' is-open' : '' ), 'data-item': item._id }, [
+					el( 'div', { class: 'kb-repeater-head' }, [
+						el( 'button', {
+							type: 'button',
+							class: 'kb-repeater-title',
+							'aria-expanded': isOpen ? 'true' : 'false',
+							text: itemTitle( control, item, index ),
+							onclick: function () {
+								openItems[ openKey ] = isOpen ? null : item._id;
+								renderPanel();
+							},
+						} ),
+						toolButton( 'dashicons-arrow-up-alt2', 'Move up', function () {
+							move( index, index - 1 );
+						} ),
+						toolButton( 'dashicons-arrow-down-alt2', 'Move down', function () {
+							move( index, index + 1 );
+						} ),
+						toolButton( 'dashicons-admin-page', 'Duplicate', function () {
+							var copy = clone( item );
+							copy._id = newItemId();
+							items.splice( index + 1, 0, copy );
+							openItems[ openKey ] = copy._id;
+							changed();
+						} ),
+						toolButton( 'dashicons-trash', 'Remove', function () {
+							items.splice( index, 1 );
+							changed();
+						} ),
+					] ),
+					body,
+				] )
+			);
+		} );
+
+		list.appendChild(
+			el( 'button', {
+				type: 'button',
+				class: 'kb-btn kb-btn-secondary kb-repeater-add',
+				text: 'Add ' + ( control.item_label || 'item' ).toLowerCase(),
+				onclick: function () {
+					var item = withDefaults( fields, {} );
+					item._id = newItemId();
+					items.push( item );
+					openItems[ openKey ] = item._id;
+					changed();
+				},
+			} )
+		);
+		return list;
+	}
+
 	function renderUrl( control, id, value, update ) {
 		function current( overrides ) {
 			return Object.assign( { url: '', is_external: '', nofollow: '' }, value, overrides );
@@ -2527,6 +2839,9 @@
 			Css.forDevice( Css.globalsRules( state.globals, config.globalTypographyControls ), state.device ) +
 			Css.forDevice( cssRules, state.device );
 		loadFonts( layout );
+		if ( window.KbrooStudio.initCarousels ) {
+			window.KbrooStudio.initCarousels( ui.canvas, { autoplay: 0 } );
+		}
 		ui.canvasWrap.scrollTop = scroll;
 		renderNavigator();
 	}

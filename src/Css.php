@@ -42,6 +42,12 @@ final class Css {
 		$rules = array_fill_keys( Controls::DEVICES, array() );
 
 		foreach ( $controls as $key => $control ) {
+			if ( 'repeater' === ( $control['type'] ?? '' ) ) {
+				foreach ( self::repeater_rules( $control, $settings[ $key ] ?? array(), $wrapper ) as $device => $list ) {
+					$rules[ $device ] = array_merge( $rules[ $device ], $list );
+				}
+				continue;
+			}
 			if ( empty( $control['selectors'] ) ) {
 				continue;
 			}
@@ -68,6 +74,32 @@ final class Css {
 			}
 		}
 
+		return $rules;
+	}
+
+	/**
+	 * Rules for each item of a repeater, where {{CURRENT_ITEM}} is the
+	 * item's class.
+	 *
+	 * @param mixed $items Repeater value.
+	 */
+	public static function repeater_rules( array $control, $items, string $wrapper ): array {
+		$rules  = array_fill_keys( Controls::DEVICES, array() );
+		$fields = $control['fields'] ?? array();
+		if ( ! is_array( $items ) || ! array_filter( array_column( $fields, 'selectors' ) ) ) {
+			return $rules;
+		}
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$class = '.kbroo-repeater-item-' . preg_replace( '/[^A-Za-z0-9]/', '', (string) ( $item['_id'] ?? '' ) );
+			foreach ( self::element_rules( $fields, Controls::with_defaults( $fields, $item ), $wrapper ) as $device => $list ) {
+				foreach ( $list as $rule ) {
+					$rules[ $device ][] = str_replace( '{{CURRENT_ITEM}}', $class, $rule );
+				}
+			}
+		}
 		return $rules;
 	}
 

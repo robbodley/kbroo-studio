@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -38,6 +38,8 @@ In the editor:
 - The device buttons in the top bar preview tablet and mobile widths. Settings marked with a device icon are saved per device: a blank tablet or mobile value inherits from the larger screen.
 - **Backgrounds**: sections, columns and containers have Background, Background on hover and Background overlay settings in the Style tab (widgets have them in Advanced). A background is a colour or image (image, position, size and repeat can differ per device), a two-colour gradient, or, for sections and containers, a YouTube, Vimeo or MP4 video. The overlay sits between the background and the content, with its own opacity and blend mode, and can change on hover.
 - Advanced has margin, padding, CSS ID and classes, **Motion effects** (an entrance animation such as fade in up, played once when the element scrolls into view, with a duration and delay), and hide on desktop / tablet / mobile. Hidden elements show faded in the editor. Animations are skipped for visitors who ask their system for reduced motion.
+- **Icons** come from Font Awesome Free (solid, regular and brands), bundled with the plugin as SVG: pages load only the icons they use, with no icon font or outside request. The icon picker searches by name and keyword.
+- Lists such as slides and social icons are edited item by item in the panel: add, open, reorder, duplicate or remove each one.
 - Buttons and images have a **hover animation** (grow, float, sink, rotate...), and images have CSS filters (brightness, contrast, saturation, blur, hue), normal and on hover.
 - **Copy and paste**: right-click any element for Duplicate, Copy, Paste, Paste style and Delete, or use Ctrl+C / Ctrl+V (Ctrl+Shift+V pastes style only). Copied elements go on the system clipboard, so they paste into another page or another site running Kbroo Studio.
 - **Navigator** (list icon in the top bar): the page as a tree. Click to select, drag to reorder (widgets between columns, columns between sections), double-click to rename.
@@ -92,3 +94,7 @@ Every save is sanitized server side against each element's control definitions (
 Global colours and fonts are stored in the `kbroo_global_styles` option in the shape of Elementor's kit (`colors` / `typography` lists with `_id` and `title`). Elements link to them through Elementor's `__globals__` setting, e.g. `"__globals__": { "title_color": "globals/colors?id=primary" }`, and the CSS uses `var(--kbroo-global-color-primary)`.
 
 Hooks: `kbroo_studio_fonts` (filter), `kbroo_studio_post_types` (filter), `kbroo_studio_register_widgets` (action), `kbroo_studio_render` (filter).
+
+## Credits
+
+Icons: [Font Awesome Free](https://fontawesome.com) 6.7.2, CC BY 4.0 (see `data/icons/FONT-AWESOME-LICENSE.txt`).
