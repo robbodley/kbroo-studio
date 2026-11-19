@@ -32,6 +32,13 @@ final class Registry {
 	public function register_core_widgets(): void {
 		$this->register( new Heading() );
 		$this->register( new TextEditor() );
+		$this->register( new Image() );
+		$this->register( new Button() );
+		$this->register( new Spacer() );
+		$this->register( new Divider() );
+		$this->register( new Html() );
+		$this->register( new Shortcode() );
+		$this->register( new MenuAnchor() );
 
 		/**
 		 * Register additional widgets.

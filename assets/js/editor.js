@@ -273,6 +273,334 @@
 	}
 
 	/* ------------------------------------------------------------------ *
+	 * Copy and paste
+	 *
+	 * A copied element goes on the system clipboard as JSON (so Ctrl+V works
+	 * on another page or another site) and into localStorage (so the Paste
+	 * menu item works without asking for clipboard permission).
+	 * ------------------------------------------------------------------ */
+
+	var CLIP_TYPE = 'kbroo-studio/element';
+	var memoryClipboard = null; // When localStorage is unavailable.
+	var pasteStyleNext = false;
+
+	function clipboardText( node ) {
+		return JSON.stringify( { type: CLIP_TYPE, version: 1, element: node } );
+	}
+
+	/** A copied element rebuilt from untrusted JSON, or null. */
+	function cleanElement( node, expected ) {
+		if ( ! node || typeof node !== 'object' || ( expected && node.elType !== expected ) ) {
+			return null;
+		}
+		var settings = node.settings && typeof node.settings === 'object' && ! Array.isArray( node.settings ) ? node.settings : {};
+		var out = { id: uid(), elType: node.elType, settings: clone( settings ) };
+		var child = { section: 'column', column: 'widget' }[ node.elType ];
+		if ( node.elType === 'widget' ) {
+			if ( ! config.widgets[ node.widgetType ] ) {
+				return null;
+			}
+			out.widgetType = node.widgetType;
+			return out;
+		}
+		if ( ! child ) {
+			return null;
+		}
+		out.elements = ( Array.isArray( node.elements ) ? node.elements : [] )
+			.map( function ( c ) {
+				return cleanElement( c, child );
+			} )
+			.filter( Boolean );
+		if ( node.elType === 'section' ) {
+			out.elements = out.elements.slice( 0, config.maxColumns );
+			if ( ! out.elements.length ) {
+				return null;
+			}
+		}
+		return out;
+	}
+
+	function parseClipboard( text ) {
+		try {
+			var data = JSON.parse( text );
+			return data && data.type === CLIP_TYPE ? cleanElement( data.element ) : null;
+		} catch ( e ) {
+			return null;
+		}
+	}
+
+	function storedClipboard() {
+		var text = null;
+		try {
+			text = window.localStorage.getItem( 'kbroo-studio:clipboard' );
+		} catch ( e ) {}
+		return parseClipboard( text || memoryClipboard || '' );
+	}
+
+	function remember( text ) {
+		memoryClipboard = text;
+		try {
+			window.localStorage.setItem( 'kbroo-studio:clipboard', text );
+		} catch ( e ) {}
+	}
+
+	/** Copy from a button or menu: also try the system clipboard. */
+	function copyElement( id ) {
+		var found = find( id );
+		if ( ! found ) {
+			return;
+		}
+		var text = clipboardText( found.node );
+		remember( text );
+		if ( navigator.clipboard && navigator.clipboard.writeText ) {
+			navigator.clipboard.writeText( text ).catch( function () {} );
+		}
+		toast( elementLabel( found.node ) + ' copied. Paste it here or on another page.' );
+	}
+
+	/** The section an element sits in. */
+	function sectionOf( id ) {
+		var found = find( id );
+		while ( found && found.node.elType !== 'section' ) {
+			found = found.parent ? find( found.parent.id ) : null;
+		}
+		return found;
+	}
+
+	/**
+	 * Insert a copied element next to (or into) the target element: widgets
+	 * go after a widget or into a column, columns after a column, sections
+	 * after the target's section. With no target they go at the end.
+	 */
+	function pasteElement( element, targetId ) {
+		var target = targetId ? find( targetId ) : null;
+		var copy = withNewIds( element );
+
+		if ( copy.elType === 'section' ) {
+			var section = target ? sectionOf( target.node.id ) : null;
+			state.layout.elements.splice( section ? section.index + 1 : state.layout.elements.length, 0, copy );
+		} else if ( copy.elType === 'column' ) {
+			var host = target ? sectionOf( target.node.id ) : null;
+			if ( host && host.node.elements.length < config.maxColumns ) {
+				var at = target.node.elType === 'column' ? target.index + 1 : target.node.elType === 'widget' ? find( target.parent.id ).index + 1 : host.node.elements.length;
+				host.node.elements.splice( at, 0, copy );
+				evenWidths( host.node );
+			} else {
+				var wrapper = makeSection( [ 100 ] );
+				copy.settings._inline_size = 100;
+				wrapper.elements = [ copy ];
+				state.layout.elements.splice( host ? host.index + 1 : state.layout.elements.length, 0, wrapper );
+			}
+		} else if ( target && target.node.elType === 'widget' ) {
+			target.list.splice( target.index + 1, 0, copy );
+		} else if ( target && target.node.elType === 'column' ) {
+			target.node.elements.push( copy );
+		} else if ( target && target.node.elType === 'section' ) {
+			target.node.elements[ 0 ].elements.push( copy );
+		} else {
+			var fresh = makeSection( [ 100 ] );
+			fresh.elements[ 0 ].elements.push( copy );
+			state.layout.elements.push( fresh );
+		}
+
+		select( copy.id, copy.elType, true );
+		changed();
+	}
+
+	/**
+	 * Copy the Style and Advanced settings (not content, CSS ID or classes)
+	 * of a copied element onto an element of the same kind.
+	 */
+	function pasteStyle( source, targetId ) {
+		var target = find( targetId );
+		if ( ! source || ! target ) {
+			return;
+		}
+		if ( source.elType !== target.node.elType || source.widgetType !== target.node.widgetType ) {
+			toast( 'Paste style needs a copied ' + elementLabel( target.node ).toLowerCase() + '. You copied a ' + elementLabel( source ).toLowerCase() + '.', true );
+			return;
+		}
+		var controls = controlsFor( target.node );
+		var from = source.settings;
+		var to = target.node.settings;
+		var fromGlobals = from.__globals__ || {};
+		var toGlobals = Object.assign( {}, to.__globals__ || {} );
+
+		Object.keys( controls ).forEach( function ( key ) {
+			var control = controls[ key ];
+			if ( control.tab === 'content' || control.type === 'text' ) {
+				return;
+			}
+			var keys = Css.keys( key, control );
+			Object.keys( keys ).forEach( function ( device ) {
+				var k = keys[ device ];
+				if ( Object.prototype.hasOwnProperty.call( from, k ) ) {
+					to[ k ] = clone( from[ k ] );
+				}
+				delete toGlobals[ k ];
+				if ( fromGlobals[ k ] ) {
+					toGlobals[ k ] = fromGlobals[ k ];
+				}
+			} );
+			if ( control.global_group ) {
+				delete toGlobals[ control.global_group ];
+				if ( fromGlobals[ control.global_group ] ) {
+					toGlobals[ control.global_group ] = fromGlobals[ control.global_group ];
+				}
+			}
+		} );
+		if ( Object.keys( toGlobals ).length ) {
+			to.__globals__ = toGlobals;
+		} else {
+			delete to.__globals__;
+		}
+		changed();
+		toast( 'Style pasted.' );
+	}
+
+	/** Right-click menu on the canvas. */
+	function openContextMenu( e, node ) {
+		closeContextMenu();
+		var copied = storedClipboard();
+		var items = [];
+		if ( node ) {
+			items.push(
+				[ 'Duplicate', 'dashicons-admin-page', function () {
+					duplicateElement( node.id );
+					changed();
+				} ],
+				[ 'Copy', 'dashicons-clipboard', function () {
+					copyElement( node.id );
+				} ]
+			);
+		}
+		items.push( [ copied ? 'Paste ' + elementLabel( copied ).toLowerCase() : 'Paste', 'dashicons-editor-paste-text', copied ? function () {
+			pasteElement( copied, node && node.id );
+		} : null ] );
+		if ( node ) {
+			items.push(
+				[ 'Paste style', 'dashicons-art', copied && copied.elType === node.elType && copied.widgetType === node.widgetType ? function () {
+					pasteStyle( copied, node.id );
+				} : null ],
+				[ 'Delete', 'dashicons-trash', function () {
+					removeElement( node.id );
+					changed();
+				}, true ]
+			);
+		}
+
+		var menu = el(
+			'div',
+			{ class: 'kb-context-menu', role: 'menu' },
+			items.map( function ( item ) {
+				return el(
+					'button',
+					{
+						type: 'button',
+						role: 'menuitem',
+						class: 'kb-context-item' + ( item[ 3 ] ? ' is-danger' : '' ),
+						disabled: ! item[ 2 ],
+						onclick: function () {
+							closeContextMenu();
+							item[ 2 ]();
+						},
+					},
+					[ icon( item[ 1 ] ), el( 'span', { text: item[ 0 ] } ) ]
+				);
+			} )
+		);
+		document.body.appendChild( menu );
+		var x = Math.min( e.clientX, window.innerWidth - menu.offsetWidth - 8 );
+		var y = Math.min( e.clientY, window.innerHeight - menu.offsetHeight - 8 );
+		menu.style.left = Math.max( 8, x ) + 'px';
+		menu.style.top = Math.max( 8, y ) + 'px';
+		var first = menu.querySelector( 'button:not([disabled])' );
+		if ( first ) {
+			first.focus();
+		}
+		ui.contextMenu = menu;
+	}
+
+	function closeContextMenu() {
+		if ( ui.contextMenu ) {
+			ui.contextMenu.remove();
+			ui.contextMenu = null;
+		}
+	}
+
+	function bindClipboard() {
+		function typing( e ) {
+			return e.target.closest && e.target.closest( 'input, textarea, select, [contenteditable]' );
+		}
+
+		document.addEventListener( 'copy', function ( e ) {
+			if ( typing( e ) || ! state.selected || state.preview || String( window.getSelection() ) ) {
+				return;
+			}
+			var found = find( state.selected.id );
+			if ( ! found ) {
+				return;
+			}
+			var text = clipboardText( found.node );
+			e.clipboardData.setData( 'text/plain', text );
+			e.preventDefault();
+			remember( text );
+			toast( elementLabel( found.node ) + ' copied. Paste it here or on another page.' );
+		} );
+
+		document.addEventListener( 'paste', function ( e ) {
+			var asStyle = pasteStyleNext;
+			pasteStyleNext = false;
+			if ( typing( e ) || state.preview ) {
+				return;
+			}
+			var element = parseClipboard( e.clipboardData.getData( 'text/plain' ) );
+			if ( ! element ) {
+				return;
+			}
+			e.preventDefault();
+			if ( asStyle ) {
+				if ( state.selected ) {
+					pasteStyle( element, state.selected.id );
+				}
+				return;
+			}
+			pasteElement( element, state.selected && state.selected.id );
+		} );
+
+		ui.canvas.addEventListener( 'contextmenu', function ( e ) {
+			if ( state.preview ) {
+				return;
+			}
+			var target = e.target.closest( '.kb-el' );
+			var found = target ? find( target.getAttribute( 'data-id' ) ) : null;
+			e.preventDefault();
+			if ( found ) {
+				select( found.node.id, found.node.elType );
+			}
+			openContextMenu( e, found && found.node );
+		} );
+
+		document.addEventListener( 'mousedown', function ( e ) {
+			if ( ui.contextMenu && ! ui.contextMenu.contains( e.target ) ) {
+				closeContextMenu();
+			}
+		} );
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( e.key === 'Escape' && ui.contextMenu ) {
+				e.stopImmediatePropagation();
+				closeContextMenu();
+			}
+			// Ctrl+Shift+V: the paste event that follows pastes style only.
+			if ( ( e.ctrlKey || e.metaKey ) && e.shiftKey && e.key.toLowerCase() === 'v' ) {
+				pasteStyleNext = true;
+			}
+		}, true );
+		window.addEventListener( 'blur', closeContextMenu );
+		ui.canvasWrap.addEventListener( 'scroll', closeContextMenu );
+	}
+
+	/* ------------------------------------------------------------------ *
 	 * Change tracking and undo / redo
 	 * ------------------------------------------------------------------ */
 
@@ -398,6 +726,7 @@
 
 		bindCanvasEvents();
 		bindKeyboard();
+		bindClipboard();
 
 		window.addEventListener( 'beforeunload', function ( e ) {
 			if ( state.dirty || state.globalsDirty ) {
@@ -734,6 +1063,28 @@
 				} ),
 				el( 'button', {
 					type: 'button',
+					class: 'kb-btn kb-btn-secondary',
+					text: 'Copy',
+					onclick: function () {
+						copyElement( node.id );
+					},
+				} ),
+				el( 'button', {
+					type: 'button',
+					class: 'kb-btn kb-btn-secondary',
+					text: 'Paste style',
+					title: 'Use the style of the copied element',
+					onclick: function () {
+						var copied = storedClipboard();
+						if ( ! copied ) {
+							toast( 'Copy an element first, then paste its style here.', true );
+							return;
+						}
+						pasteStyle( copied, node.id );
+					},
+				} ),
+				el( 'button', {
+					type: 'button',
 					class: 'kb-btn kb-btn-danger',
 					text: 'Delete',
 					onclick: function () {
@@ -1014,6 +1365,31 @@
 				input = box;
 				break;
 
+			case 'code':
+				input = el( 'div', { class: 'kb-code-wrap' }, [
+					el( 'textarea', { id: id, rows: 10, class: 'kb-code', spellcheck: 'false' } ),
+					config.canUnfilteredHtml
+						? null
+						: el( 'p', {
+								class: 'kb-control-note',
+								text: 'Scripts and some other tags are removed when you save, because your account cannot add unfiltered HTML.',
+						  } ),
+				] );
+				var code = input.querySelector( 'textarea' );
+				code.value = value;
+				code.addEventListener( 'input', function () {
+					update( code.value, true );
+				} );
+				break;
+
+			case 'media':
+				input = renderMedia( control, id, value || {}, update );
+				break;
+
+			case 'url':
+				input = renderUrl( control, id, value || {}, update );
+				break;
+
 			case 'slider':
 				input = renderSlider( control, id, value, inherited, update );
 				break;
@@ -1041,7 +1417,98 @@
 				: null,
 		] );
 
-		return el( 'div', { class: 'kb-control kb-control-' + control.type, 'data-control': key }, [ label, input ] );
+		return el( 'div', { class: 'kb-control kb-control-' + control.type, 'data-control': key }, [
+			label,
+			input,
+			control.description ? el( 'p', { class: 'kb-control-note', text: control.description } ) : null,
+		] );
+	}
+
+	/** Image from the Media Library, or any image address. */
+	function renderMedia( control, id, value, update ) {
+		var preview = el( 'button', {
+			type: 'button',
+			class: 'kb-media-preview' + ( value.url ? '' : ' is-empty' ),
+			title: 'Choose image',
+			onclick: openLibrary,
+		} );
+		if ( value.url ) {
+			preview.appendChild( el( 'img', { src: value.url, alt: '' } ) );
+		} else {
+			preview.appendChild( el( 'span', { text: 'Choose image' } ) );
+		}
+
+		var address = el( 'input', { type: 'url', id: id, placeholder: 'or paste an image address' } );
+		address.value = value.id ? '' : value.url || '';
+		address.addEventListener( 'change', function () {
+			update( { url: address.value.trim(), id: '' }, false );
+		} );
+
+		function openLibrary() {
+			if ( ! window.wp || ! wp.media ) {
+				toast( 'The Media Library is not available here. Paste an image address instead.', true );
+				return;
+			}
+			var frame = wp.media( { title: 'Choose image', library: { type: 'image' }, multiple: false, button: { text: 'Use this image' } } );
+			frame.on( 'open', function () {
+				if ( value.id ) {
+					var attachment = wp.media.attachment( value.id );
+					attachment.fetch();
+					frame.state().get( 'selection' ).reset( [ attachment ] );
+				}
+			} );
+			frame.on( 'select', function () {
+				var picked = frame.state().get( 'selection' ).first().toJSON();
+				window.KbrooStudio.captions[ picked.id ] = picked.caption || '';
+				update( { url: picked.url, id: picked.id }, false );
+			} );
+			frame.open();
+		}
+
+		return el( 'div', { class: 'kb-media' }, [
+			preview,
+			el( 'div', { class: 'kb-media-actions' }, [
+				el( 'button', { type: 'button', class: 'kb-btn kb-btn-secondary', text: value.url ? 'Replace' : 'Choose image', onclick: openLibrary } ),
+				value.url
+					? el( 'button', {
+							type: 'button',
+							class: 'kb-link',
+							text: 'Remove',
+							onclick: function () {
+								update( { url: '', id: '' }, false );
+							},
+					  } )
+					: null,
+			] ),
+			address,
+		] );
+	}
+
+	/** Link: address, new tab and nofollow (Elementor's link shape). */
+	function renderUrl( control, id, value, update ) {
+		function current( overrides ) {
+			return Object.assign( { url: '', is_external: '', nofollow: '' }, value, overrides );
+		}
+		var address = el( 'input', { type: 'text', id: id, placeholder: 'https://, /page or #anchor', inputmode: 'url' } );
+		address.value = value.url || '';
+		address.addEventListener( 'input', function () {
+			value = current( { url: address.value.trim() } );
+			update( value, true );
+		} );
+
+		function option( key, text ) {
+			var box = el( 'input', { type: 'checkbox' } );
+			box.checked = value[ key ] === 'on';
+			box.addEventListener( 'change', function () {
+				var patch = {};
+				patch[ key ] = box.checked ? 'on' : '';
+				value = current( patch );
+				update( value, false );
+			} );
+			return el( 'label', { class: 'kb-check' }, [ box, el( 'span', { text: text } ) ] );
+		}
+
+		return el( 'div', { class: 'kb-url' }, [ address, option( 'is_external', 'Open in a new tab' ), option( 'nofollow', 'Add nofollow' ) ] );
 	}
 
 	function unitSelect( control, current, onChange ) {
@@ -1994,14 +2461,68 @@
 		);
 	}
 
+	/* Widgets only WordPress can render (shortcodes) are previewed with HTML
+	 * from the server, fetched shortly after their settings stop changing. */
+	var serverCache = {};
+	var serverLast = {};
+	var serverTimers = {};
+
+	function serverPreview( widget, s ) {
+		var definition = config.widgets[ widget.widgetType ];
+		var key = widget.widgetType + ':' + JSON.stringify( s );
+		var empty = window.KbrooStudio.hint( definition.icon, definition.title + ': fill in the settings in the panel.' );
+		if ( Object.prototype.hasOwnProperty.call( serverCache, key ) ) {
+			serverLast[ widget.id ] = serverCache[ key ];
+			return serverCache[ key ] || empty;
+		}
+		clearTimeout( serverTimers[ widget.id ] );
+		serverTimers[ widget.id ] = setTimeout( function () {
+			fetch( config.widgetPreviewUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce },
+				body: JSON.stringify( { widgetType: widget.widgetType, settings: s } ),
+			} )
+				.then( parseResponse )
+				.then( function ( data ) {
+					serverCache[ key ] = String( data.html || '' );
+				} )
+				.catch( function ( error ) {
+					serverCache[ key ] = window.KbrooStudio.hint( 'dashicons-warning', 'Preview failed: ' + error.message );
+				} )
+				.then( renderCanvas );
+		}, 400 );
+		return serverLast[ widget.id ] != null ? serverLast[ widget.id ] || empty : window.KbrooStudio.hint( definition.icon, 'Loading preview…' );
+	}
+
+	/** Captions for images linked to the Media Library, fetched once each. */
+	var captionRequests = {};
+
+	function fetchCaption( id ) {
+		if ( captionRequests[ id ] || ! window.wp || ! wp.media ) {
+			return;
+		}
+		captionRequests[ id ] = true;
+		var attachment = wp.media.attachment( id );
+		attachment.fetch().then( function () {
+			window.KbrooStudio.captions[ id ] = attachment.get( 'caption' ) || '';
+			renderCanvas();
+		} );
+	}
+
 	function renderWidget( widget ) {
 		var render = renderers[ widget.widgetType ];
 		var definition = config.widgets[ widget.widgetType ];
-		if ( ! render || ! definition ) {
+		if ( ( ! render && ! ( definition && definition.server ) ) || ! definition ) {
 			return null;
 		}
 		var s = withDefaults( definition.controls, widget.settings );
 		collectCss( widget, definition.controls, s );
+		if ( widget.widgetType === 'image' && s.caption_source === 'attachment' && s.image && s.image.id ) {
+			if ( ! ( s.image.id in window.KbrooStudio.captions ) ) {
+				fetchCaption( s.image.id );
+			}
+		}
 
 		var node = el(
 			'div',
@@ -2031,7 +2552,7 @@
 		// Insert the preview markup directly so selectors such as
 		// "{{WRAPPER}} > .kbroo-heading" match the same tree as the front end.
 		var holder = document.createElement( 'div' );
-		holder.innerHTML = render( s );
+		holder.innerHTML = definition.server ? serverPreview( widget, s ) : render( s );
 		while ( holder.firstChild ) {
 			node.appendChild( holder.firstChild );
 		}
@@ -2398,6 +2919,16 @@
 
 	// Exposed for debugging and tests.
 	window.KbrooStudio.editor = {
+		copy: copyElement,
+		paste: function ( targetId ) {
+			var copied = storedClipboard();
+			if ( copied ) {
+				pasteElement( copied, targetId );
+			}
+		},
+		pasteStyle: function ( targetId ) {
+			pasteStyle( storedClipboard(), targetId );
+		},
 		getLayout: function () {
 			return clone( state.layout );
 		},

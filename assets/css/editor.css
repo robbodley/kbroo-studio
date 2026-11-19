@@ -1115,3 +1115,156 @@ span.kb-unit {
 .kb-nav-label > span:first-child {
 	flex-shrink: 0;
 }
+
+/* ---- Media, link and code controls ------------------------------------ */
+
+.kb-media {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.kb-media-preview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 140px;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--kb-border);
+	border-radius: 6px;
+	background: repeating-conic-gradient(#f1f5f9 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+	color: var(--kb-muted);
+	cursor: pointer;
+}
+
+.kb-media-preview.is-empty {
+	border-style: dashed;
+}
+
+.kb-media-preview img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+.kb-media-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.kb-url {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.kb-check {
+	display: flex !important;
+	align-items: center;
+	gap: 6px;
+	font-weight: 400 !important;
+}
+
+.kb-code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	tab-size: 2;
+}
+
+.kb-control-note {
+	margin: 4px 0 0;
+	color: var(--kb-muted);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.kb-panel-actions {
+	flex-wrap: wrap;
+}
+
+/* ---- Empty-widget hints (editor only) --------------------------------- */
+
+.kb-widget-hint {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 14px 16px;
+	border: 1px dashed #cbd5e1;
+	border-radius: 6px;
+	background: #f8fafc;
+	color: #64748b;
+	font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kbroo-widget--menu-anchor .kb-widget-hint {
+	padding: 6px 10px;
+}
+
+/* ---- Right-click menu --------------------------------------------------- */
+
+.kb-context-menu {
+	position: fixed;
+	z-index: 100000;
+	display: flex;
+	flex-direction: column;
+	min-width: 190px;
+	padding: 4px;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	background: #fff;
+	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+	font: 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.kb-context-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: #0f172a;
+	text-align: left;
+	cursor: pointer;
+}
+
+.kb-context-item:hover:not([disabled]),
+.kb-context-item:focus-visible {
+	background: #ede9fe;
+	outline: none;
+}
+
+.kb-context-item[disabled] {
+	color: #94a3b8;
+	cursor: default;
+}
+
+.kb-context-item.is-danger {
+	color: #b91c1c;
+}
+
+.kb-context-item .dashicons {
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+/* The editor page does not load wp-admin's common styles, which the Media
+   Library modal relies on for its visually hidden headings. */
+.kbroo-editor-body .screen-reader-text {
+	position: absolute !important;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(1px, 1px, 1px, 1px);
+	clip-path: inset(50%);
+	border: 0;
+	word-wrap: normal !important;
+}

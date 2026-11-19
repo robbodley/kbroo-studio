@@ -74,6 +74,95 @@
 	margin-bottom: 0;
 }
 
+/* Image */
+.kbroo-image {
+	margin: 0;
+}
+
+.kbroo-image img {
+	display: inline-block;
+	max-width: 100%;
+	height: auto;
+	vertical-align: middle;
+}
+
+.kbroo-image a {
+	display: inline-block;
+}
+
+.kbroo-image__caption {
+	margin-top: 8px;
+	font-size: 0.875em;
+}
+
+/* Button. The wrapper is a column flex box so alignment, including full
+   width, is one responsive align-items value. */
+.kbroo-button-wrapper {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+}
+
+.kbroo-button {
+	display: inline-block;
+	border-radius: 3px;
+	background-color: var(--kbroo-global-color-accent, #2563eb);
+	color: #fff;
+	font-size: 15px;
+	line-height: 1;
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+	transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+}
+
+.kbroo-button:hover,
+.kbroo-button:focus-visible {
+	color: #fff;
+}
+
+.kbroo-button--xs { padding: 10px 20px; font-size: 13px; }
+.kbroo-button--sm { padding: 12px 24px; font-size: 15px; }
+.kbroo-button--md { padding: 15px 30px; font-size: 16px; }
+.kbroo-button--lg { padding: 20px 40px; font-size: 18px; border-radius: 5px; }
+.kbroo-button--xl { padding: 25px 50px; font-size: 20px; border-radius: 6px; }
+
+/* Spacer */
+.kbroo-spacer {
+	height: 50px;
+}
+
+/* Divider: style, weight and color are variables so the line and the
+   lines either side of the text share them. */
+.kbroo-divider {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	padding: 15px 0;
+}
+
+.kbroo-divider__line {
+	flex: 1 1 auto;
+	border-top: var(--kbroo-divider-weight, 1px) var(--kbroo-divider-style, solid) var(--kbroo-divider-color, #d1d5db);
+}
+
+.kbroo-divider__text {
+	flex: 0 0 auto;
+	margin: 0;
+	padding: 0 12px;
+	line-height: 1;
+}
+
+.kbroo-divider--text-left .kbroo-divider__line:first-child,
+.kbroo-divider--text-right .kbroo-divider__line:last-child {
+	flex: 0 0 5%;
+}
+
+/* Menu anchor: sticky headers would cover the target, so leave room. */
+.kbroo-menu-anchor {
+	scroll-margin-top: var(--kbroo-anchor-offset, 0px);
+}
+
 /* Hide per device. Not applied inside the editor, which shows these faded. */
 @media (min-width: 1025px) {
 	.kbroo-page:not(.kb-canvas) .kbroo-hidden-desktop {

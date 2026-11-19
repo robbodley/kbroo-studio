@@ -64,6 +64,7 @@ final class Editor {
 
 	private function enqueue_editor_assets( WP_Post $post ): void {
 		wp_enqueue_style( 'dashicons' );
+		wp_enqueue_media( array( 'post' => $post->ID ) );
 		wp_enqueue_style( 'kbroo-frontend', KBROO_STUDIO_URL . 'assets/css/frontend.css', array(), KBROO_STUDIO_VERSION );
 		wp_enqueue_style( 'kbroo-editor', KBROO_STUDIO_URL . 'assets/css/editor.css', array( 'dashicons', 'kbroo-frontend' ), KBROO_STUDIO_VERSION );
 
@@ -104,6 +105,8 @@ final class Editor {
 			'globalTypographyControls' => Controls::for_editor( Globals::typography_controls() ),
 			'systemGlobalIds' => Globals::SYSTEM_IDS,
 			'fonts'          => Fonts::all(),
+			'widgetPreviewUrl' => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/widget-preview' ) ),
+			'canUnfilteredHtml' => current_user_can( 'unfiltered_html' ),
 			'revisionsUrl'   => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/revisions' ) ),
 		);
 	}

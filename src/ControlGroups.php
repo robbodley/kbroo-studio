@@ -109,8 +109,14 @@ final class ControlGroups {
 
 	/**
 	 * Border controls applied to $selector.
+	 *
+	 * @param string $selector CSS selector, using {{WRAPPER}}.
+	 * @param array  $base     Keys merged into every control.
+	 * @param string $prefix   Setting name prefix: "border" gives border_border,
+	 *                         border_width, border_color and border_radius, as in
+	 *                         Elementor; the image widget uses "image_border".
 	 */
-	public static function border( string $selector, array $base = array() ): array {
+	public static function border( string $selector, array $base = array(), string $prefix = 'border' ): array {
 		$base = array_merge(
 			array(
 				'tab'     => 'style',
@@ -118,10 +124,10 @@ final class ControlGroups {
 			),
 			$base
 		);
-		$when = array( 'condition' => array_merge( $base['condition'] ?? array(), array( 'border_border!' => '' ) ) );
+		$when = array( 'condition' => array_merge( $base['condition'] ?? array(), array( $prefix . '_border!' => '' ) ) );
 
 		return array(
-			'border_border' => $base + array(
+			$prefix . '_border' => $base + array(
 				'type'      => 'select',
 				'label'     => __( 'Border type', 'kbroo-studio' ),
 				'default'   => '',
@@ -134,20 +140,20 @@ final class ControlGroups {
 				),
 				'selectors' => array( $selector => 'border-style: {{VALUE}};' ),
 			),
-			'border_width'  => $when + $base + array(
+			$prefix . '_width'  => $when + $base + array(
 				'type'       => 'dimensions',
 				'label'      => __( 'Border width', 'kbroo-studio' ),
 				'units'      => array( 'px' ),
 				'responsive' => true,
 				'selectors'  => array( $selector => 'border-width: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};' ),
 			),
-			'border_color'  => $when + $base + array(
+			$prefix . '_color'  => $when + $base + array(
 				'type'      => 'color',
 				'label'     => __( 'Border color', 'kbroo-studio' ),
 				'default'   => '',
 				'selectors' => array( $selector => 'border-color: {{VALUE}};' ),
 			),
-			'border_radius' => $base + array(
+			$prefix . '_radius' => $base + array(
 				'type'       => 'dimensions',
 				'label'      => __( 'Border radius', 'kbroo-studio' ),
 				'units'      => array( 'px', '%' ),

@@ -56,7 +56,112 @@
 		return '<div class="kbroo-text">' + autop( s.editor ) + '</div>';
 	};
 
+	/** Twin of Widget::link_attributes(). */
+	function linkAttributes( link ) {
+		if ( ! link || ! link.url ) {
+			return '';
+		}
+		var out = ' href="' + esc( link.url ) + '"';
+		var rel = [];
+		if ( link.is_external === 'on' ) {
+			out += ' target="_blank"';
+			rel.push( 'noopener' );
+		}
+		if ( link.nofollow === 'on' ) {
+			rel.push( 'nofollow' );
+		}
+		return rel.length ? out + ' rel="' + rel.join( ' ' ) + '"' : out;
+	}
+
+	// Empty widgets render nothing on the published page. In the editor they
+	// show a hint instead (kb- classes are editor-only).
+	function hint( iconName, text ) {
+		return '<div class="kb-widget-hint"><span class="dashicons ' + iconName + '"></span>' + esc( text ) + '</div>';
+	}
+
+	var PLACEHOLDER_IMAGE =
+		'data:image/svg+xml;charset=utf-8,' +
+		encodeURIComponent(
+			'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">' +
+				'<rect width="800" height="450" fill="#e5e7eb"/>' +
+				'<path d="M300 300l70-90 50 60 40-40 80 70z" fill="#9ca3af"/>' +
+				'<circle cx="470" cy="170" r="28" fill="#9ca3af"/></svg>'
+		);
+
+	/** Attachment captions, filled in by the editor from the Media Library. */
+	var captions = {};
+
+	renderers.image = function ( s ) {
+		var image = s.image || {};
+		var img = '<img src="' + esc( image.url || PLACEHOLDER_IMAGE ) + '" alt="" />';
+		var link = '';
+		if ( s.link_to === 'file' && image.url ) {
+			link = ' href="' + esc( image.url ) + '"';
+		} else if ( s.link_to === 'custom' ) {
+			link = linkAttributes( s.link );
+		}
+		if ( link ) {
+			img = '<a' + link + '>' + img + '</a>';
+		}
+		var caption = '';
+		if ( s.caption_source === 'attachment' && image.id ) {
+			caption = captions[ image.id ] || '';
+		} else if ( s.caption_source === 'custom' ) {
+			caption = s.caption || '';
+		}
+		if ( caption ) {
+			img += '<figcaption class="kbroo-image__caption">' + esc( caption ) + '</figcaption>';
+		}
+		return '<figure class="kbroo-image">' + img + '</figure>';
+	};
+
+	var BUTTON_SIZES = [ 'xs', 'sm', 'md', 'lg', 'xl' ];
+
+	renderers.button = function ( s ) {
+		var size = BUTTON_SIZES.indexOf( s.size ) > -1 ? s.size : 'sm';
+		var link = linkAttributes( s.link );
+		var tag = link ? 'a' : 'span';
+		return (
+			'<div class="kbroo-button-wrapper"><' + tag + ' class="kbroo-button kbroo-button--' + size + '"' + link + '>' +
+			'<span class="kbroo-button__text">' + esc( s.text ) + '</span></' + tag + '></div>'
+		);
+	};
+
+	renderers.spacer = function () {
+		return '<div class="kbroo-spacer" aria-hidden="true"></div>';
+	};
+
+	var DIVIDER_TAGS = [ 'span', 'div', 'p', 'h2', 'h3', 'h4', 'h5', 'h6' ];
+
+	renderers.divider = function ( s ) {
+		if ( s.look !== 'line_text' || ! String( s.text || '' ).trim() ) {
+			return '<div class="kbroo-divider" role="separator"><span class="kbroo-divider__line"></span></div>';
+		}
+		var tag = DIVIDER_TAGS.indexOf( s.html_tag ) > -1 ? s.html_tag : 'span';
+		var position = [ 'left', 'center', 'right' ].indexOf( s.text_align ) > -1 ? s.text_align : 'center';
+		return (
+			'<div class="kbroo-divider kbroo-divider--text kbroo-divider--text-' + position + '">' +
+			'<span class="kbroo-divider__line"></span><' + tag + ' class="kbroo-divider__text">' + esc( s.text ) + '</' + tag + '>' +
+			'<span class="kbroo-divider__line"></span></div>'
+		);
+	};
+
+	renderers.html = function ( s ) {
+		// Scripts added with innerHTML do not run, so the canvas shows the
+		// markup without its behaviour. The published page runs it.
+		return String( s.html || '' ).trim() ? s.html : hint( 'dashicons-editor-code', 'Add your HTML code in the panel.' );
+	};
+
+	renderers[ 'menu-anchor' ] = function ( s ) {
+		return s.anchor
+			? '<div class="kbroo-menu-anchor" id="' + esc( s.anchor ) + '"></div>' + hint( 'dashicons-admin-links', 'Anchor: #' + s.anchor )
+			: hint( 'dashicons-admin-links', 'Name this anchor, then link to it with #name.' );
+	};
+
 	window.KbrooStudio = window.KbrooStudio || {};
+	window.KbrooStudio.linkAttributes = linkAttributes;
+	window.KbrooStudio.hint = hint;
+	window.KbrooStudio.captions = captions;
 	window.KbrooStudio.widgetRenderers = renderers;
 	window.KbrooStudio.esc = esc;
 	window.KbrooStudio.registerWidget = function ( name, render ) {
