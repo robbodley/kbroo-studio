@@ -1331,3 +1331,8 @@ span.kb-unit {
 :where(.kb-canvas-wrap[data-device="mobile"]) .kbroo-con-inner {
 	flex-wrap: wrap;
 }
+
+/* Background video stand-in (see backgroundVideo() in editor.js). */
+.kb-bg-video-preview {
+	background: #1e1e1e center / cover no-repeat;
+}

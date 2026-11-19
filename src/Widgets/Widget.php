@@ -51,7 +51,16 @@ abstract class Widget {
 	 */
 	final public function get_controls(): array {
 		if ( null === $this->controls ) {
-			$this->controls = array_merge( $this->widget_controls(), ControlGroups::advanced( '_' ) );
+			$this->controls = array_merge(
+				$this->widget_controls(),
+				ControlGroups::advanced( '_' ),
+				ControlGroups::background(
+					'{{WRAPPER}}',
+					array( 'tab' => 'advanced' ),
+					'_background',
+					array( 'hover' => '{{WRAPPER}}:hover' )
+				)
+			);
 		}
 		return $this->controls;
 	}

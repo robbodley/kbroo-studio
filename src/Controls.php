@@ -27,12 +27,18 @@
  *   sanitize    text: 'classes' (CSS class list) or 'id' (HTML id).
  *   selectors   CSS selector => declaration template. Placeholders:
  *               {{WRAPPER}} the element, {{VALUE}}, {{SIZE}} {{UNIT}} (slider),
- *               {{TOP}} {{RIGHT}} {{BOTTOM}} {{LEFT}} {{UNIT}} (dimensions).
+ *               {{TOP}} {{RIGHT}} {{BOTTOM}} {{LEFT}} {{UNIT}} (dimensions),
+ *               {{URL}} (media: a quoted url()), {{DEVICE}} (desktop, tablet
+ *               or mobile), and {{other_key.VALUE}} / {{other_key.SIZE}} ...
+ *               for another control's value on the same element (for
+ *               gradients and filters, which combine several settings).
  *   selectors_dictionary  select: option value => CSS value used for {{VALUE}}.
  *   global_group / global_property  Part of a typography group that can
  *               link to a global font (see Globals).
  *   condition   Show and apply only when other settings match:
  *               [ 'key' => value|[values], 'key!' => value|[values] ].
+ *               For a responsive control's tablet and mobile rules, a
+ *               responsive condition key is read for that device too.
  *
  * Setting names and value shapes follow Elementor's where there is an
  * equivalent, so imported Elementor data maps across with little work.
@@ -48,7 +54,7 @@ final class Controls {
 
 	const DEVICES = array( 'desktop', 'tablet', 'mobile' );
 
-	const ALL_UNITS = array( 'px', '%', 'em', 'rem', 'vw', 'vh' );
+	const ALL_UNITS = array( 'px', '%', 'em', 'rem', 'vw', 'vh', 'deg', 's', 'ms' );
 
 	/**
 	 * Setting key for a control on a device.

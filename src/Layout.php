@@ -38,6 +38,12 @@ defined( 'ABSPATH' ) || exit;
 
 final class Layout {
 
+	/** Background options for sections and containers. */
+	const WITH_VIDEO = array(
+		'types' => array( 'classic', 'gradient', 'video' ),
+		'hover' => '{{WRAPPER}}:hover',
+	);
+
 	const VERSION     = 1;
 	const MAX_COLUMNS = 6;
 	const MAX_DEPTH   = 12; // Element levels, counting columns.
@@ -139,7 +145,8 @@ final class Layout {
 					),
 				),
 			),
-			ControlGroups::background( '{{WRAPPER}}' ),
+			ControlGroups::background( '{{WRAPPER}}', array(), 'background', self::WITH_VIDEO ),
+			ControlGroups::overlay( '{{WRAPPER}}::before', '{{WRAPPER}}:hover::before' ),
 			ControlGroups::border( '{{WRAPPER}}' ),
 			ControlGroups::advanced(
 				'',
@@ -199,7 +206,13 @@ final class Layout {
 					'selectors' => array( $inner => 'gap: {{SIZE}}{{UNIT}};' ),
 				),
 			),
-			ControlGroups::background( $inner ),
+			ControlGroups::background(
+				$inner,
+				array(),
+				'background',
+				array( 'hover' => '{{WRAPPER}}:hover > .kbroo-column-inner' )
+			),
+			ControlGroups::overlay( $inner . '::before', '{{WRAPPER}}:hover > .kbroo-column-inner::before' ),
 			ControlGroups::border( $inner ),
 			ControlGroups::advanced( '', $inner )
 		);
@@ -328,7 +341,8 @@ final class Layout {
 					'selectors'  => array( $inner => 'flex-wrap: {{VALUE}};' ),
 				),
 			),
-			ControlGroups::background( '{{WRAPPER}}' ),
+			ControlGroups::background( '{{WRAPPER}}', array(), 'background', self::WITH_VIDEO ),
+			ControlGroups::overlay( '{{WRAPPER}}::before', '{{WRAPPER}}:hover::before' ),
 			ControlGroups::border( '{{WRAPPER}}' ),
 			ControlGroups::advanced( '' )
 		);

@@ -2588,6 +2588,47 @@
 		);
 	}
 
+	/** Twin of Renderer::video_source(). */
+	function videoSource( link ) {
+		link = String( link || '' ).trim();
+		var m = link.match( /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{6,20})/ );
+		if ( m ) {
+			return { type: 'youtube', id: m[ 1 ] };
+		}
+		m = link.match( /vimeo\.com\/(?:video\/)?(\d{3,12})/ );
+		if ( m ) {
+			return { type: 'vimeo', id: m[ 1 ] };
+		}
+		if ( /^https?:\/\/[^\s"'<>]+\.(mp4|webm|ogv|mov)(\?[^\s"'<>]*)?$/i.test( link ) ) {
+			return { type: 'file', url: link };
+		}
+		return null;
+	}
+
+	/**
+	 * Background video in the canvas. The canvas is rebuilt on every change,
+	 * which would restart an embedded player, so YouTube shows its still
+	 * image and Vimeo a plain layer; video files play.
+	 */
+	function backgroundVideo( s ) {
+		if ( s.background_background !== 'video' ) {
+			return null;
+		}
+		var video = videoSource( s.background_video_link );
+		if ( ! video ) {
+			return null;
+		}
+		var layer = el( 'div', { class: 'kbroo-bg-video kbroo-bg-video--mobile kb-bg-video-preview', 'aria-hidden': 'true' } );
+		if ( video.type === 'file' ) {
+			var player = el( 'video', { src: video.url, autoplay: '', loop: '', playsinline: '' } );
+			player.muted = true;
+			layer.appendChild( player );
+		} else if ( video.type === 'youtube' ) {
+			layer.style.backgroundImage = 'url("https://i.ytimg.com/vi/' + encodeURIComponent( video.id ) + '/hqdefault.jpg")';
+		}
+		return layer;
+	}
+
 	function renderSection( section ) {
 		var s = withDefaults( config.sectionControls, section.settings );
 		collectCss( section, config.sectionControls, s );
@@ -2628,6 +2669,7 @@
 						changed();
 					} ),
 				] ),
+				backgroundVideo( s ),
 				el( 'div', { class: 'kbroo-container' }, [ row ] ),
 			]
 		);
@@ -2701,6 +2743,7 @@
 						changed();
 					} ),
 				] ),
+				backgroundVideo( s ),
 				zone,
 			]
 		);

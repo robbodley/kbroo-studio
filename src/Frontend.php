@@ -61,6 +61,16 @@ final class Frontend {
 		}
 	}
 
+	/**
+	 * The script that plays entrance animations, in the footer.
+	 */
+	public static function enqueue_script(): void {
+		if ( ! wp_script_is( 'kbroo-frontend', 'registered' ) ) {
+			wp_register_script( 'kbroo-frontend', KBROO_STUDIO_URL . 'assets/js/frontend.js', array(), KBROO_STUDIO_VERSION, true );
+		}
+		wp_enqueue_script( 'kbroo-frontend' );
+	}
+
 	/** @var bool Whether the global styles were added to the page. */
 	private $globals_added = false;
 

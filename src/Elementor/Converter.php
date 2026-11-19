@@ -16,6 +16,7 @@
 
 namespace KbrooStudio\Elementor;
 
+use KbrooStudio\ControlGroups;
 use KbrooStudio\Controls;
 use KbrooStudio\Fonts;
 use KbrooStudio\Layout;
@@ -185,12 +186,52 @@ final class Converter {
 					$settings[ $key ] = $color;
 				}
 			}
+			// Elementor's placeholder image left in a background: its file goes
+			// when Elementor does, and it was never meant to show.
+			if ( is_array( $value ) && isset( $value['url'] ) && is_string( $value['url'] ) && false !== strpos( $value['url'], '/elementor/assets/images/placeholder' ) ) {
+				$settings[ $key ] = array(
+					'url' => '',
+					'id'  => '',
+				);
+				continue;
+			}
 			// Sliders saved empty come through as { size: null }.
 			if ( is_array( $value ) && array_key_exists( 'size', $value ) && null === $value['size'] ) {
 				$settings[ $key ]['size'] = '';
 			}
 		}
+		foreach ( array( '_animation', 'animation' ) as $key ) {
+			if ( isset( $settings[ $key ] ) && is_string( $settings[ $key ] ) && '' !== $settings[ $key ] && 'none' !== $settings[ $key ] ) {
+				$settings[ $key ] = $this->animation( $settings[ $key ] );
+			}
+		}
+		if ( isset( $settings['hover_animation'] ) && is_string( $settings['hover_animation'] ) && '' !== $settings['hover_animation']
+			&& ! isset( ControlGroups::HOVER_ANIMATIONS[ $settings['hover_animation'] ] ) ) {
+			$this->drop( 'hover animation ' . $settings['hover_animation'] );
+			$settings['hover_animation'] = '';
+		}
 		return $settings;
+	}
+
+	/**
+	 * The nearest entrance animation Kbroo Studio has to an Elementor one.
+	 * Ones that are not the same are noted in the report.
+	 */
+	private function animation( string $name ): string {
+		if ( in_array( $name, ControlGroups::ENTRANCE_ANIMATIONS, true ) ) {
+			return $name;
+		}
+		$near = 'fadeIn';
+		foreach ( ControlGroups::ENTRANCE_ANIMATIONS as $known ) {
+			if ( 0 === strpos( $name, $known ) && strlen( $known ) > strlen( $near ) ) {
+				$near = $known; // fadeInUpBig becomes fadeInUp.
+			}
+		}
+		if ( 0 === strpos( $name, 'zoomIn' ) ) {
+			$near = 'zoomIn';
+		}
+		$this->drop( 'animation ' . $name . ' (shown as ' . $near . ')' );
+		return $near;
 	}
 
 	private function section( array $settings ): array {

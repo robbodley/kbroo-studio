@@ -52,9 +52,9 @@
 
 .kbroo-column-inner {
 	display: flex;
+	flex: 1 1 auto;
 	flex-direction: column;
 	gap: 20px;
-	width: 100%;
 	min-width: 0;
 }
 
@@ -133,6 +133,134 @@
 	margin-bottom: 0;
 }
 
+/* Backgrounds. The overlay is a ::before layer over the background and
+   under the content (Layout's background_overlay controls style it). A
+   background video sits under both. */
+.kbroo-section::before,
+.kbroo-con::before,
+.kbroo-column-inner::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	transition: background 0.3s, border-radius 0.3s, opacity 0.3s;
+}
+
+.kbroo-section,
+.kbroo-column-inner {
+	position: relative;
+}
+
+.kbroo-section > .kbroo-container,
+.kbroo-con > .kbroo-con-inner,
+.kbroo-column-inner > * {
+	position: relative;
+}
+
+.kbroo-section,
+.kbroo-con,
+.kbroo-column-inner,
+.kbroo-widget {
+	transition: background 0.3s, border 0.3s, border-radius 0.3s, box-shadow 0.3s;
+}
+
+.kbroo-bg-video {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+.kbroo-bg-video video,
+.kbroo-bg-video iframe {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	object-fit: cover;
+	transform: translate(-50%, -50%);
+}
+
+/* An embedded player cannot "cover" by itself: size it to 16:9 and larger
+   than the box on both axes. */
+.kbroo-bg-video iframe {
+	width: max(100%, 177.78vh);
+	height: max(100%, 56.25vw);
+	min-width: 177.78%;
+	min-height: 56.25%;
+}
+
+:is(.kbroo-section, .kbroo-con):has(> .kbroo-bg-video)::before {
+	z-index: 1;
+}
+
+.kbroo-section:has(> .kbroo-bg-video) > .kbroo-container,
+.kbroo-con:has(> .kbroo-bg-video) > .kbroo-con-inner {
+	z-index: 2;
+}
+
+/* Phones show the fallback image unless the video is set to play there. */
+@media (max-width: 767px) {
+	.kbroo-bg-video:not(.kbroo-bg-video--mobile) {
+		display: none;
+	}
+}
+
+/* Hover animations (hover_animation) set --kbroo-hover-transform. */
+.kbroo-button,
+.kbroo-image img {
+	transition-property: color, background-color, border-color, transform, filter, opacity;
+	transition-duration: 0.3s;
+	transition-timing-function: ease-out;
+}
+
+.kbroo-button:hover,
+.kbroo-button:focus-visible,
+.kbroo-image:hover img {
+	transform: var(--kbroo-hover-transform, none);
+}
+
+/* Entrance animations: hidden until frontend.js marks them as animated. */
+@media (prefers-reduced-motion: no-preference) {
+	.kbroo-js [data-kbroo-animation]:not(.kbroo-animated) {
+		visibility: hidden;
+	}
+
+	.kbroo-animated {
+		animation-duration: 1.25s;
+		animation-fill-mode: both;
+	}
+
+	.kbroo-animated[data-kbroo-duration="slow"] { animation-duration: 2s; }
+	.kbroo-animated[data-kbroo-duration="fast"] { animation-duration: 0.75s; }
+
+	.kbroo-animated[data-kbroo-animation="fadeIn"] { animation-name: kbroo-fadeIn; }
+	.kbroo-animated[data-kbroo-animation="fadeInUp"] { animation-name: kbroo-fadeInUp; }
+	.kbroo-animated[data-kbroo-animation="fadeInDown"] { animation-name: kbroo-fadeInDown; }
+	.kbroo-animated[data-kbroo-animation="fadeInLeft"] { animation-name: kbroo-fadeInLeft; }
+	.kbroo-animated[data-kbroo-animation="fadeInRight"] { animation-name: kbroo-fadeInRight; }
+	.kbroo-animated[data-kbroo-animation="zoomIn"] { animation-name: kbroo-zoomIn; }
+	.kbroo-animated[data-kbroo-animation="slideInUp"] { animation-name: kbroo-slideInUp; }
+	.kbroo-animated[data-kbroo-animation="slideInDown"] { animation-name: kbroo-slideInDown; }
+	.kbroo-animated[data-kbroo-animation="slideInLeft"] { animation-name: kbroo-slideInLeft; }
+	.kbroo-animated[data-kbroo-animation="slideInRight"] { animation-name: kbroo-slideInRight; }
+}
+
+@keyframes kbroo-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kbroo-fadeInUp { from { opacity: 0; transform: translate3d(0, 100%, 0); } to { opacity: 1; transform: none; } }
+@keyframes kbroo-fadeInDown { from { opacity: 0; transform: translate3d(0, -100%, 0); } to { opacity: 1; transform: none; } }
+@keyframes kbroo-fadeInLeft { from { opacity: 0; transform: translate3d(-100%, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes kbroo-fadeInRight { from { opacity: 0; transform: translate3d(100%, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes kbroo-zoomIn { from { opacity: 0; transform: scale3d(0.3, 0.3, 0.3); } 50% { opacity: 1; } }
+@keyframes kbroo-slideInUp { from { visibility: visible; transform: translate3d(0, 100%, 0); } to { transform: none; } }
+@keyframes kbroo-slideInDown { from { visibility: visible; transform: translate3d(0, -100%, 0); } to { transform: none; } }
+@keyframes kbroo-slideInLeft { from { visibility: visible; transform: translate3d(-100%, 0, 0); } to { transform: none; } }
+@keyframes kbroo-slideInRight { from { visibility: visible; transform: translate3d(100%, 0, 0); } to { transform: none; } }
+
 /* Image */
 .kbroo-image {
 	margin: 0;
@@ -172,7 +300,6 @@
 	text-align: center;
 	text-decoration: none;
 	cursor: pointer;
-	transition: color 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
 .kbroo-button:hover,
