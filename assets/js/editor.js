@@ -42,6 +42,11 @@
 		dirty: false,
 		saving: false,
 		revision: 0,
+		navigator: readPref( 'navigator' ) === '1',
+		panelView: 'widgets', // Shown when nothing is selected: widgets | globals | revisions.
+		globals: JSON.parse( JSON.stringify( config.globals ) ),
+		globalsDirty: false,
+		preview: null, // { id, label, layout } while previewing a revision.
 	};
 
 	var history = { stack: [], index: -1, mergeKey: null, mergeTime: 0, savedIndex: 0 };
@@ -79,6 +84,21 @@
 			}
 		} );
 		return node;
+	}
+
+	/** Per-viewer UI preferences; storage can be unavailable, so never rely on it. */
+	function readPref( key ) {
+		try {
+			return window.localStorage.getItem( 'kbroo-studio:' + key );
+		} catch ( e ) {
+			return null;
+		}
+	}
+
+	function writePref( key, value ) {
+		try {
+			window.localStorage.setItem( 'kbroo-studio:' + key, value );
+		} catch ( e ) {}
 	}
 
 	function icon( name ) {
@@ -296,6 +316,7 @@
 	}
 
 	function undo() {
+		state.preview = null;
 		if ( history.index > 0 ) {
 			restore( history.index - 1 );
 		}
@@ -331,7 +352,13 @@
 	 * ------------------------------------------------------------------ */
 
 	function select( id, kind, silent ) {
+		if ( state.preview ) {
+			return; // The canvas is read-only while previewing a revision.
+		}
 		var previousKind = state.selected && state.selected.kind;
+		if ( ! id ) {
+			state.panelView = 'widgets';
+		}
 		state.selected = id ? { id: id, kind: kind } : null;
 		if ( kind !== previousKind ) {
 			state.tab = 'content';
@@ -339,6 +366,7 @@
 		if ( ! silent ) {
 			renderCanvas();
 			renderPanel();
+			renderTopbar();
 		}
 	}
 
@@ -364,14 +392,15 @@
 
 		document.head.appendChild( ui.styles );
 		app.appendChild( ui.topbar );
-		app.appendChild( el( 'div', { class: 'kb-main' }, [ ui.panel, ui.canvasWrap ] ) );
+		ui.navigator = el( 'aside', { class: 'kb-navigator', 'aria-label': 'Navigator' } );
+		app.appendChild( el( 'div', { class: 'kb-main' }, [ ui.panel, ui.canvasWrap, ui.navigator ] ) );
 		app.appendChild( ui.toast );
 
 		bindCanvasEvents();
 		bindKeyboard();
 
 		window.addEventListener( 'beforeunload', function ( e ) {
-			if ( state.dirty ) {
+			if ( state.dirty || state.globalsDirty ) {
 				e.preventDefault();
 				e.returnValue = '';
 			}
@@ -471,11 +500,31 @@
 					class: 'kb-badge' + ( published ? ' is-live' : '' ),
 					text: published ? 'Published' : 'Draft',
 				} ),
-				state.dirty ? el( 'span', { class: 'kb-unsaved', text: 'Unsaved changes' } ) : null,
+				state.dirty || state.globalsDirty ? el( 'span', { class: 'kb-unsaved', text: 'Unsaved changes' } ) : null,
 			] )
 		);
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-end' }, [
+				panelButton( 'globals', 'dashicons-admin-site-alt3', 'Site colours and fonts' ),
+				panelButton( 'revisions', 'dashicons-backup', 'Revisions' ),
+				el(
+					'button',
+					{
+						type: 'button',
+						class: 'kb-icon-btn' + ( state.navigator ? ' is-active' : '' ),
+						title: 'Navigator',
+						'aria-label': 'Navigator',
+						'aria-pressed': state.navigator ? 'true' : 'false',
+						'data-action': 'navigator',
+						onclick: function () {
+							state.navigator = ! state.navigator;
+							writePref( 'navigator', state.navigator ? '1' : '0' );
+							renderTopbar();
+							renderNavigator();
+						},
+					},
+					[ icon( 'dashicons-list-view' ) ]
+				),
 				el( 'a', {
 					class: 'kb-btn kb-btn-secondary',
 					href: published ? state.permalink : config.previewUrl,
@@ -509,6 +558,34 @@
 		);
 	}
 
+	function panelButton( view, iconName, title ) {
+		var active = ! state.selected && state.panelView === view;
+		return el(
+			'button',
+			{
+				type: 'button',
+				class: 'kb-icon-btn' + ( active ? ' is-active' : '' ),
+				title: title,
+				'aria-label': title,
+				'aria-pressed': active ? 'true' : 'false',
+				'data-action': view,
+				onclick: function () {
+					showPanel( active ? 'widgets' : view );
+				},
+			},
+			[ icon( iconName ) ]
+		);
+	}
+
+	function showPanel( view ) {
+		if ( state.preview && view !== 'revisions' ) {
+			state.preview = null;
+		}
+		state.panelView = view;
+		state.selected = null;
+		renderAll();
+	}
+
 	/* ------------------------------------------------------------------ *
 	 * Side panel
 	 * ------------------------------------------------------------------ */
@@ -518,12 +595,18 @@
 		var scrollTop = scroll ? scroll.scrollTop : 0;
 
 		ui.panel.innerHTML = '';
-		var sel = state.selected && find( state.selected.id );
+		var sel = ! state.preview && state.selected && find( state.selected.id );
 		if ( sel ) {
 			renderSettingsPanel( sel.node );
 		} else {
 			state.selected = null;
-			renderWidgetsPanel();
+			if ( state.preview || state.panelView === 'revisions' ) {
+				renderRevisionsPanel();
+			} else if ( state.panelView === 'globals' ) {
+				renderGlobalsPanel();
+			} else {
+				renderWidgetsPanel();
+			}
 		}
 
 		var body = ui.panel.querySelector( '.kb-panel-body' );
@@ -571,6 +654,9 @@
 	}
 
 	function elementLabel( node ) {
+		if ( node.settings && node.settings._title ) {
+			return node.settings._title;
+		}
 		if ( node.elType === 'widget' ) {
 			return config.widgets[ node.widgetType ] ? config.widgets[ node.widgetType ].title : node.widgetType;
 		}
@@ -628,6 +714,9 @@
 			if ( control.section && control.section !== currentSection ) {
 				currentSection = control.section;
 				body.appendChild( el( 'h3', { class: 'kb-control-section', text: control.section } ) );
+				if ( control.global_group ) {
+					body.appendChild( globalFontControl( node, control.global_group ) );
+				}
 			}
 			body.appendChild( renderControl( node, key, control ) );
 		} );
@@ -677,6 +766,30 @@
 		ui.panel.appendChild( body );
 	}
 
+	/** "Global font" picker at the top of a typography section. */
+	function globalFontControl( node, group ) {
+		var id = 'kb-control-' + group;
+		var current = Css.globalId( node.settings, group );
+		var select = el( 'select', { id: id } );
+		select.appendChild( el( 'option', { value: '', text: 'None (set below)' } ) );
+		state.globals.typography.forEach( function ( preset ) {
+			var option = el( 'option', {
+				value: preset._id,
+				text: ( preset.title || preset._id ) + ( preset.typography_font_family ? ' · ' + preset.typography_font_family : '' ),
+			} );
+			option.selected = preset._id === current;
+			select.appendChild( option );
+		} );
+		select.addEventListener( 'change', function () {
+			setGlobal( node, group, select.value ? 'globals/typography?id=' + select.value : null );
+		} );
+		return el( 'div', { class: 'kb-control kb-control-select', 'data-control': group }, [
+			el( 'label', { for: id }, [ el( 'span', { text: 'Global font' } ) ] ),
+			select,
+			current ? el( 'p', { class: 'kb-hint kb-hint-small', text: 'Settings below override the global font.' } ) : null,
+		] );
+	}
+
 	/**
 	 * The value a responsive control falls back to on the current device:
 	 * the next larger device's value, or the desktop value.
@@ -686,6 +799,81 @@
 			return settings[ key + '_tablet' ];
 		}
 		return settings[ key ];
+	}
+
+	/**
+	 * Load the Google Fonts the canvas needs: the layout's own families and
+	 * every global font (they are few, and the site settings panel shows them).
+	 */
+	function loadFonts( layout ) {
+		var names = [];
+		( function walk( list ) {
+			list.forEach( function ( node ) {
+				Object.keys( node.settings || {} ).forEach( function ( key ) {
+					if ( /_font_family$/.test( key ) && node.settings[ key ] ) {
+						names.push( node.settings[ key ] );
+					}
+				} );
+				walk( node.elements || [] );
+			} );
+		} )( layout.elements );
+		state.globals.typography.forEach( function ( preset ) {
+			if ( preset.typography_font_family ) {
+				names.push( preset.typography_font_family );
+			}
+		} );
+		var url = Css.googleUrl( names, config.fonts );
+		if ( ! ui.fontLink ) {
+			ui.fontLink = el( 'link', { rel: 'stylesheet' } );
+			document.head.appendChild( ui.fontLink );
+		}
+		if ( url && ui.fontLink.getAttribute( 'href' ) !== url ) {
+			ui.fontLink.setAttribute( 'href', url );
+		}
+	}
+
+	function globalLabel( kind, id ) {
+		var item = ( state.globals[ kind ] || [] ).filter( function ( g ) {
+			return g._id === id;
+		} )[ 0 ];
+		return item ? item.title || id : id + ' (missing)';
+	}
+
+	function setGlobal( node, key, ref ) {
+		node.settings.__globals__ = Object.assign( {}, node.settings.__globals__ || {} );
+		if ( ref ) {
+			node.settings.__globals__[ key ] = ref;
+		} else {
+			delete node.settings.__globals__[ key ];
+		}
+		if ( ! Object.keys( node.settings.__globals__ ).length ) {
+			delete node.settings.__globals__;
+		}
+		changed();
+	}
+
+	/** A small menu of global colors; picking one links the setting to it. */
+	function globalColorMenu( node, settingKey ) {
+		var current = Css.globalId( node.settings, settingKey );
+		var menu = el( 'div', { class: 'kb-global-menu', role: 'menu' } );
+		state.globals.colors.forEach( function ( color ) {
+			menu.appendChild(
+				el(
+					'button',
+					{
+						type: 'button',
+						role: 'menuitem',
+						class: 'kb-global-option' + ( current === color._id ? ' is-active' : '' ),
+						'data-global': color._id,
+						onclick: function () {
+							setGlobal( node, settingKey, 'globals/colors?id=' + color._id );
+						},
+					},
+					[ el( 'span', { class: 'kb-swatch', style: 'background:' + ( color.color || 'transparent' ) } ), el( 'span', { text: color.title || color._id } ) ]
+				)
+			);
+		} );
+		return menu;
 	}
 
 	function renderControl( node, key, control ) {
@@ -733,17 +921,62 @@
 				break;
 
 			case 'color':
-				var picker = el( 'input', { type: 'color', id: id } );
-				picker.value = /^#[0-9a-f]{6}$/i.test( value || '' ) ? value : '#000000';
-				var clear = el( 'button', { type: 'button', class: 'kb-link', text: value ? 'Clear' : 'Default' } );
-				picker.addEventListener( 'input', function () {
-					clear.textContent = 'Clear';
-					update( picker.value, true );
-				} );
-				clear.addEventListener( 'click', function () {
-					update( '', false );
-				} );
-				input = el( 'div', { class: 'kb-color' }, [ picker, clear ] );
+				var linked = Css.globalId( node.settings, settingKey );
+				var globe = el(
+					'button',
+					{
+						type: 'button',
+						class: 'kb-icon-btn kb-global-btn' + ( linked ? ' is-active' : '' ),
+						title: 'Global colours',
+						'aria-label': 'Global colours',
+						'aria-expanded': 'false',
+						onclick: function () {
+							var open = wrap.querySelector( '.kb-global-menu' );
+							if ( open ) {
+								open.remove();
+								globe.setAttribute( 'aria-expanded', 'false' );
+							} else {
+								wrap.appendChild( globalColorMenu( node, settingKey ) );
+								globe.setAttribute( 'aria-expanded', 'true' );
+							}
+						},
+					},
+					[ icon( 'dashicons-admin-site-alt3' ) ]
+				);
+				var wrap;
+				if ( linked ) {
+					var linkedColor = state.globals.colors.filter( function ( c ) {
+						return c._id === linked;
+					} )[ 0 ];
+					wrap = el( 'div', { class: 'kb-color' }, [
+						el( 'span', { class: 'kb-global-chip', id: id }, [
+							el( 'span', { class: 'kb-swatch', style: 'background:' + ( linkedColor ? linkedColor.color : 'transparent' ) } ),
+							el( 'span', { text: globalLabel( 'colors', linked ) } ),
+						] ),
+						el( 'button', {
+							type: 'button',
+							class: 'kb-link',
+							text: 'Unlink',
+							onclick: function () {
+								setGlobal( node, settingKey, null );
+							},
+						} ),
+						globe,
+					] );
+				} else {
+					var picker = el( 'input', { type: 'color', id: id } );
+					picker.value = /^#[0-9a-f]{6}$/i.test( value || '' ) ? value : '#000000';
+					var clear = el( 'button', { type: 'button', class: 'kb-link', text: value ? 'Clear' : 'Default' } );
+					picker.addEventListener( 'input', function () {
+						clear.textContent = 'Clear';
+						update( picker.value, true );
+					} );
+					clear.addEventListener( 'click', function () {
+						update( '', false );
+					} );
+					wrap = el( 'div', { class: 'kb-color' }, [ picker, clear, globe ] );
+				}
+				input = wrap;
 				break;
 
 			case 'number':
@@ -913,6 +1146,643 @@
 		] );
 	}
 
+
+	/* ------------------------------------------------------------------ *
+	 * Site colours and fonts
+	 * ------------------------------------------------------------------ */
+
+	function globalsChanged( redrawPanel ) {
+		state.globalsDirty = true;
+		renderCanvas();
+		renderTopbar();
+		if ( redrawPanel ) {
+			renderPanel();
+		}
+	}
+
+	function newGlobalId( kind ) {
+		var id;
+		do {
+			id = uid();
+		} while ( state.globals[ kind ].some( function ( g ) {
+			return g._id === id;
+		} ) );
+		return id;
+	}
+
+	function panelHeader( title ) {
+		return el( 'div', { class: 'kb-panel-header' }, [
+			el(
+				'button',
+				{
+					type: 'button',
+					class: 'kb-icon-btn',
+					title: 'Back to widgets',
+					'data-action': 'back',
+					onclick: function () {
+						showPanel( 'widgets' );
+					},
+				},
+				[ icon( 'dashicons-arrow-left-alt2' ) ]
+			),
+			el( 'h2', { text: title } ),
+		] );
+	}
+
+	function renderGlobalsPanel() {
+		var editable = config.canEditGlobals;
+		var body = el( 'div', { class: 'kb-panel-body kb-globals' } );
+		body.appendChild(
+			el( 'p', {
+				class: 'kb-hint',
+				text: editable
+					? 'These apply across the whole site. Link a colour or font to them from any element, and changing it here restyles every page that uses it.'
+					: 'These apply across the whole site. Only administrators can change them.',
+			} )
+		);
+
+		// Colours.
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Colours' } ) );
+		state.globals.colors.forEach( function ( color, index ) {
+			var system = config.systemGlobalIds.indexOf( color._id ) > -1;
+			var name = el( 'input', { type: 'text', class: 'kb-global-name', 'aria-label': 'Colour name', disabled: ! editable } );
+			name.value = color.title;
+			name.addEventListener( 'input', function () {
+				color.title = name.value;
+				globalsChanged( false );
+			} );
+			var picker = el( 'input', { type: 'color', 'aria-label': ( color.title || color._id ) + ' colour', disabled: ! editable, 'data-global-color': color._id } );
+			picker.value = /^#[0-9a-f]{6}$/i.test( color.color || '' ) ? color.color : '#000000';
+			picker.addEventListener( 'input', function () {
+				color.color = picker.value;
+				globalsChanged( false );
+			} );
+			body.appendChild(
+				el( 'div', { class: 'kb-global-row' }, [
+					picker,
+					name,
+					editable && ! system
+						? el(
+								'button',
+								{
+									type: 'button',
+									class: 'kb-icon-btn',
+									title: 'Delete colour',
+									'aria-label': 'Delete colour',
+									onclick: function () {
+										state.globals.colors.splice( index, 1 );
+										globalsChanged( true );
+									},
+								},
+								[ icon( 'dashicons-trash' ) ]
+						  )
+						: el( 'span', { class: 'kb-global-row-space' } ),
+				] )
+			);
+		} );
+		if ( editable ) {
+			body.appendChild(
+				el( 'button', {
+					type: 'button',
+					class: 'kb-btn kb-btn-secondary kb-add-global',
+					text: 'Add colour',
+					'data-action': 'add-global-color',
+					onclick: function () {
+						state.globals.colors.push( { _id: newGlobalId( 'colors' ), title: 'New colour', color: '#000000' } );
+						globalsChanged( true );
+					},
+				} )
+			);
+		}
+
+		// Fonts.
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Fonts' } ) );
+		var controls = config.globalTypographyControls;
+		state.globals.typography.forEach( function ( preset, index ) {
+			var system = config.systemGlobalIds.indexOf( preset._id ) > -1;
+			var name = el( 'input', { type: 'text', class: 'kb-global-name', 'aria-label': 'Font name', disabled: ! editable } );
+			name.value = preset.title;
+			name.addEventListener( 'input', function () {
+				preset.title = name.value;
+				globalsChanged( false );
+			} );
+			var sample = el( 'div', { class: 'kb-font-sample', text: 'The quick brown fox' } );
+			sample.style.fontFamily = 'var(--kbroo-global-typography-' + preset._id + '-font-family)';
+			sample.style.fontWeight = 'var(--kbroo-global-typography-' + preset._id + '-font-weight)';
+
+			var fields = el( 'div', { class: 'kb-global-font-fields' } );
+			[ 'typography_font_family', 'typography_font_weight', 'typography_font_size', 'typography_line_height' ].forEach( function ( key ) {
+				fields.appendChild( renderPresetControl( preset, key, controls[ key ], editable ) );
+			} );
+
+			body.appendChild(
+				el( 'div', { class: 'kb-global-font', 'data-global-font': preset._id }, [
+					el( 'div', { class: 'kb-global-row' }, [
+						name,
+						editable && ! system
+							? el(
+									'button',
+									{
+										type: 'button',
+										class: 'kb-icon-btn',
+										title: 'Delete font',
+										'aria-label': 'Delete font',
+										onclick: function () {
+											state.globals.typography.splice( index, 1 );
+											globalsChanged( true );
+										},
+									},
+									[ icon( 'dashicons-trash' ) ]
+							  )
+							: null,
+					] ),
+					sample,
+					fields,
+				] )
+			);
+		} );
+		if ( editable ) {
+			body.appendChild(
+				el( 'button', {
+					type: 'button',
+					class: 'kb-btn kb-btn-secondary kb-add-global',
+					text: 'Add font',
+					onclick: function () {
+						var preset = defaults( controls );
+						preset._id = newGlobalId( 'typography' );
+						preset.title = 'New font';
+						state.globals.typography.push( preset );
+						globalsChanged( true );
+					},
+				} )
+			);
+		}
+
+		ui.panel.appendChild( panelHeader( 'Site colours and fonts' ) );
+		ui.panel.appendChild( body );
+	}
+
+	/** One field of a global font preset (device-aware like element settings). */
+	function renderPresetControl( preset, key, control, editable ) {
+		var device = control.responsive ? state.device : 'desktop';
+		var settingKey = Css.deviceKey( key, device );
+		var id = 'kb-global-' + preset._id + '-' + settingKey;
+		var input;
+
+		function update( value, merge ) {
+			preset[ settingKey ] = value;
+			globalsChanged( ! merge );
+		}
+
+		if ( control.type === 'select' ) {
+			input = el( 'select', { id: id, disabled: ! editable } );
+			Object.keys( control.options ).forEach( function ( v ) {
+				var option = el( 'option', { value: v, text: control.options[ v ] } );
+				option.selected = v === ( preset[ settingKey ] || '' );
+				input.appendChild( option );
+			} );
+			input.addEventListener( 'change', function () {
+				update( input.value, false );
+			} );
+		} else {
+			var inherited = device !== 'desktop' ? inheritedValue( preset, key, control ) : null;
+			input = renderSlider( control, id, preset[ settingKey ], inherited, update );
+			if ( ! editable ) {
+				Array.prototype.forEach.call( input.querySelectorAll( 'input, select' ), function ( i ) {
+					i.disabled = true;
+				} );
+			}
+		}
+		return el( 'div', { class: 'kb-control kb-control-' + control.type }, [
+			el( 'label', { for: id }, [
+				el( 'span', { text: control.label } ),
+				control.responsive ? el( 'span', { class: 'kb-device-badge' }, [ icon( DEVICES[ state.device ].icon ) ] ) : null,
+			] ),
+			input,
+		] );
+	}
+
+	function saveGlobals() {
+		return window
+			.fetch( config.globalsUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce },
+				body: JSON.stringify( { globals: state.globals } ),
+			} )
+			.then( parseResponse )
+			.then( function ( data ) {
+				state.globals = data;
+				state.globalsDirty = false;
+			} );
+	}
+
+	/* ------------------------------------------------------------------ *
+	 * Revisions
+	 * ------------------------------------------------------------------ */
+
+	var revisions = { items: null, loading: false, error: '' };
+
+	function loadRevisions() {
+		revisions.loading = true;
+		revisions.error = '';
+		renderPanel();
+		window
+			.fetch( config.revisionsUrl, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } } )
+			.then( parseResponse )
+			.then( function ( items ) {
+				revisions.items = items;
+			} )
+			.catch( function ( error ) {
+				revisions.error = error.message;
+			} )
+			.then( function () {
+				revisions.loading = false;
+				renderPanel();
+			} );
+	}
+
+	function previewRevision( item, label ) {
+		window
+			.fetch( config.revisionsUrl + '/' + item.id, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } } )
+			.then( parseResponse )
+			.then( function ( data ) {
+				state.preview = { id: item.id, label: label, layout: normalizeLayout( data.layout ) };
+				state.selected = null;
+				renderAll();
+			} )
+			.catch( function ( error ) {
+				toast( error.message, true );
+			} );
+	}
+
+	function restorePreview() {
+		var layout = state.preview.layout;
+		state.preview = null;
+		state.layout = clone( layout );
+		state.panelView = 'widgets';
+		changed();
+		toast( 'Revision restored. Save to keep it, or undo to go back.' );
+	}
+
+	function renderRevisionsPanel() {
+		var body = el( 'div', { class: 'kb-panel-body kb-revisions' } );
+
+		if ( state.preview ) {
+			body.appendChild(
+				el( 'div', { class: 'kb-preview-banner' }, [
+					el( 'p', {}, [ el( 'strong', { text: 'Previewing ' + state.preview.label } ) ] ),
+					el( 'p', { class: 'kb-hint', text: 'The page is read-only while you preview. Restoring replaces the current layout; you can still undo it.' } ),
+					el( 'div', { class: 'kb-panel-actions' }, [
+						el( 'button', { type: 'button', class: 'kb-btn kb-btn-primary', text: 'Restore this version', 'data-action': 'restore-revision', onclick: restorePreview } ),
+						el( 'button', {
+							type: 'button',
+							class: 'kb-btn kb-btn-secondary',
+							text: 'Cancel',
+							onclick: function () {
+								state.preview = null;
+								renderAll();
+							},
+						} ),
+					] ),
+				] )
+			);
+		}
+
+		if ( revisions.items === null && ! revisions.loading && ! revisions.error ) {
+			setTimeout( loadRevisions, 0 );
+		}
+		if ( revisions.loading && ! revisions.items ) {
+			body.appendChild( el( 'p', { class: 'kb-hint', text: 'Loading revisions…' } ) );
+		} else if ( revisions.error ) {
+			body.appendChild( el( 'p', { class: 'kb-hint', text: revisions.error } ) );
+		} else if ( revisions.items && ! revisions.items.length ) {
+			body.appendChild( el( 'p', { class: 'kb-hint', text: 'No saved versions yet. Each save adds one here.' } ) );
+		} else if ( revisions.items ) {
+			var list = el( 'ul', { class: 'kb-revision-list' } );
+			revisions.items.forEach( function ( item, index ) {
+				var when = new Date( item.date );
+				var label = when.toLocaleString( undefined, { dateStyle: 'medium', timeStyle: 'short' } );
+				var active = state.preview && state.preview.id === item.id;
+				list.appendChild(
+					el( 'li', {}, [
+						el(
+							'button',
+							{
+								type: 'button',
+								class: 'kb-revision' + ( active ? ' is-active' : '' ),
+								'data-revision': item.id,
+								onclick: function () {
+									previewRevision( item, label );
+								},
+							},
+							[
+								el( 'span', { class: 'kb-revision-date', text: label } ),
+								el( 'span', { class: 'kb-revision-meta', text: item.ago + ( item.author ? ' · ' + item.author : '' ) + ( index === 0 ? ' · last saved' : '' ) } ),
+							]
+						),
+					] )
+				);
+			} );
+			body.appendChild( list );
+		}
+
+		ui.panel.appendChild( panelHeader( 'Revisions' ) );
+		ui.panel.appendChild( body );
+	}
+
+	/* ------------------------------------------------------------------ *
+	 * Navigator (layer tree)
+	 * ------------------------------------------------------------------ */
+
+	var collapsed = {};
+	var navDrag = null; // { id, elType }
+	var navTarget = null; // { id, position: 'before' | 'after' | 'inside' }
+
+	var NAV_ICONS = { section: 'dashicons-editor-table', column: 'dashicons-columns' };
+
+	/** A short preview of a widget's text, for its Navigator row. */
+	function widgetSnippet( node ) {
+		var s = node.settings || {};
+		var text = s.title || s.editor || '';
+		var div = document.createElement( 'div' );
+		div.innerHTML = String( text );
+		text = ( div.textContent || '' ).replace( /\s+/g, ' ' ).trim();
+		return text.length > 28 ? text.slice( 0, 27 ) + '…' : text;
+	}
+
+	function hiddenHere( node ) {
+		return node.settings && node.settings[ 'hide_' + state.device ] === 'yes';
+	}
+
+	function renderNavigator() {
+		if ( ! ui.navigator ) {
+			return;
+		}
+		ui.navigator.hidden = ! state.navigator;
+		if ( ! state.navigator ) {
+			return;
+		}
+		var tree = el( 'div', { class: 'kb-nav-tree', role: 'tree' } );
+		if ( state.preview ) {
+			tree.appendChild( el( 'p', { class: 'kb-hint kb-nav-empty', text: 'Previewing a revision.' } ) );
+			ui.navigator.innerHTML = '';
+			ui.navigator.appendChild( el( 'div', { class: 'kb-panel-header' }, [ el( 'h2', { text: 'Navigator' } ) ] ) );
+			ui.navigator.appendChild( el( 'div', { class: 'kb-panel-body kb-nav-body' }, [ tree ] ) );
+			return;
+		}
+
+		( function walk( list, depth ) {
+			list.forEach( function ( node ) {
+				var hasChildren = node.elType !== 'widget' && node.elements && node.elements.length;
+				tree.appendChild( navRow( node, depth, hasChildren ) );
+				if ( hasChildren && ! collapsed[ node.id ] ) {
+					walk( node.elements, depth + 1 );
+				}
+			} );
+		} )( state.layout.elements, 0 );
+
+		if ( ! state.layout.elements.length ) {
+			tree.appendChild( el( 'p', { class: 'kb-hint kb-nav-empty', text: 'Nothing on the page yet.' } ) );
+		}
+
+		ui.navigator.innerHTML = '';
+		ui.navigator.appendChild(
+			el( 'div', { class: 'kb-panel-header' }, [
+				el( 'h2', { text: 'Navigator' } ),
+				el(
+					'button',
+					{
+						type: 'button',
+						class: 'kb-icon-btn kb-nav-close',
+						title: 'Close navigator',
+						'aria-label': 'Close navigator',
+						onclick: function () {
+							state.navigator = false;
+							writePref( 'navigator', '0' );
+							renderTopbar();
+							renderNavigator();
+						},
+					},
+					[ icon( 'dashicons-no-alt' ) ]
+				),
+			] )
+		);
+		ui.navigator.appendChild( el( 'div', { class: 'kb-panel-body kb-nav-body' }, [ tree ] ) );
+	}
+
+	function navRow( node, depth, hasChildren ) {
+		var definition = node.elType === 'widget' ? config.widgets[ node.widgetType ] : null;
+		var snippet = node.elType === 'widget' && ! ( node.settings && node.settings._title ) ? widgetSnippet( node ) : '';
+
+		var label = el( 'span', { class: 'kb-nav-label', title: 'Double-click to rename' }, [
+			el( 'span', { text: elementLabel( node ) } ),
+			snippet ? el( 'span', { class: 'kb-nav-snippet', text: snippet } ) : null,
+		] );
+		label.addEventListener( 'dblclick', function ( e ) {
+			e.stopPropagation();
+			renameInline( node, label );
+		} );
+
+		var row = el(
+			'div',
+			{
+				class:
+					'kb-nav-row kb-nav-' + node.elType +
+					( isSelected( node.id ) ? ' is-selected' : '' ) +
+					( hiddenHere( node ) ? ' is-hidden-here' : '' ),
+				role: 'treeitem',
+				'aria-selected': isSelected( node.id ) ? 'true' : 'false',
+				'aria-expanded': hasChildren ? ( collapsed[ node.id ] ? 'false' : 'true' ) : null,
+				'data-id': node.id,
+				draggable: 'true',
+				style: 'padding-left:' + ( 8 + depth * 16 ) + 'px',
+				onclick: function () {
+					// Re-rendering on a second click would detach the row before
+					// its dblclick (rename) arrives.
+					if ( ! isSelected( node.id ) ) {
+						select( node.id, node.elType );
+					}
+					var target = ui.canvas.querySelector( '[data-id="' + node.id + '"]' );
+					if ( target && target.scrollIntoView ) {
+						target.scrollIntoView( { block: 'nearest', behavior: 'smooth' } );
+					}
+				},
+				ondragstart: function ( e ) {
+					navDrag = { id: node.id, elType: node.elType };
+					e.dataTransfer.effectAllowed = 'move';
+					e.dataTransfer.setData( 'text/plain', 'kbroo:nav' );
+				},
+				ondragover: function ( e ) {
+					navDragOver( e, node, row );
+				},
+				ondrop: function ( e ) {
+					e.preventDefault();
+					navDrop();
+				},
+				ondragend: navDragEnd,
+			},
+			[
+				hasChildren
+					? el(
+							'button',
+							{
+								type: 'button',
+								class: 'kb-nav-caret',
+								'aria-label': collapsed[ node.id ] ? 'Expand' : 'Collapse',
+								onclick: function ( e ) {
+									e.stopPropagation();
+									collapsed[ node.id ] = ! collapsed[ node.id ];
+									renderNavigator();
+								},
+							},
+							[ icon( collapsed[ node.id ] ? 'dashicons-arrow-right' : 'dashicons-arrow-down' ) ]
+					  )
+					: el( 'span', { class: 'kb-nav-caret-space' } ),
+				icon( definition ? definition.icon : NAV_ICONS[ node.elType ] ),
+				label,
+				hiddenHere( node ) ? el( 'span', { class: 'kb-nav-hidden', title: 'Hidden on ' + state.device }, [ icon( 'dashicons-hidden' ) ] ) : null,
+			]
+		);
+		return row;
+	}
+
+	function renameInline( node, label ) {
+		var input = el( 'input', { type: 'text', class: 'kb-nav-rename', 'aria-label': 'Name' } );
+		input.value = ( node.settings && node.settings._title ) || '';
+		input.placeholder = elementLabel( Object.assign( {}, node, { settings: {} } ) );
+		label.replaceWith( input );
+		input.focus();
+		var done = false;
+		function commit( keep ) {
+			if ( done ) {
+				return;
+			}
+			done = true;
+			if ( keep ) {
+				var value = input.value.trim().slice( 0, 100 );
+				node.settings = node.settings || {};
+				if ( value ) {
+					node.settings._title = value;
+				} else {
+					delete node.settings._title;
+				}
+				changed();
+			} else {
+				renderNavigator();
+			}
+		}
+		input.addEventListener( 'keydown', function ( e ) {
+			e.stopPropagation();
+			if ( e.key === 'Enter' ) {
+				commit( true );
+			} else if ( e.key === 'Escape' ) {
+				commit( false );
+			}
+		} );
+		input.addEventListener( 'blur', function () {
+			commit( true );
+		} );
+		input.addEventListener( 'click', function ( e ) {
+			e.stopPropagation();
+		} );
+	}
+
+	/** Whether `ancestorId` is `id` or contains it. */
+	function contains( ancestorId, id ) {
+		var found = find( ancestorId );
+		if ( ! found ) {
+			return false;
+		}
+		return ancestorId === id || !! find( id, found.node.elements || [] );
+	}
+
+	function navDragOver( e, node, row ) {
+		if ( ! navDrag || contains( navDrag.id, node.id ) ) {
+			return;
+		}
+		var position = null;
+		var rect = row.getBoundingClientRect();
+		var after = e.clientY > rect.top + rect.height / 2;
+
+		if ( node.elType === navDrag.elType ) {
+			position = after ? 'after' : 'before';
+		} else if ( navDrag.elType === 'widget' && node.elType === 'column' ) {
+			position = 'inside';
+		} else if ( navDrag.elType === 'column' && node.elType === 'section' && node.elements.length < config.maxColumns ) {
+			position = 'inside';
+		}
+		if ( ! position ) {
+			return;
+		}
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'move';
+		navTarget = { id: node.id, position: position };
+		Array.prototype.forEach.call( ui.navigator.querySelectorAll( '.kb-nav-drop-before, .kb-nav-drop-after, .kb-nav-drop-inside' ), function ( r ) {
+			r.classList.remove( 'kb-nav-drop-before', 'kb-nav-drop-after', 'kb-nav-drop-inside' );
+		} );
+		row.classList.add( 'kb-nav-drop-' + position );
+	}
+
+	function navDragEnd() {
+		navDrag = null;
+		navTarget = null;
+		renderNavigator();
+	}
+
+	function navDrop() {
+		if ( ! navDrag || ! navTarget ) {
+			navDragEnd();
+			return;
+		}
+		var moved = moveElement( navDrag.id, navTarget.id, navTarget.position );
+		navDrag = null;
+		navTarget = null;
+		if ( moved ) {
+			changed();
+		} else {
+			renderNavigator();
+		}
+	}
+
+	/**
+	 * Move an element before, after or inside another. Columns that change
+	 * section share the width evenly in both sections.
+	 */
+	function moveElement( id, targetId, position ) {
+		if ( id === targetId || contains( id, targetId ) ) {
+			return false;
+		}
+		var source = find( id );
+		var target = find( targetId );
+		if ( ! source || ! target ) {
+			return false;
+		}
+		var oldParent = source.parent;
+		var newParent = position === 'inside' ? target.node : target.parent;
+		if ( source.node.elType === 'column' && newParent !== oldParent && newParent.elements.length >= config.maxColumns ) {
+			return false;
+		}
+
+		var node = source.list.splice( source.index, 1 )[ 0 ];
+		if ( position === 'inside' ) {
+			target.node.elements.push( node );
+		} else {
+			target = find( targetId ); // Indexes may have shifted.
+			target.list.splice( target.index + ( position === 'after' ? 1 : 0 ), 0, node );
+		}
+
+		if ( node.elType === 'column' && newParent !== oldParent ) {
+			evenWidths( newParent );
+			if ( oldParent.elements.length ) {
+				evenWidths( oldParent );
+			} else {
+				removeElement( oldParent.id );
+			}
+		}
+		return true;
+	}
+
 	/* ------------------------------------------------------------------ *
 	 * Canvas
 	 * ------------------------------------------------------------------ */
@@ -993,11 +1863,15 @@
 		ui.canvas.style.maxWidth = width ? width + 'px' : '';
 		ui.canvasWrap.setAttribute( 'data-device', state.device );
 
-		state.layout.elements.forEach( function ( section ) {
+		var layout = state.preview ? state.preview.layout : state.layout;
+		Css.setGlobals( state.globals, config.globalTypographyControls );
+		ui.canvasWrap.classList.toggle( 'is-previewing', !! state.preview );
+
+		layout.elements.forEach( function ( section ) {
 			ui.canvas.appendChild( renderSection( section ) );
 		} );
 
-		if ( ! state.layout.elements.length ) {
+		if ( ! layout.elements.length ) {
 			ui.canvas.appendChild(
 				el( 'div', { class: 'kb-empty' }, [
 					el( 'p', { class: 'kb-empty-title', text: 'Your page is empty' } ),
@@ -1007,8 +1881,12 @@
 		}
 
 		ui.canvas.appendChild( renderAddSection() );
-		ui.styles.textContent = Css.forDevice( cssRules, state.device );
+		ui.styles.textContent =
+			Css.forDevice( Css.globalsRules( state.globals, config.globalTypographyControls ), state.device ) +
+			Css.forDevice( cssRules, state.device );
+		loadFonts( layout );
 		ui.canvasWrap.scrollTop = scroll;
+		renderNavigator();
 	}
 
 	function renderSection( section ) {
@@ -1330,7 +2208,7 @@
 	}
 
 	function onDragOver( e ) {
-		if ( ! drag ) {
+		if ( ! drag || state.preview ) {
 			return;
 		}
 		e.preventDefault();
@@ -1445,6 +2323,15 @@
 	 * Saving
 	 * ------------------------------------------------------------------ */
 
+	function parseResponse( response ) {
+		return response.json().then( function ( data ) {
+			if ( ! response.ok ) {
+				throw new Error( ( data && data.message ) || 'Request failed (' + response.status + ').' );
+			}
+			return data;
+		} );
+	}
+
 	function save( status ) {
 		if ( state.saving ) {
 			return;
@@ -1458,22 +2345,18 @@
 			body.status = status;
 		}
 
-		window
-			.fetch( config.restUrl, {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce },
-				body: JSON.stringify( body ),
-			} )
-			.then( function ( response ) {
-				return response.json().then( function ( data ) {
-					if ( ! response.ok ) {
-						throw new Error( ( data && data.message ) || 'Saving failed (' + response.status + ').' );
-					}
-					return data;
+		( state.globalsDirty && config.canEditGlobals ? saveGlobals() : Promise.resolve() )
+			.then( function () {
+				return window.fetch( config.restUrl, {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce },
+					body: JSON.stringify( body ),
 				} );
 			} )
+			.then( parseResponse )
 			.then( function ( data ) {
+				revisions.items = null; // A save adds a revision; reload the list when shown.
 				state.status = data.status;
 				state.permalink = data.permalink;
 				config.title = data.title;
@@ -1489,6 +2372,9 @@
 						state.selected = null;
 					}
 					renderCanvas();
+					renderPanel();
+				}
+				if ( ! state.selected && state.panelView === 'revisions' ) {
 					renderPanel();
 				}
 				toast( status === 'publish' ? 'Published' : 'Saved' );

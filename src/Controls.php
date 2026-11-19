@@ -24,6 +24,8 @@
  *               {{WRAPPER}} the element, {{VALUE}}, {{SIZE}} {{UNIT}} (slider),
  *               {{TOP}} {{RIGHT}} {{BOTTOM}} {{LEFT}} {{UNIT}} (dimensions).
  *   selectors_dictionary  select: option value => CSS value used for {{VALUE}}.
+ *   global_group / global_property  Part of a typography group that can
+ *               link to a global font (see Globals).
  *   condition   Show and apply only when other settings match:
  *               [ 'key' => value|[values], 'key!' => value|[values] ].
  *
@@ -143,7 +145,65 @@ final class Controls {
 					: self::default_for( $control, $device );
 			}
 		}
+
+		// Custom name shown in the Navigator (Elementor's `_title`).
+		if ( isset( $settings['_title'] ) && is_string( $settings['_title'] ) ) {
+			$title = mb_substr( sanitize_text_field( $settings['_title'] ), 0, 100 );
+			if ( '' !== $title ) {
+				$clean['_title'] = $title;
+			}
+		}
+
+		$globals = self::sanitize_globals( $controls, $settings['__globals__'] ?? array() );
+		if ( $globals ) {
+			$clean['__globals__'] = $globals;
+		}
+
 		return $clean;
+	}
+
+	/**
+	 * Links from settings to global colors and fonts, in Elementor's shape:
+	 * `__globals__: { title_color: "globals/colors?id=primary",
+	 *                 typography_typography: "globals/typography?id=text" }`.
+	 *
+	 * @param mixed $globals Raw links.
+	 */
+	public static function sanitize_globals( array $controls, $globals ): array {
+		$clean = array();
+		if ( ! is_array( $globals ) ) {
+			return $clean;
+		}
+
+		$targets = array(); // setting key => 'colors' | 'typography'
+		foreach ( $controls as $key => $control ) {
+			if ( 'color' === ( $control['type'] ?? '' ) ) {
+				foreach ( self::keys( $key, $control ) as $setting_key ) {
+					$targets[ $setting_key ] = 'colors';
+				}
+			}
+			if ( ! empty( $control['global_group'] ) ) {
+				$targets[ $control['global_group'] ] = 'typography';
+			}
+		}
+
+		foreach ( $globals as $key => $ref ) {
+			if ( ! is_string( $key ) || ! isset( $targets[ $key ] ) || ! is_string( $ref ) ) {
+				continue;
+			}
+			if ( preg_match( '#^globals/' . $targets[ $key ] . '\?id=[a-z0-9_-]{1,40}$#', $ref ) ) {
+				$clean[ $key ] = $ref;
+			}
+		}
+		return $clean;
+	}
+
+	/**
+	 * The global id a setting links to, or ''.
+	 */
+	public static function global_id( array $settings, string $key ): string {
+		$ref = $settings['__globals__'][ $key ] ?? '';
+		return is_string( $ref ) && preg_match( '#\?id=([a-z0-9_-]{1,40})$#', $ref, $m ) ? $m[1] : '';
 	}
 
 	/**

@@ -46,7 +46,8 @@ final class Css {
 				continue;
 			}
 			foreach ( Controls::keys( $key, $control ) as $device => $setting_key ) {
-				$replacements = self::replacements( $control, $settings[ $setting_key ] ?? null );
+				$replacements = self::global_replacements( $control, $settings, $setting_key, $device )
+					?? self::replacements( $control, $settings[ $setting_key ] ?? null );
 				if ( null === $replacements ) {
 					continue;
 				}
@@ -59,6 +60,41 @@ final class Css {
 		}
 
 		return $rules;
+	}
+
+	/**
+	 * Placeholder values pointing at a global color or font, or null.
+	 *
+	 * A color linked to a global uses its variable. A typography property
+	 * uses the linked global font's variable unless the element sets its
+	 * own value. Tablet and mobile need no rule: the variables themselves
+	 * change in media queries.
+	 */
+	public static function global_replacements( array $control, array $settings, string $setting_key, string $device ): ?array {
+		if ( 'color' === ( $control['type'] ?? '' ) ) {
+			$id = Controls::global_id( $settings, $setting_key );
+			if ( '' === $id || ! Globals::defines( 'colors', $id ) ) {
+				return null; // Falls back to the element's own color, if any.
+			}
+			return array( '{{VALUE}}' => 'var(' . Globals::variable( 'colors', $id ) . ')' );
+		}
+
+		if ( empty( $control['global_group'] ) || empty( $control['global_property'] ) || 'desktop' !== $device ) {
+			return null;
+		}
+		$id = Controls::global_id( $settings, $control['global_group'] );
+		if ( '' === $id || null !== self::replacements( $control, $settings[ $setting_key ] ?? null ) ) {
+			return null;
+		}
+		if ( ! Globals::defines( 'typography', $id, $control['global_property'] ) ) {
+			return null;
+		}
+		$var = 'var(' . Globals::variable( 'typography', $id, $control['global_property'] ) . ')';
+		return array(
+			'{{VALUE}}' => $var,
+			'{{SIZE}}'  => $var,
+			'{{UNIT}}'  => '',
+		);
 	}
 
 	/**
@@ -76,8 +112,12 @@ final class Css {
 				if ( ! is_string( $value ) || '' === $value || ! array_key_exists( $value, $control['options'] ?? array() ) ) {
 					return null;
 				}
-				$css = $control['selectors_dictionary'][ $value ] ?? $value;
-				return array( '{{VALUE}}' => preg_replace( '/[^A-Za-z0-9_\-\.%# ]/', '', (string) $css ) );
+				// Dictionary values are written in code (font stacks may hold quotes
+				// and commas); option keys are filtered to plain characters.
+				if ( isset( $control['selectors_dictionary'][ $value ] ) ) {
+					return array( '{{VALUE}}' => (string) $control['selectors_dictionary'][ $value ] );
+				}
+				return array( '{{VALUE}}' => preg_replace( '/[^A-Za-z0-9_\-\.%# ]/', '', $value ) );
 
 			case 'number':
 				return is_numeric( $value ) ? array( '{{VALUE}}' => (string) ( 0 + $value ) ) : null;

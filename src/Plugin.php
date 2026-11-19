@@ -41,6 +41,7 @@ final class Plugin {
 		( new Rest( $this->widgets, $this->renderer ) )->hooks();
 		( new Editor( $this->widgets ) )->hooks();
 		( new Frontend( $this->renderer ) )->hooks();
+		( new Revisions() )->hooks();
 	}
 
 	public function widgets(): Registry {

@@ -65,6 +65,78 @@ final class Rest {
 				),
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/documents/(?P<id>\d+)/revisions',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => function ( WP_REST_Request $request ) {
+					return rest_ensure_response( Revisions::list_for( (int) $request['id'] ) );
+				},
+				'permission_callback' => array( $this, 'can_edit' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/documents/(?P<id>\d+)/revisions/(?P<revision>\d+)',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => function ( WP_REST_Request $request ) {
+					$layout = Revisions::layout( (int) $request['id'], (int) $request['revision'] );
+					if ( null === $layout ) {
+						return new WP_Error( 'kbroo_not_found', __( 'Revision not found.', 'kbroo-studio' ), array( 'status' => 404 ) );
+					}
+					return rest_ensure_response(
+						array(
+							'id'     => (int) $request['revision'],
+							'layout' => Layout::sanitize( $layout, $this->widgets ),
+						)
+					);
+				},
+				'permission_callback' => array( $this, 'can_edit' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/globals',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => function () {
+						return rest_ensure_response( Globals::get() );
+					},
+					'permission_callback' => function () {
+						return current_user_can( 'edit_posts' );
+					},
+				),
+				array(
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => function ( WP_REST_Request $request ) {
+						return rest_ensure_response( Globals::save( $request->get_param( 'globals' ) ) );
+					},
+					'permission_callback' => array( $this, 'can_edit_globals' ),
+					'args'                => array(
+						'globals' => array(
+							'required' => true,
+							'type'     => 'object',
+						),
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * @return true|WP_Error
+	 */
+	public function can_edit_globals() {
+		if ( ! current_user_can( Globals::CAPABILITY ) ) {
+			return new WP_Error( 'kbroo_forbidden', __( 'You are not allowed to change site-wide styles.', 'kbroo-studio' ), array( 'status' => rest_authorization_required_code() ) );
+		}
+		return true;
 	}
 
 	/**
