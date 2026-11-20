@@ -48,6 +48,13 @@ final class Css {
 				}
 				continue;
 			}
+			if ( 'css' === ( $control['type'] ?? '' ) ) {
+				$css = self::custom_css( (string) ( $settings[ $key ] ?? '' ), $wrapper );
+				if ( '' !== $css ) {
+					$rules['desktop'][] = $css;
+				}
+				continue;
+			}
 			if ( empty( $control['selectors'] ) ) {
 				continue;
 			}
@@ -75,6 +82,15 @@ final class Css {
 		}
 
 		return $rules;
+	}
+
+	/**
+	 * An element's custom CSS, with "selector" standing for the element.
+	 * The JavaScript twin is customCss() in css.js.
+	 */
+	public static function custom_css( string $css, string $wrapper ): string {
+		$css = Controls::sanitize_css( $css );
+		return '' === $css ? '' : (string) preg_replace( '/\bselector\b/', $wrapper, $css );
 	}
 
 	/**

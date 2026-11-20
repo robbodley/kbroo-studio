@@ -2,7 +2,7 @@
 /**
  * Moving pages from Elementor to Kbroo Studio, and back.
  *
- * - Tools > Move from Elementor lists Elementor pages with their state and
+ * - Kbroo Studio > Move from Elementor lists Elementor pages with their state and
  *   conversion report, imports the kit's colours and fonts, and imports
  *   exported Elementor template files.
  * - The Pages and Posts lists get "Convert to Kbroo Studio" (row and bulk
@@ -19,6 +19,7 @@
 
 namespace KbrooStudio\Elementor;
 
+use KbrooStudio\Admin;
 use KbrooStudio\Document;
 use KbrooStudio\Renderer;
 use KbrooStudio\Widgets\Registry;
@@ -193,7 +194,7 @@ final class Migration {
 		$post_id = absint( $_REQUEST['post'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
 		check_admin_referer( self::ACTION . '_' . $do . '_' . $post_id );
 
-		$back   = 'list' === ( $_REQUEST['back'] ?? '' ) ? wp_get_referer() : admin_url( 'tools.php?page=' . self::PAGE ); // phpcs:ignore WordPress.Security.NonceVerification
+		$back   = 'list' === ( $_REQUEST['back'] ?? '' ) ? wp_get_referer() : admin_url( 'admin.php?page=' . self::PAGE ); // phpcs:ignore WordPress.Security.NonceVerification
 		$notice = '';
 
 		if ( 'kit' === $do ) {
@@ -323,7 +324,7 @@ final class Migration {
 			case 'bulk':
 				$count = absint( $_GET['kbroo_count'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
 				/* translators: %d: number of pages. */
-				$text = sprintf( _n( '%d page converted to Kbroo Studio. See Tools > Move from Elementor for the report.', '%d pages converted to Kbroo Studio. See Tools > Move from Elementor for the reports.', $count, 'kbroo-studio' ), $count );
+				$text = sprintf( _n( '%d page converted to Kbroo Studio. See Kbroo Studio > Move from Elementor for the report.', '%d pages converted to Kbroo Studio. See Kbroo Studio > Move from Elementor for the reports.', $count, 'kbroo-studio' ), $count );
 				break;
 			case 'no-kit':
 				$text = __( 'No Elementor Site Settings were found on this site.', 'kbroo-studio' );
@@ -344,11 +345,12 @@ final class Migration {
 	}
 
 	/* ------------------------------------------------------------------ *
-	 * Tools > Move from Elementor
+	 * Kbroo Studio > Move from Elementor
 	 * ------------------------------------------------------------------ */
 
 	public function menu(): void {
-		add_management_page(
+		add_submenu_page(
+			Admin::MENU,
 			__( 'Move from Elementor', 'kbroo-studio' ),
 			__( 'Move from Elementor', 'kbroo-studio' ),
 			'edit_pages',

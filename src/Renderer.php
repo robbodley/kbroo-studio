@@ -256,7 +256,7 @@ final class Renderer {
 			$tag,
 			$this->attributes( $section, $settings, $classes, '' ),
 			$this->render_children( (array) ( $section['elements'] ?? array() ) ),
-			self::background_video( $settings )
+			self::background_video( $settings ) . ShapeDividers::render( $settings )
 		);
 	}
 
@@ -285,7 +285,7 @@ final class Renderer {
 			$tag,
 			$this->attributes( $container, $settings, $classes, '' ),
 			$this->render_children( (array) ( $container['elements'] ?? array() ) ),
-			self::background_video( $settings )
+			self::background_video( $settings ) . ShapeDividers::render( $settings )
 		);
 	}
 

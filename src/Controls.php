@@ -21,6 +21,8 @@
  *               multiselect: a list of option keys (Elementor's select2 with
  *               multiple), shown as checkboxes.
  *               gallery: a list of { id, url } images (Elementor's shape).
+ *               css: custom CSS for the element; the word "selector"
+ *               stands for the element (Elementor's custom_css).
  *   media_type  media: 'image' (default) or 'video', for the Media Library.
  *   fields      repeater: control definitions for each item.
  *   title_field repeater: field shown as each item's name in the panel.
@@ -372,6 +374,9 @@ final class Controls {
 			case 'code':
 				return current_user_can( 'unfiltered_html' ) ? (string) $value : wp_kses_post( (string) $value );
 
+			case 'css':
+				return self::sanitize_css( $value );
+
 			case 'textarea':
 				return empty( $control['html'] )
 					? sanitize_textarea_field( (string) $value )
@@ -466,6 +471,22 @@ final class Controls {
 	 *
 	 * @param mixed $value Raw value.
 	 */
+	/** Most characters custom CSS keeps. */
+	const MAX_CSS = 50000;
+
+	/**
+	 * Custom CSS: kept as typed, except that "<" is removed so it can never
+	 * close the <style> element it is printed in.
+	 *
+	 * @param mixed $value Raw CSS.
+	 */
+	public static function sanitize_css( $value ): string {
+		if ( ! is_string( $value ) ) {
+			return '';
+		}
+		return trim( mb_substr( str_replace( '<', '', wp_check_invalid_utf8( $value ) ), 0, self::MAX_CSS ) );
+	}
+
 	public static function sanitize_color( $value ): string {
 		if ( ! is_string( $value ) ) {
 			return '';

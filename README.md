@@ -4,11 +4,11 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
-Tools > **Move from Elementor**:
+**Kbroo Studio > Move from Elementor** in the WordPress admin menu:
 
 1. **Import colours and fonts** copies Elementor's Site Settings (global colours and fonts) into Kbroo Studio's, keeping their ids so converted pages stay linked to them. Fonts the pages use are added from Google Fonts.
 2. **Convert** each page (or use the *Convert to Kbroo Studio* row and bulk actions in the Pages list). Sections, inner sections, columns, containers and the widgets Kbroo Studio has keep their settings; widgets it does not have yet become fallback blocks that still show (live while Elementor is active, otherwise as they looked when converted). The report lists those blocks and any settings not carried over yet.
@@ -23,6 +23,10 @@ Copy this folder to `wp-content/plugins/kbroo-studio` and activate **Kbroo Studi
 Requires WordPress 6.2+ and PHP 7.4+.
 
 ## Using it
+
+Kbroo Studio has its own menu in the WordPress admin sidebar. Its **Overview** page lists the pages built with Kbroo Studio, has a **New page** button that opens a blank page in the editor, and links to the site colours, fonts and CSS, **Move from Elementor** and **Form messages**.
+
+![The Kbroo Studio admin menu and Overview page](docs/screenshots/admin-menu.png)
 
 Open a page or post with any of these:
 
@@ -41,10 +45,10 @@ In the editor:
 - **Icons** come from Font Awesome Free (solid, regular and brands), bundled with the plugin as SVG: pages load only the icons they use, with no icon font or outside request. The icon picker searches by name and keyword.
 - Lists such as slides and social icons are edited item by item in the panel: add, open, reorder, duplicate or remove each one.
 - **Posts** shows a grid of posts (classic or cards), picked by post type, categories or tags to include or leave out, order and offset, with numbered and/or previous/next pages. The editor previews the real posts.
-- **Form** builds a contact form from fields (text, email, textarea, phone, number, URL, date, time, select, radio, checkboxes, acceptance, hidden). Each message is emailed (to the site admin address unless the form names another, with Reply-To set to the sender) and saved under Tools > **Form messages**. Spam protection is built in with no outside service: a hidden trap field, a minimum time before sending, and a limit of 5 messages per visitor in 10 minutes. Forms send without reloading the page and still work with JavaScript off. Developers can hook `kbroo_studio_form_submitted`.
+- **Form** builds a contact form from fields (text, email, textarea, phone, number, URL, date, time, select, radio, checkboxes, acceptance, hidden). Each message is emailed (to the site admin address unless the form names another, with Reply-To set to the sender) and saved under Kbroo Studio > **Form messages**. Spam protection is built in with no outside service: a hidden trap field, a minimum time before sending, and a limit of 5 messages per visitor in 10 minutes. Forms send without reloading the page and still work with JavaScript off. Developers can hook `kbroo_studio_form_submitted`.
 
 ![A converted Elementor form showing a field error](docs/screenshots/form-errors.png)
-![Saved form messages under Tools](docs/screenshots/form-messages.png)
+![Saved form messages](docs/screenshots/form-messages.png)
 
 - **Icon box** and **Image box** put an icon or image above, left or right of a title and description, with an optional link. **Icon list** shows items with icons, stacked or in a row, with optional dividers and links.
 - **Video** plays YouTube, Vimeo or a file from the Media Library, with start and end times, autoplay, mute, loop and aspect ratio. With an **image overlay**, nothing loads from YouTube or Vimeo until the visitor presses play; YouTube uses its privacy-enhanced (no-cookie) address by default.
@@ -52,11 +56,16 @@ In the editor:
 
 ![Icon boxes, image box, icon lists, videos, gallery and carousel converted from Elementor](docs/screenshots/boxes-media-frontend.png)
 
+- **Shape dividers**: sections and containers can have a shape (waves, mountains, tilt, zigzag, curve, clouds, arrow and more, 18 in all) on their top and bottom edges, with colour, width, height, flip, invert, and an option to sit in front of the content.
+- **Custom CSS** (Advanced tab): CSS for one element, where `selector` stands for that element, e.g. `selector .kbroo-heading { text-transform: uppercase; }`. It shows live in the editor.
+
+![Shape dividers and custom CSS converted from Elementor](docs/screenshots/shape-dividers.png)
+
 - Buttons and images have a **hover animation** (grow, float, sink, rotate...), and images have CSS filters (brightness, contrast, saturation, blur, hue), normal and on hover.
 - **Copy and paste**: right-click any element for Duplicate, Copy, Paste, Paste style and Delete, or use Ctrl+C / Ctrl+V (Ctrl+Shift+V pastes style only). Copied elements go on the system clipboard, so they paste into another page or another site running Kbroo Studio.
 - **Navigator** (list icon in the top bar): the page as a tree. Click to select, drag to reorder (widgets between columns, columns between sections), double-click to rename.
 - **Revisions** (clock icon): every save is a WordPress revision with the layout attached. Click one to preview it read-only, then restore it (undoable) and save.
-- **Site colours and fonts** (globe icon): site-wide colours and font presets. Link any colour setting to a global with its globe button, and any typography section to a global font. Changing a global restyles every page that links to it. Editing them needs the `edit_theme_options` capability. Google Fonts are loaded only for fonts a page uses.
+- **Site colours, fonts and CSS** (globe icon): site-wide colours and font presets, and CSS added to every page built with Kbroo Studio (Elementor's site-wide custom CSS is imported here). Link any colour setting to a global with its globe button, and any typography section to a global font. Changing a global restyles every page that links to it. Editing them needs the `edit_theme_options` capability. Google Fonts are loaded only for fonts a page uses.
 - `Ctrl/Cmd+Z` undoes, `Ctrl/Cmd+Shift+Z` or `Ctrl/Cmd+Y` redoes, `Ctrl/Cmd+S` saves, `Delete` removes the selected element, `Esc` deselects.
 
 ## How it works

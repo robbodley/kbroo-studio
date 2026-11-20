@@ -147,6 +147,7 @@ final class Layout {
 			),
 			ControlGroups::background( '{{WRAPPER}}', array(), 'background', self::WITH_VIDEO ),
 			ControlGroups::overlay( '{{WRAPPER}}::before', '{{WRAPPER}}:hover::before' ),
+			ShapeDividers::all_controls(),
 			ControlGroups::border( '{{WRAPPER}}' ),
 			ControlGroups::advanced(
 				'',
@@ -343,6 +344,7 @@ final class Layout {
 			),
 			ControlGroups::background( '{{WRAPPER}}', array(), 'background', self::WITH_VIDEO ),
 			ControlGroups::overlay( '{{WRAPPER}}::before', '{{WRAPPER}}:hover::before' ),
+			ShapeDividers::all_controls(),
 			ControlGroups::border( '{{WRAPPER}}' ),
 			ControlGroups::advanced( '' )
 		);
