@@ -105,6 +105,30 @@ final class Admin {
 		);
 	}
 
+	/**
+	 * The newest switched-on header or footer, for the overview.
+	 */
+	private function area_templates( string $area ): ?\WP_Post {
+		$posts = get_posts(
+			array(
+				'post_type'      => Templates::POST_TYPE,
+				'post_status'    => 'publish',
+				'posts_per_page' => 20,
+				'orderby'        => 'modified',
+				'order'          => 'DESC',
+				'meta_key'       => Templates::META_TYPE, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'     => $area, // phpcs:ignore WordPress.DB.SlowDBQuery
+			)
+		);
+		foreach ( $posts as $post ) {
+			$display = ThemeBuilder::get_display( $post );
+			if ( $display['active'] && $display['include'] ) {
+				return $post;
+			}
+		}
+		return null;
+	}
+
 	public function render_overview(): void {
 		$query   = $this->built_posts( 20 );
 		$latest  = $query->posts ? $query->posts[0] : null;
@@ -147,6 +171,27 @@ final class Admin {
 							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE ) ); ?>"><?php esc_html_e( 'New template', 'kbroo-studio' ); ?></a>
 						<?php endif; ?>
 					</p>
+				</div>
+				<div class="card">
+					<h2 class="title"><?php esc_html_e( 'Header and footer', 'kbroo-studio' ); ?></h2>
+					<?php foreach ( ThemeBuilder::AREAS as $area ) : ?>
+						<?php $current = $this->area_templates( $area ); ?>
+						<p>
+							<strong><?php echo esc_html( Templates::types()[ $area ] ); ?>:</strong>
+							<?php if ( $current ) : ?>
+								<a href="<?php echo esc_url( Document::editor_url( $current ) ); ?>"><?php echo esc_html( get_the_title( $current ) ); ?></a>
+								<span class="description">(<?php echo esc_html( ThemeBuilder::summary( $current ) ); ?>)</span>
+							<?php else : ?>
+								<?php esc_html_e( 'the theme\'s own', 'kbroo-studio' ); ?>
+							<?php endif; ?>
+						</p>
+					<?php endforeach; ?>
+					<?php if ( current_user_can( 'publish_pages' ) ) : ?>
+						<p>
+							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=header' ) ); ?>"><?php esc_html_e( 'New header', 'kbroo-studio' ); ?></a>
+							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=footer' ) ); ?>"><?php esc_html_e( 'New footer', 'kbroo-studio' ); ?></a>
+						</p>
+					<?php endif; ?>
 				</div>
 				<div class="card">
 					<h2 class="title"><?php esc_html_e( 'Move from Elementor', 'kbroo-studio' ); ?></h2>

@@ -56,6 +56,9 @@ final class Registry {
 		$this->register( new Video() );
 		$this->register( new Gallery() );
 		$this->register( new ImageCarousel() );
+		$this->register( new NavMenu() );
+		$this->register( new SiteLogo() );
+		$this->register( new SiteTitle() );
 		$this->register( new ElementorFallback() );
 
 		/**

@@ -75,6 +75,20 @@ final class Frontend {
 	private $globals_added = false;
 
 	/**
+	 * A builder post's layout as HTML, with its styles enqueued. Used for
+	 * site headers and footers.
+	 */
+	public function render_post( \WP_Post $post ): string {
+		$layout = Document::get_layout( $post );
+		$this->enqueue_for( $layout );
+		return $this->renderer->render( $layout, $post->ID );
+	}
+
+	public function enqueue_layout( array $layout ): void {
+		$this->enqueue_for( $layout );
+	}
+
+	/**
 	 * Stylesheet, global colors and fonts, and the Google Fonts a layout uses.
 	 */
 	private function enqueue_for( array $layout ): void {
