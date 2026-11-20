@@ -1,0 +1,41 @@
+# When a release is published on GitHub, build kbroo-studio.zip and attach
+# it to the release. Sites running Kbroo Studio then offer the update.
+name: Release zip
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version matches the tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          want="${TAG#v}"
+          header="$(sed -n 's/^ \* Version: *//p' kbroo-studio.php | tr -d '[:space:]')"
+          constant="$(sed -n "s/^define( 'KBROO_STUDIO_VERSION', '\(.*\)' );/\1/p" kbroo-studio.php)"
+          echo "tag $want, header $header, constant $constant"
+          if [ "$header" != "$want" ] || [ "$constant" != "$want" ]; then
+            echo "::error::Set Version and KBROO_STUDIO_VERSION in kbroo-studio.php to $want before releasing."
+            exit 1
+          fi
+
+      - name: Check PHP syntax
+        run: find . -name '*.php' -not -path './theme/*' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Build the zip
+        run: bin/build-zip.sh build
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" build/kbroo-studio.zip --clobber

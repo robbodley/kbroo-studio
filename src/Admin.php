@@ -211,6 +211,30 @@ final class Admin {
 						<p><a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . Forms::POST_TYPE ) ); ?>"><?php esc_html_e( 'View messages', 'kbroo-studio' ); ?></a></p>
 					</div>
 				<?php endif; ?>
+				<div class="card">
+					<h2 class="title"><?php esc_html_e( 'Updates', 'kbroo-studio' ); ?></h2>
+					<?php
+					$release = current_user_can( 'update_plugins' ) ? Updater::latest() : null;
+					/* translators: %s: version number. */
+					echo '<p>' . esc_html( sprintf( __( 'Version %s.', 'kbroo-studio' ), KBROO_STUDIO_VERSION ) ) . ' ';
+					if ( $release && version_compare( $release['version'], KBROO_STUDIO_VERSION, '>' ) ) {
+						/* translators: %s: version number. */
+						echo '<strong>' . esc_html( sprintf( __( 'Version %s is out.', 'kbroo-studio' ), $release['version'] ) ) . '</strong>';
+					} elseif ( $release ) {
+						esc_html_e( 'This is the latest release.', 'kbroo-studio' );
+					}
+					echo '</p>';
+					?>
+					<p class="description"><?php esc_html_e( 'New versions come from GitHub releases and install like any plugin update. Turn on auto-updates for Kbroo Studio on the Plugins screen to have them installed for you.', 'kbroo-studio' ); ?></p>
+					<?php if ( current_user_can( 'update_plugins' ) ) : ?>
+						<p>
+							<?php if ( $release && version_compare( $release['version'], KBROO_STUDIO_VERSION, '>' ) ) : ?>
+								<a class="button button-primary" href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>"><?php esc_html_e( 'Update now', 'kbroo-studio' ); ?></a>
+							<?php endif; ?>
+							<a class="button" href="<?php echo esc_url( admin_url( 'update-core.php?force-check=1' ) ); ?>"><?php esc_html_e( 'Check for updates', 'kbroo-studio' ); ?></a>
+						</p>
+					<?php endif; ?>
+				</div>
 			</div>
 
 			<h2><?php esc_html_e( 'Built with Kbroo Studio', 'kbroo-studio' ); ?></h2>

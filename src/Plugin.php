@@ -54,6 +54,7 @@ final class Plugin {
 		( new Forms( $this->widgets ) )->hooks();
 		( new Templates( $this->widgets, $this->renderer ) )->hooks();
 		( new Elementor\Migration( $this->widgets, $this->renderer ) )->hooks();
+		( new Updater() )->register(); // Also runs for background auto-updates.
 	}
 
 	public function theme_builder(): ThemeBuilder {
