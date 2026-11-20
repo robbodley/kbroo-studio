@@ -3,8 +3,9 @@
  * Moving pages from Elementor to Kbroo Studio, and back.
  *
  * - Kbroo Studio > Move from Elementor lists Elementor pages with their state and
- *   conversion report, imports the kit's colours and fonts, and imports
- *   exported Elementor template files.
+ *   conversion report, imports the kit's colours and fonts, converts the
+ *   site's Elementor saved templates into the template library, and imports
+ *   exported Elementor template files there too.
  * - The Pages and Posts lists get "Convert to Kbroo Studio" (row and bulk
  *   action) and "Switch back to Elementor".
  *
@@ -22,6 +23,7 @@ namespace KbrooStudio\Elementor;
 use KbrooStudio\Admin;
 use KbrooStudio\Document;
 use KbrooStudio\Renderer;
+use KbrooStudio\Templates;
 use KbrooStudio\Widgets\Registry;
 use WP_Post;
 
@@ -126,7 +128,7 @@ final class Migration {
 	}
 
 	/**
-	 * Create a draft page from an exported Elementor template file.
+	 * Add an exported Elementor template file to the template library.
 	 *
 	 * @return array{post_id: int, report: array}|\WP_Error
 	 */
@@ -135,30 +137,104 @@ final class Migration {
 		if ( ! is_array( $file ) || ! isset( $file['content'] ) || ! is_array( $file['content'] ) ) {
 			return new \WP_Error( 'kbroo_bad_template', __( 'That file is not an Elementor template export.', 'kbroo-studio' ) );
 		}
-		$title   = sanitize_text_field( (string) ( $file['title'] ?? '' ) );
-		$post_id = wp_insert_post(
-			array(
-				'post_type'   => 'page',
-				'post_status' => 'draft',
-				'post_title'  => '' !== $title ? $title : __( 'Imported Elementor template', 'kbroo-studio' ),
-			),
-			true
-		);
+		$title  = sanitize_text_field( (string) ( $file['title'] ?? '' ) );
+		$type   = sanitize_key( (string) ( $file['type'] ?? '' ) );
+		$result = ( new Converter( $this->widgets ) )->convert( $file['content'], 0 );
+		$post_id = Templates::create( '' !== $title ? $title : __( 'Imported Elementor template', 'kbroo-studio' ), self::template_type( $type ), $result['layout'] );
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
 		}
-		$result = ( new Converter( $this->widgets ) )->convert( $file['content'], 0 );
 		$result['report']['template'] = array(
 			'title' => $title,
-			'type'  => sanitize_key( (string) ( $file['type'] ?? '' ) ),
+			'type'  => $type,
 		);
-		Document::save_layout( $post_id, $result['layout'] );
 		update_post_meta( $post_id, self::META_REPORT, $result['report'] );
 		$this->write_content( $post_id, $result['layout'] );
 		return array(
 			'post_id' => $post_id,
 			'report'  => $result['report'],
 		);
+	}
+
+	/** Elementor template types the library takes. */
+	const LIBRARY_TYPES = array( 'page', 'section', 'container' );
+
+	/** The library type for an Elementor template type. */
+	private static function template_type( string $elementor_type ): string {
+		return in_array( $elementor_type, array( 'section', 'container' ), true ) ? 'section' : 'page';
+	}
+
+	/**
+	 * Elementor saved templates (Templates > Saved Templates) that can go
+	 * into the library.
+	 *
+	 * @return WP_Post[]
+	 */
+	private function library_posts(): array {
+		$posts = get_posts(
+			array(
+				'post_type'      => 'elementor_library',
+				'post_status'    => array( 'publish', 'draft', 'private' ),
+				'posts_per_page' => 500,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+				'meta_key'       => '_elementor_template_type', // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'     => self::LIBRARY_TYPES, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_compare'   => 'IN',
+			)
+		);
+		return array_values(
+			array_filter(
+				$posts,
+				function ( $post ) {
+					return null !== Converter::post_data( $post->ID );
+				}
+			)
+		);
+	}
+
+	/** The library template converted from an Elementor template, if any. */
+	public static function converted_template( int $elementor_id ): ?WP_Post {
+		$found = get_posts(
+			array(
+				'post_type'      => Templates::POST_TYPE,
+				'post_status'    => array( 'publish', 'draft', 'private' ),
+				'posts_per_page' => 1,
+				'meta_key'       => Templates::META_SOURCE, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'     => (string) $elementor_id, // phpcs:ignore WordPress.DB.SlowDBQuery
+			)
+		);
+		return $found ? $found[0] : null;
+	}
+
+	/**
+	 * Convert an Elementor saved template into the library, replacing an
+	 * earlier conversion of it. Elementor's template is left as it is.
+	 *
+	 * @return int|null Library template ID, or null if there was nothing to convert.
+	 */
+	public function convert_library( int $elementor_id ): ?int {
+		$source = get_post( $elementor_id );
+		$data   = $source && 'elementor_library' === $source->post_type ? Converter::post_data( $elementor_id ) : null;
+		$type   = (string) get_post_meta( $elementor_id, '_elementor_template_type', true );
+		if ( null === $data || ! in_array( $type, self::LIBRARY_TYPES, true ) ) {
+			return null;
+		}
+		$result   = ( new Converter( $this->widgets ) )->convert( $data, $elementor_id );
+		$existing = self::converted_template( $elementor_id );
+		if ( $existing ) {
+			$id = $existing->ID;
+			Document::save_layout( $id, $result['layout'] );
+		} else {
+			$id = Templates::create( get_the_title( $source ), self::template_type( $type ), $result['layout'] );
+			if ( is_wp_error( $id ) ) {
+				return null;
+			}
+			update_post_meta( $id, Templates::META_SOURCE, (string) $elementor_id );
+		}
+		update_post_meta( $id, self::META_REPORT, $result['report'] );
+		$this->write_content( $id, $result['layout'] );
+		return $id;
 	}
 
 	/** A plain HTML copy in post_content, as the editor's save does. */
@@ -202,6 +278,24 @@ final class Migration {
 				wp_die( esc_html__( 'You are not allowed to change site-wide styles.', 'kbroo-studio' ), 403 );
 			}
 			$notice = null === Kit::import() ? 'no-kit' : 'kit';
+		} elseif ( 'library' === $do || 'library-all' === $do ) {
+			if ( ! current_user_can( 'publish_pages' ) ) {
+				wp_die( esc_html__( 'You are not allowed to save templates.', 'kbroo-studio' ), 403 );
+			}
+			$ids  = 'library' === $do ? array( $post_id ) : wp_list_pluck( $this->library_posts(), 'ID' );
+			$done = 0;
+			foreach ( $ids as $id ) {
+				$converted = $this->convert_library( (int) $id );
+				if ( null !== $converted ) {
+					$done++;
+					$post_id = $converted;
+				}
+			}
+			if ( 'library-all' === $do ) {
+				wp_safe_redirect( add_query_arg( array( 'kbroo_notice' => 'library-all', 'kbroo_count' => $done ), $back ) );
+				exit;
+			}
+			$notice = $done ? 'library' : 'no-data';
 		} elseif ( 'template' === $do ) {
 			if ( ! current_user_can( 'publish_pages' ) && ! current_user_can( 'edit_pages' ) ) {
 				wp_die( esc_html__( 'You are not allowed to create pages.', 'kbroo-studio' ), 403 );
@@ -214,7 +308,7 @@ final class Migration {
 				if ( is_wp_error( $result ) ) {
 					$notice = 'bad-file';
 				} else {
-					$notice  = 'imported';
+					$notice  = 'library';
 					$post_id = $result['post_id'];
 				}
 			}
@@ -310,6 +404,23 @@ final class Migration {
 					$text = sprintf( __( '"%s" is now built with Kbroo Studio. Everything converted.', 'kbroo-studio' ), $title );
 				}
 				break;
+			case 'library':
+				$text = sprintf(
+					/* translators: 1: template title, 2: number of parts. */
+					_n( '"%1$s" is now in Kbroo Studio > Templates. %2$d part could not be converted yet; it is listed below.', '"%1$s" is now in Kbroo Studio > Templates. %2$d parts could not be converted yet; they are listed below.', $missing, 'kbroo-studio' ),
+					$title,
+					$missing
+				);
+				if ( ! $missing ) {
+					/* translators: %s: template title. */
+					$text = sprintf( __( '"%s" is now in Kbroo Studio > Templates. Everything converted.', 'kbroo-studio' ), $title );
+				}
+				break;
+			case 'library-all':
+				$count = absint( $_GET['kbroo_count'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+				/* translators: %d: number of templates. */
+				$text = sprintf( _n( '%d Elementor template converted into Kbroo Studio > Templates.', '%d Elementor templates converted into Kbroo Studio > Templates.', $count, 'kbroo-studio' ), $count );
+				break;
 			case 'to-elementor':
 				/* translators: %s: page title. */
 				$text = sprintf( __( '"%s" is back on Elementor. Its Kbroo Studio version is kept if you want to switch again.', 'kbroo-studio' ), $title );
@@ -378,9 +489,10 @@ final class Migration {
 
 	public function render_page(): void {
 		$posts    = array_filter( $this->elementor_posts(), array( self::class, 'is_elementor' ) );
+		$library  = $this->library_posts();
 		$imported = get_posts(
 			array(
-				'post_type'      => 'page',
+				'post_type'      => array( 'page', Templates::POST_TYPE ),
 				'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
 				'posts_per_page' => 100,
 				'meta_key'       => self::META_REPORT, // phpcs:ignore WordPress.DB.SlowDBQuery
@@ -390,7 +502,7 @@ final class Migration {
 			$imported,
 			function ( $post ) {
 				$report = self::report( $post->ID );
-				return $report && isset( $report['template'] );
+				return $report && isset( $report['template'] ) && ! get_post_meta( $post->ID, Templates::META_SOURCE, true );
 			}
 		);
 		?>
@@ -427,8 +539,45 @@ final class Migration {
 				</table>
 			<?php endif; ?>
 
-			<h2><?php esc_html_e( '3. Template files', 'kbroo-studio' ); ?></h2>
-			<p><?php esc_html_e( 'Import a template exported from Elementor (Templates > Saved Templates > Export). It becomes a new draft page built with Kbroo Studio.', 'kbroo-studio' ); ?></p>
+			<h2><?php esc_html_e( '3. Saved templates', 'kbroo-studio' ); ?></h2>
+			<?php if ( ! $library ) : ?>
+				<p><?php esc_html_e( 'No Elementor saved templates (pages, sections or containers) were found on this site.', 'kbroo-studio' ); ?></p>
+			<?php else : ?>
+				<p><?php esc_html_e( 'Copy Elementor\'s saved templates into Kbroo Studio > Templates, so they can be inserted into any page from the editor.', 'kbroo-studio' ); ?></p>
+				<p><a class="button" href="<?php echo esc_url( self::action_url( 'library-all' ) ); ?>"><?php esc_html_e( 'Convert all templates', 'kbroo-studio' ); ?></a></p>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Elementor template', 'kbroo-studio' ); ?></th>
+							<th><?php esc_html_e( 'Conversion report', 'kbroo-studio' ); ?></th>
+							<th><?php esc_html_e( 'Actions', 'kbroo-studio' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+					<?php foreach ( $library as $source ) : ?>
+						<?php $converted = self::converted_template( $source->ID ); ?>
+						<tr data-elementor-template="<?php echo (int) $source->ID; ?>">
+							<td>
+								<strong><?php echo esc_html( get_the_title( $source ) ); ?></strong>
+								<div><?php echo esc_html( ucfirst( (string) get_post_meta( $source->ID, '_elementor_template_type', true ) ) ); ?></div>
+							</td>
+							<td><?php $this->render_report( $converted ? self::report( $converted->ID ) : null ); ?></td>
+							<td class="row-actions-static">
+								<?php if ( $converted ) : ?>
+									<a class="button button-small" href="<?php echo esc_url( Document::editor_url( $converted ) ); ?>"><?php esc_html_e( 'Edit with Kbroo Studio', 'kbroo-studio' ); ?></a>
+									<a class="button button-small" href="<?php echo esc_url( self::action_url( 'library', $source->ID ) ); ?>" onclick="return confirm('<?php echo esc_js( __( 'Convert again? This replaces the Kbroo Studio copy of this template, including any changes made to it.', 'kbroo-studio' ) ); ?>');"><?php esc_html_e( 'Convert again', 'kbroo-studio' ); ?></a>
+								<?php else : ?>
+									<a class="button button-primary button-small" href="<?php echo esc_url( self::action_url( 'library', $source->ID ) ); ?>"><?php esc_html_e( 'Convert', 'kbroo-studio' ); ?></a>
+								<?php endif; ?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+
+			<h2><?php esc_html_e( '4. Template files', 'kbroo-studio' ); ?></h2>
+			<p><?php esc_html_e( 'Import a template exported from Elementor on another site (Templates > Saved Templates > Export). It is added to Kbroo Studio > Templates.', 'kbroo-studio' ); ?></p>
 			<form method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::ACTION ); ?>" />
 				<input type="hidden" name="do" value="template" />
@@ -441,7 +590,7 @@ final class Migration {
 				<table class="widefat striped" style="margin-top:12px">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Imported page', 'kbroo-studio' ); ?></th>
+							<th><?php esc_html_e( 'Imported', 'kbroo-studio' ); ?></th>
 							<th><?php esc_html_e( 'Conversion report', 'kbroo-studio' ); ?></th>
 							<th><?php esc_html_e( 'Actions', 'kbroo-studio' ); ?></th>
 						</tr>

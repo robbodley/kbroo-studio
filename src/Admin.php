@@ -2,8 +2,8 @@
 /**
  * The Kbroo Studio menu in the WordPress admin sidebar. Its first page is
  * an overview: pages built with Kbroo Studio, a button for a new page, and
- * links to the site styles, Move from Elementor and Form messages, which
- * sit under the same menu.
+ * links to the site styles, Templates, Move from Elementor and Form
+ * messages, which sit under the same menu.
  *
  * @package KbrooStudio
  */
@@ -111,6 +111,8 @@ final class Admin {
 		$new_url = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::NEW_PAGE . '&post_type=page' ), self::NEW_PAGE );
 		$styles  = $latest ? add_query_arg( 'kb-panel', 'globals', Document::editor_url( $latest ) ) : '';
 		$forms   = (int) ( wp_count_posts( Forms::POST_TYPE )->private ?? 0 );
+		$counts  = wp_count_posts( Templates::POST_TYPE );
+		$library = (int) ( $counts->publish ?? 0 ) + (int) ( $counts->draft ?? 0 ) + (int) ( $counts->private ?? 0 );
 		?>
 		<div class="wrap kbroo-admin">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Kbroo Studio', 'kbroo-studio' ); ?></h1>
@@ -130,6 +132,21 @@ final class Admin {
 					<?php else : ?>
 						<p class="description"><?php esc_html_e( 'Only administrators can change them.', 'kbroo-studio' ); ?></p>
 					<?php endif; ?>
+				</div>
+				<div class="card">
+					<h2 class="title"><?php esc_html_e( 'Templates', 'kbroo-studio' ); ?></h2>
+					<p>
+						<?php
+						/* translators: %d: number of saved templates. */
+						echo esc_html( sprintf( _n( '%d saved section or page to insert into any page.', '%d saved sections and pages to insert into any page.', $library, 'kbroo-studio' ), $library ) );
+						?>
+					</p>
+					<p>
+						<a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . Templates::POST_TYPE ) ); ?>"><?php esc_html_e( 'View templates', 'kbroo-studio' ); ?></a>
+						<?php if ( current_user_can( 'publish_pages' ) ) : ?>
+							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE ) ); ?>"><?php esc_html_e( 'New template', 'kbroo-studio' ); ?></a>
+						<?php endif; ?>
+					</p>
 				</div>
 				<div class="card">
 					<h2 class="title"><?php esc_html_e( 'Move from Elementor', 'kbroo-studio' ); ?></h2>
