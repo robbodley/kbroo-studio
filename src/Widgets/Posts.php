@@ -20,6 +20,9 @@ class Posts extends Widget {
 	/** Query variable for the page number, so it never clashes with the page's own. */
 	const PAGE_VAR = 'kbroo-page';
 
+	/** Source that shows the posts of the archive being viewed. */
+	const CURRENT_QUERY = 'current_query';
+
 	public function get_name(): string {
 		return 'posts';
 	}
@@ -81,6 +84,8 @@ class Posts extends Widget {
 	protected function widget_controls(): array {
 		$layout = array( 'section' => __( 'Layout', 'kbroo-studio' ) );
 		$query  = array( 'section' => __( 'Query', 'kbroo-studio' ) );
+		// Hidden when the posts come from the archive being viewed.
+		$custom = array( 'condition' => array( 'posts_post_type!' => self::CURRENT_QUERY ) );
 		$paging = array( 'section' => __( 'Pagination', 'kbroo-studio' ) );
 		$cards  = array( 'condition' => array( '_skin' => 'cards' ) );
 		$style  = function ( string $section ) {
@@ -240,20 +245,20 @@ class Posts extends Widget {
 					'type'    => 'select',
 					'label'   => __( 'Source', 'kbroo-studio' ),
 					'default' => 'post',
-					'options' => self::post_types(),
+					'options' => array( self::CURRENT_QUERY => __( 'Current archive (for blog archive templates)', 'kbroo-studio' ) ) + self::post_types(),
 				),
-				'posts_include_term_ids' => $query + array(
+				'posts_include_term_ids' => $query + $custom + array(
 					'type'        => 'multiselect',
 					'label'       => __( 'Only these categories or tags', 'kbroo-studio' ),
 					'description' => __( 'Leave all unticked to show every post.', 'kbroo-studio' ),
 					'options'     => self::terms(),
 				),
-				'posts_exclude_term_ids' => $query + array(
+				'posts_exclude_term_ids' => $query + $custom + array(
 					'type'    => 'multiselect',
 					'label'   => __( 'Leave out these categories or tags', 'kbroo-studio' ),
 					'options' => self::terms(),
 				),
-				'posts_orderby'          => $query + array(
+				'posts_orderby'          => $query + $custom + array(
 					'type'    => 'select',
 					'label'   => __( 'Order by', 'kbroo-studio' ),
 					'default' => 'post_date',
@@ -266,7 +271,7 @@ class Posts extends Widget {
 						'rand'          => __( 'Random', 'kbroo-studio' ),
 					),
 				),
-				'posts_order'            => $query + array(
+				'posts_order'            => $query + $custom + array(
 					'type'    => 'select',
 					'label'   => __( 'Order', 'kbroo-studio' ),
 					'default' => 'desc',
@@ -275,14 +280,14 @@ class Posts extends Widget {
 						'asc'  => __( 'Oldest or A first', 'kbroo-studio' ),
 					),
 				),
-				'posts_offset'           => $query + array(
+				'posts_offset'           => $query + $custom + array(
 					'type'    => 'number',
 					'label'   => __( 'Skip the first', 'kbroo-studio' ),
 					'default' => 0,
 					'min'     => 0,
 					'max'     => 100,
 				),
-				'posts_exclude_current'  => $query + array(
+				'posts_exclude_current'  => $query + $custom + array(
 					'type'    => 'switcher',
 					'label'   => __( 'Leave out the page being viewed', 'kbroo-studio' ),
 					'default' => 'yes',
@@ -489,6 +494,7 @@ class Posts extends Widget {
 		$types = self::post_types();
 		$per   = max( 1, min( 100, (int) $settings['posts_per_page'] ) );
 		$args  = array(
+			// "Current archive" outside an archive (the editor) shows the latest posts.
 			'post_type'           => isset( $types[ $settings['posts_post_type'] ] ) ? $settings['posts_post_type'] : 'post',
 			'post_status'         => 'publish',
 			'posts_per_page'      => $per,
@@ -526,9 +532,27 @@ class Posts extends Widget {
 		return $args;
 	}
 
+	/**
+	 * Whether to show the posts of the archive being viewed: set to
+	 * "current archive", and rendering the page, not an editor preview.
+	 */
+	private function uses_main_query( array $settings ): bool {
+		global $wp_query;
+		return self::CURRENT_QUERY === $settings['posts_post_type'] && '' !== $this->element_id
+			&& $wp_query instanceof WP_Query && ( $wp_query->is_archive() || $wp_query->is_home() || $wp_query->is_search() );
+	}
+
 	public function render( array $settings ): string {
-		$page  = self::current_page();
-		$query = new WP_Query( self::query_args( $settings, $page ) );
+		global $wp_query;
+		$main = $this->uses_main_query( $settings );
+		if ( $main ) {
+			$page  = max( 1, (int) get_query_var( 'paged' ) );
+			$query = clone $wp_query;
+			$query->rewind_posts();
+		} else {
+			$page  = self::current_page();
+			$query = new WP_Query( self::query_args( $settings, $page ) );
+		}
 		if ( ! $query->have_posts() ) {
 			$message = (string) $settings['nothing_found_message'];
 			return '' !== $message ? '<div class="kbroo-posts-nothing">' . esc_html( $message ) . '</div>' : '';
@@ -544,7 +568,7 @@ class Posts extends Widget {
 		wp_reset_postdata();
 
 		$html = sprintf( '<div class="kbroo-posts kbroo-posts--%1$s kbroo-posts--thumb-%2$s">%3$s</div>', $skin, $thumb, $html );
-		return $html . $this->pagination( $settings, $query, $page );
+		return $html . $this->pagination( $settings, $query, $page, $main );
 	}
 
 	private function render_post( array $settings, string $skin, string $thumb ): string {
@@ -618,19 +642,25 @@ class Posts extends Widget {
 		return '<div class="kbroo-post__meta">' . implode( $separator, $parts ) . '</div>';
 	}
 
-	private function pagination( array $settings, WP_Query $query, int $page ): string {
+	/**
+	 * @param bool $main Whether these are the archive's own posts, which page
+	 *                   with WordPress's own links (/page/2/).
+	 */
+	private function pagination( array $settings, WP_Query $query, int $page, bool $main = false ): string {
 		$type = $settings['pagination_type'];
 		if ( '' === $type ) {
 			return '';
 		}
-		$offset = max( 0, (int) $settings['posts_offset'] );
-		$per    = max( 1, (int) $query->get( 'posts_per_page' ) );
-		$total  = (int) ceil( max( 0, $query->found_posts - $offset ) / $per );
+		$offset = $main ? 0 : max( 0, (int) $settings['posts_offset'] );
+		$total  = $main ? (int) $query->max_num_pages : (int) ceil( max( 0, $query->found_posts - $offset ) / max( 1, (int) $query->get( 'posts_per_page' ) ) );
 		$total  = min( $total, max( 1, (int) $settings['pagination_page_limit'] ) );
 		if ( $total < 2 ) {
 			return '';
 		}
-		$url   = function ( int $n ) {
+		$url   = function ( int $n ) use ( $main ) {
+			if ( $main ) {
+				return esc_url( get_pagenum_link( $n ) );
+			}
 			return esc_url( 1 === $n ? remove_query_arg( self::PAGE_VAR ) : add_query_arg( self::PAGE_VAR, $n ) );
 		};
 		$links = array();

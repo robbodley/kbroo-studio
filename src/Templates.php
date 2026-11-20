@@ -51,6 +51,7 @@ final class Templates {
 			'page'    => __( 'Page', 'kbroo-studio' ),
 			'header'  => __( 'Header', 'kbroo-studio' ),
 			'footer'  => __( 'Footer', 'kbroo-studio' ),
+			'archive' => __( 'Blog archive', 'kbroo-studio' ),
 		);
 	}
 
@@ -85,7 +86,7 @@ final class Templates {
 			return;
 		}
 		$links = '';
-		foreach ( ThemeBuilder::AREAS as $area ) {
+		foreach ( ThemeBuilder::TYPES as $area ) {
 			$links .= sprintf(
 				' <a href="%s" class="page-title-action" data-kbroo-new="%s">%s</a>',
 				esc_url( admin_url( 'post-new.php?post_type=' . self::POST_TYPE . '&template_type=' . $area ) ),
@@ -158,9 +159,10 @@ final class Templates {
 		if ( is_wp_error( $id ) ) {
 			wp_die( esc_html( $id->get_error_message() ) );
 		}
-		if ( in_array( $type, ThemeBuilder::AREAS, true ) ) {
-			// A new header or footer is for the whole site unless changed.
-			ThemeBuilder::save_display( $id, array( 'include' => array( 'entire_site' ) ) );
+		if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
+			// A new header or footer is for the whole site unless changed, and
+			// an archive template for every archive.
+			ThemeBuilder::save_display( $id, array( 'include' => array( 'archive' === $type ? 'archives' : 'entire_site' ) ) );
 			wp_update_post(
 				array(
 					'ID'         => $id,
@@ -198,7 +200,7 @@ final class Templates {
 		if ( 'kbroo_type' === $column ) {
 			$type = self::type_of( $post_id );
 			echo esc_html( self::types()[ $type ] );
-			if ( in_array( $type, ThemeBuilder::AREAS, true ) ) {
+			if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
 				echo '<br /><span class="description">' . esc_html( ThemeBuilder::summary( $post_id ) ) . '</span>';
 			}
 			$source = (int) get_post_meta( $post_id, self::META_SOURCE, true );

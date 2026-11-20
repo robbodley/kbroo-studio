@@ -59,6 +59,11 @@ final class Registry {
 		$this->register( new NavMenu() );
 		$this->register( new SiteLogo() );
 		$this->register( new SiteTitle() );
+		$this->register( new ArchiveTitle() );
+		$this->register( new WpCategories() );
+		$this->register( new WpRecentPosts() );
+		$this->register( new WpSearch() );
+		$this->register( new Sidebar() );
 		$this->register( new ElementorFallback() );
 
 		/**
