@@ -731,6 +731,29 @@ body.kbroo-editor-body {
 	background-image: repeating-linear-gradient(-45deg, transparent 0 8px, rgba(100, 116, 139, 0.12) 8px 16px);
 }
 
+/* Elements with show and hide rules get a clock badge; hidden right now, faded. */
+.kb-has-rules {
+	position: relative;
+}
+
+.kb-has-rules::after {
+	content: "\f469"; /* dashicons-clock */
+	font: normal 14px/1 dashicons;
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	z-index: 5;
+	padding: 3px;
+	border-radius: 3px;
+	color: #fff;
+	background: #64748b;
+	pointer-events: none;
+}
+
+.kb-hidden-now::after {
+	background: #b45309;
+}
+
 /* ---- Settings tabs and controls --------------------------------------- */
 
 .kb-tabs {

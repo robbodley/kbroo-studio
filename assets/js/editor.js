@@ -1621,6 +1621,15 @@
 				} );
 				break;
 
+			case 'datetime':
+			case 'time':
+				input = el( 'input', { type: control.type === 'time' ? 'time' : 'datetime-local', id: id } );
+				input.value = value || '';
+				input.addEventListener( 'change', function () {
+					update( input.value, false );
+				} );
+				break;
+
 			case 'slider':
 				input = renderSlider( control, id, value, inherited, update );
 				break;
@@ -3402,10 +3411,54 @@
 	}
 
 	/**
+	 * Show and hide rules (src/Visibility.php): whether any is filled in, and
+	 * whether the element shows now for a logged-out visitor.
+	 */
+	function hasDisplayRules( s ) {
+		if ( s.display_mode !== 'show' && s.display_mode !== 'hide' ) {
+			return false;
+		}
+		return !! ( s.display_from || s.display_until || s.display_time_from || s.display_time_until || s.display_login || ( Array.isArray( s.display_days ) && s.display_days.length ) );
+	}
+
+	function visibleNow( s ) {
+		var now = new Date( Date.now() + ( config.siteTimeOffset || 0 ) * 1000 ); // Site time, read with the UTC getters.
+		var pad = function ( n ) {
+			return ( n < 10 ? '0' : '' ) + n;
+		};
+		var stamp = now.getUTCFullYear() + '-' + pad( now.getUTCMonth() + 1 ) + '-' + pad( now.getUTCDate() ) + 'T' + pad( now.getUTCHours() ) + ':' + pad( now.getUTCMinutes() );
+		var time = stamp.slice( 11 );
+		var match = true;
+		if ( ( s.display_from && stamp < s.display_from ) || ( s.display_until && stamp >= s.display_until ) ) {
+			match = false;
+		}
+		if ( Array.isArray( s.display_days ) && s.display_days.length && s.display_days.indexOf( String( now.getUTCDay() || 7 ) ) < 0 ) {
+			match = false;
+		}
+		if ( s.display_time_from || s.display_time_until ) {
+			var start = s.display_time_from || '00:00';
+			var end = s.display_time_until || '24:00';
+			if ( start <= end ? ! ( time >= start && time < end ) : ! ( time >= start || time < end ) ) {
+				match = false;
+			}
+		}
+		if ( s.display_login === 'in' ) {
+			match = false; // Previewed as a visitor.
+		}
+		return s.display_mode === 'show' ? match : ! match;
+	}
+
+	/**
 	 * Classes shared with the front end (src/Renderer.php), plus editor state.
 	 */
 	function elementClasses( node, settings, base, prefix ) {
 		var classes = base.concat( [ 'kbroo-el', 'kbroo-el-' + node.id, 'kb-el', 'kb-' + node.elType ] );
+		if ( hasDisplayRules( settings ) ) {
+			classes.push( 'kb-has-rules' );
+			if ( ! visibleNow( settings ) ) {
+				classes.push( 'kb-hidden-here', 'kb-hidden-now' );
+			}
+		}
 		[ 'desktop', 'tablet', 'mobile' ].forEach( function ( device ) {
 			if ( settings[ 'hide_' + device ] === 'yes' ) {
 				classes.push( 'kbroo-hidden-' + device );

@@ -39,6 +39,12 @@ final class Renderer {
 
 		$html = $this->render_children( (array) ( $layout['elements'] ?? array() ) );
 
+		if ( ! defined( 'DONOTCACHEPAGE' ) && Visibility::layout_has_rules( (array) ( $layout['elements'] ?? array() ) ) ) {
+			// Shown or hidden by date and time: ask page caches (WP Super
+			// Cache, W3 Total Cache, WP Rocket...) not to keep a copy.
+			define( 'DONOTCACHEPAGE', true );
+		}
+
 		if ( $this->animated ) {
 			// Animated elements start hidden only once this has run, so the
 			// page still shows everything if scripts never load.
@@ -220,7 +226,7 @@ final class Renderer {
 	private function render_children( array $elements ): string {
 		$html = '';
 		foreach ( $elements as $element ) {
-			if ( ! is_array( $element ) ) {
+			if ( ! is_array( $element ) || ! Visibility::visible( (array) ( $element['settings'] ?? array() ) ) ) {
 				continue;
 			}
 			switch ( $element['elType'] ?? '' ) {

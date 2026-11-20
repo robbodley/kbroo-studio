@@ -108,6 +108,7 @@ final class Editor {
 			'displayTargets' => ThemeBuilder::targets_for( $is_template ? Templates::type_of( $post ) : '' ),
 			'displayPosts'   => $is_template && 'archive' !== Templates::type_of( $post ) && in_array( Templates::type_of( $post ), ThemeBuilder::TYPES, true ) ? ThemeBuilder::pickable_posts() : array(),
 			'siteUrl'        => home_url( '/' ),
+			'siteTimeOffset' => wp_timezone()->getOffset( new \DateTime( 'now' ) ),
 			'templatesAdminUrl' => admin_url( 'edit.php?post_type=' . Templates::POST_TYPE ),
 			'canSaveTemplates' => current_user_can( 'publish_pages' ),
 			'postId'         => $post->ID,
