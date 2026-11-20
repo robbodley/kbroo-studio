@@ -27,13 +27,15 @@ Kbroo Studio updates itself from this repository's GitHub releases, like any plu
 
 Sites running 0.1.0 have no updater yet, so update those once by hand (upload the 0.2.0 zip; WordPress offers to replace the installed version). From 0.2.0 on, updates arrive by themselves.
 
+The **Kbroo Hello** theme updates the same way, from the same releases (see [theme/README.md](theme/README.md)). The plugin and theme each name the oldest version of the other they work with; if one is too old, admins see a notice asking them to update it.
+
 ![An update from GitHub on the Plugins screen](docs/screenshots/update-available.png)
 
 ### Making a release
 
-1. Set the new version in `kbroo-studio.php`, in both the `Version:` header and `KBROO_STUDIO_VERSION`, and merge it to `main`.
+1. Set the new version in `kbroo-studio.php`, in both the `Version:` header and `KBROO_STUDIO_VERSION`, and merge it to `main`. If the theme changed, also raise its version in `theme/kbroo-hello/style.css`, `KBROO_HELLO_VERSION` in its `functions.php` and `Stable tag` in its `readme.txt` (all three the same; the theme's version doesn't have to match the plugin's). If one now needs the other's newer version, raise `KBROO_STUDIO_MIN_HELLO` or `KBROO_HELLO_MIN_STUDIO`.
 2. On GitHub, **Releases > Draft a new release**, with a new tag `v` + the version (e.g. `v0.2.0`), notes about what changed, then **Publish release**.
-3. The *Release zip* workflow checks the version matches the tag, builds `kbroo-studio.zip` (`bin/build-zip.sh`, without the docs and starter theme) and attaches it to the release. Sites offer the update once the zip is attached; if the versions don't match, the workflow fails and nothing is offered.
+3. The *Release zip* workflow checks the versions, builds `kbroo-studio.zip` (the plugin, without the docs and starter theme) and `kbroo-hello-<version>.zip` (the theme) with `bin/build-zip.sh`, and attaches both to the release. Sites offer the updates once the zips are attached; a theme update is offered only when the theme's version went up. If the versions don't match, the workflow fails and nothing is offered.
 
 Requires WordPress 6.2+ and PHP 7.4+.
 
@@ -121,7 +123,7 @@ In the editor:
 | Shape dividers | `src/ShapeDividers.php` |
 | Site header, footer and blog archive (display rules, replacing the theme's) | `src/ThemeBuilder.php`, `templates/site-header.php`, `templates/site-footer.php`, `templates/site-archive.php` |
 | Show and hide rules | `src/Visibility.php` |
-| Updates from GitHub releases, release zip | `src/Updater.php`, `bin/build-zip.sh`, `.github/workflows/release.yml` |
+| Updates from GitHub releases, release zips | `src/Updater.php`, `theme/kbroo-hello/inc/updater.php`, `bin/build-zip.sh`, `.github/workflows/release.yml` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |
 
 The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree follows Elementor's: the page holds sections and containers, sections hold columns, columns hold widgets, inner sections and containers, and containers hold widgets and containers (see `Layout::allowed_children()`):

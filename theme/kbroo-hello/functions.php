@@ -7,13 +7,21 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'KBROO_HELLO_VERSION', '0.1.0' );
+define( 'KBROO_HELLO_VERSION', '0.2.0' );
+
+/*
+ * Oldest Kbroo Studio plugin this theme works with. Raise it when the theme
+ * starts relying on something newer in the plugin; admins then see a
+ * notice asking them to update the plugin.
+ */
+define( 'KBROO_HELLO_MIN_STUDIO', '0.1.0' );
 define( 'KBROO_HELLO_DIR', trailingslashit( get_template_directory() ) );
 define( 'KBROO_HELLO_URL', trailingslashit( get_template_directory_uri() ) );
 
 require KBROO_HELLO_DIR . 'inc/locations.php';
 require KBROO_HELLO_DIR . 'inc/customizer.php';
 require KBROO_HELLO_DIR . 'inc/admin-notice.php';
+require KBROO_HELLO_DIR . 'inc/updater.php';
 
 if ( ! isset( $content_width ) ) {
 	$content_width = 1140; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Core expects this global.

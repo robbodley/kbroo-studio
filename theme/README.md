@@ -6,10 +6,16 @@ The theme lives in its own folder, `theme/kbroo-hello`, and is installed separat
 
 ## Install
 
-1. Make a zip of the `kbroo-hello` folder (the zip should contain the `kbroo-hello` folder itself, not just its files).
+1. Download `kbroo-hello-<version>.zip` from the [latest release](https://github.com/robbodley/kbroo-studio/releases/latest).
 2. In WordPress go to **Appearance > Themes > Add New Theme > Upload Theme**, choose the zip, then **Install Now** and **Activate**.
 
 Or copy the `kbroo-hello` folder to `wp-content/themes/` and activate it under **Appearance > Themes**.
+
+## Updates
+
+From 0.2.0, Kbroo Hello updates itself from the same GitHub releases as the plugin, with or without the plugin installed. A newer version shows on **Appearance > Themes** and **Dashboard > Updates**, and **Enable auto-updates** on the theme's details installs it in the background. Sites on 0.1.0 need the 0.2.0 zip uploaded once by hand (WordPress offers to replace the installed theme).
+
+The theme and the plugin each say which version of the other they need (`KBROO_HELLO_MIN_STUDIO` in the theme's `functions.php`, `KBROO_STUDIO_MIN_HELLO` in the plugin). If one is too old for the other, admins see a notice asking them to update it.
 
 ## What you get
 

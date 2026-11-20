@@ -3,7 +3,7 @@
  * Plugin Name:       Kbroo Studio
  * Plugin URI:        https://github.com/robbodley/kbroo-studio
  * Description:       A visual, drag-and-drop page builder for WordPress.
- * Version:           0.2.0
+ * Version:           0.2.1
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Kbroo
@@ -17,7 +17,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'KBROO_STUDIO_VERSION', '0.2.0' );
+define( 'KBROO_STUDIO_VERSION', '0.2.1' );
+
+/*
+ * Oldest Kbroo Hello theme this plugin works with. Raise it when the plugin
+ * starts relying on something newer in the theme; admins using an older
+ * Kbroo Hello then see a notice asking them to update the theme.
+ */
+define( 'KBROO_STUDIO_MIN_HELLO', '0.1.0' );
 define( 'KBROO_STUDIO_FILE', __FILE__ );
 define( 'KBROO_STUDIO_DIR', plugin_dir_path( __FILE__ ) );
 define( 'KBROO_STUDIO_URL', plugin_dir_url( __FILE__ ) );
