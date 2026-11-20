@@ -1739,3 +1739,24 @@ textarea.kbroo-form__input {
 .kbroo-archive {
 	display: block;
 }
+
+/* Page layouts (Page settings > Page layout): content edge to edge, and
+   comments, when a page allows them, at a readable width underneath. */
+.kbroo-page-layout {
+	display: block;
+	width: 100%;
+	max-width: none;
+	margin: 0;
+	padding: 0;
+}
+
+.kbroo-page-comments {
+	box-sizing: border-box;
+	max-width: 1140px;
+	margin: 0 auto;
+	padding: 40px 20px;
+}
+
+body.kbroo-template-canvas {
+	margin: 0;
+}

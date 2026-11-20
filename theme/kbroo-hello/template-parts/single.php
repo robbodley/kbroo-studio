@@ -1,7 +1,9 @@
 <?php
 /**
  * A page or post. Pages built with Kbroo Studio get the whole width and no
- * theme title, so the builder layout is all that shows.
+ * theme title, so the builder layout is all that shows (unless the page
+ * turns Hide title off in Kbroo Studio's Page settings). Their comments
+ * show underneath when the page allows them.
  *
  * @package KbrooHello
  */
@@ -16,7 +18,21 @@ $kbroo_hello_builder = kbroo_hello_is_builder_page();
 		the_post();
 
 		if ( $kbroo_hello_builder ) :
+			if ( kbroo_hello_show_builder_title() ) :
+				?>
+				<header class="entry-header site-main__inner">
+					<?php the_title( '<h1 class="entry-title">', '</h1>' ); ?>
+				</header>
+				<?php
+			endif;
 			the_content();
+			if ( comments_open() || get_comments_number() ) :
+				?>
+				<div class="site-main__inner">
+					<?php comments_template(); ?>
+				</div>
+				<?php
+			endif;
 			continue;
 		endif;
 		?>

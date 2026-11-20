@@ -98,6 +98,12 @@ final class Editor {
 
 		$is_template = Templates::is_template( $post );
 
+		$page = PageSettings::applies_to( $post ) ? PageSettings::for_editor( $post ) : null;
+		if ( $page && $conversion ) {
+			// Elementor's Hide title and page template, saved with the page.
+			$page = array_merge( $page, PageSettings::from_elementor( $post->ID ) );
+		}
+
 		return array(
 			'conversion'     => $conversion,
 			'isTemplate'     => $is_template,
@@ -114,6 +120,7 @@ final class Editor {
 			'postId'         => $post->ID,
 			'title'          => get_the_title( $post ),
 			'status'         => $post->post_status,
+			'page'           => $page,
 			'postTypeLabel'  => $type ? $type->labels->singular_name : '',
 			'canPublish'     => $type ? current_user_can( $type->cap->publish_posts ) : false,
 			'permalink'      => get_permalink( $post ),
