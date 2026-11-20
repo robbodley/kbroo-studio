@@ -28,7 +28,9 @@ final class Kbroo_Hello_Updater {
 		// style.css's "Update URI" points at github.com (WordPress 6.1+).
 		add_filter( 'update_themes_github.com', array( __CLASS__, 'update_data' ), 10, 3 );
 		add_filter( 'upgrader_source_selection', array( __CLASS__, 'fix_folder' ), 10, 4 );
-		add_action( 'load-update-core.php', array( __CLASS__, 'forget_on_force_check' ) );
+		// Priority 1: core checks for updates on this same hook at priority
+		// 10, so the cached release has to be gone before then.
+		add_action( 'load-update-core.php', array( __CLASS__, 'forget_on_force_check' ), 1 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'forget' ), 10, 0 );
 	}
 
@@ -64,7 +66,8 @@ final class Kbroo_Hello_Updater {
 		if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
 			$release = self::parse( json_decode( wp_remote_retrieve_body( $response ), true ) );
 		}
-		set_site_transient( self::CACHE_KEY, array( 'release' => $release ), $release || ! is_wp_error( $response ) ? self::CACHE_TTL : HOUR_IN_SECONDS );
+		// A release whose zip isn't attached yet is asked about again soon.
+		set_site_transient( self::CACHE_KEY, array( 'release' => $release ), $release ? self::CACHE_TTL : ( is_wp_error( $response ) ? HOUR_IN_SECONDS : 15 * MINUTE_IN_SECONDS ) );
 		return $release;
 	}
 
@@ -147,8 +150,11 @@ final class Kbroo_Hello_Updater {
 	 * "Check again" on Dashboard > Updates asks GitHub again too.
 	 */
 	public static function forget_on_force_check() {
-		if ( ! empty( $_GET['force-check'] ) && current_user_can( 'update_themes' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only refresh, as core does.
+		if ( ! empty( $_GET['force-check'] ) && ( current_user_can( 'update_themes' ) || current_user_can( 'update_plugins' ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only refresh, as core does.
 			self::forget();
+			// The Kbroo Studio plugin's cached release too, so an older
+			// plugin whose own refresh runs too late still shows its update.
+			delete_site_transient( 'kbroo_studio_release' );
 		}
 	}
 

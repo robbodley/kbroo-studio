@@ -22,6 +22,10 @@ class Updater {
 	const ASSET     = 'kbroo-studio.zip';
 	const CACHE_KEY = 'kbroo_studio_release';
 
+	/** The Kbroo Hello theme's folder, and where its updater caches the release. */
+	const THEME           = 'kbroo-hello';
+	const THEME_CACHE_KEY = 'kbroo_hello_release';
+
 	/** How long a check is kept, so GitHub is asked a few times a day at most. */
 	const CACHE_TTL = 6 * HOUR_IN_SECONDS;
 
@@ -31,7 +35,9 @@ class Updater {
 		add_filter( 'update_plugins_github.com', array( $this, 'update_data' ), 10, 3 );
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
 		add_filter( 'upgrader_source_selection', array( $this, 'fix_folder' ), 10, 4 );
-		add_action( 'load-update-core.php', array( $this, 'forget_on_force_check' ) );
+		// Priority 1: core checks for updates on this same hook at priority
+		// 10, so the cached release has to be gone before then.
+		add_action( 'load-update-core.php', array( $this, 'forget_on_force_check' ), 1 );
 		add_action( 'upgrader_process_complete', array( $this, 'forget' ), 10, 0 );
 	}
 
@@ -76,8 +82,9 @@ class Updater {
 		}
 
 		// A failed check is kept for an hour, so a GitHub outage doesn't slow
-		// every admin page.
-		set_site_transient( self::CACHE_KEY, array( 'release' => $release ), $release || ! is_wp_error( $response ) ? self::CACHE_TTL : HOUR_IN_SECONDS );
+		// every admin page. A release whose zip isn't attached yet (the
+		// workflow takes a few minutes) is asked about again soon.
+		set_site_transient( self::CACHE_KEY, array( 'release' => $release ), $release ? self::CACHE_TTL : ( is_wp_error( $response ) ? HOUR_IN_SECONDS : 15 * MINUTE_IN_SECONDS ) );
 		return $release;
 	}
 
@@ -240,12 +247,82 @@ class Updater {
 	 * "Check again" on Dashboard > Updates asks GitHub again too.
 	 */
 	public function forget_on_force_check(): void {
-		if ( ! empty( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only refresh, as core does.
-			$this->forget();
+		if ( ! empty( $_GET['force-check'] ) && ( current_user_can( 'update_plugins' ) || current_user_can( 'update_themes' ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only refresh, as core does.
+			self::forget_all();
 		}
 	}
 
 	public function forget(): void {
 		delete_site_transient( self::CACHE_KEY );
+	}
+
+	/**
+	 * Forget the cached GitHub release for the plugin and the Kbroo Hello
+	 * theme (its updater keeps its own copy).
+	 */
+	public static function forget_all(): void {
+		delete_site_transient( self::CACHE_KEY );
+		delete_site_transient( self::THEME_CACHE_KEY );
+	}
+
+	/**
+	 * Ask GitHub again now, and have WordPress rebuild its list of plugin
+	 * and theme updates, so a new Kbroo Studio or Kbroo Hello release shows
+	 * up straight away. WordPress core itself is not checked or updated.
+	 */
+	public static function check_now(): void {
+		self::forget_all();
+		$checks = array(
+			'update_plugins' => 'wp_update_plugins',
+			'update_themes'  => 'wp_update_themes',
+		);
+		foreach ( $checks as $cap => $check ) {
+			if ( ! current_user_can( $cap ) || ! function_exists( $check ) ) {
+				continue;
+			}
+			// Mark WordPress's last check as old rather than deleting it, so
+			// the other updates it knows about stay if WordPress.org can't be
+			// reached.
+			$current = get_site_transient( $cap );
+			if ( is_object( $current ) ) {
+				$current->last_checked = 0;
+				set_site_transient( $cap, $current );
+			}
+			$check();
+		}
+	}
+
+	/**
+	 * The version WordPress will install for the plugin, or '' when it knows
+	 * of no update.
+	 */
+	public static function pending_plugin_version(): string {
+		$updates = get_site_transient( 'update_plugins' );
+		$update  = is_object( $updates ) && isset( $updates->response[ self::basename() ] ) ? (array) $updates->response[ self::basename() ] : array();
+		return (string) ( $update['new_version'] ?? '' );
+	}
+
+	/**
+	 * The version WordPress will install for Kbroo Hello, or ''.
+	 */
+	public static function pending_theme_version(): string {
+		$updates = get_site_transient( 'update_themes' );
+		$update  = is_object( $updates ) && isset( $updates->response[ self::THEME ] ) ? (array) $updates->response[ self::THEME ] : array();
+		return (string) ( $update['new_version'] ?? '' );
+	}
+
+	/**
+	 * Link that installs the waiting plugin update, as "update now" on the
+	 * Plugins screen does.
+	 */
+	public static function update_plugin_url(): string {
+		return wp_nonce_url( self_admin_url( 'update.php?action=upgrade-plugin&plugin=' . rawurlencode( self::basename() ) ), 'upgrade-plugin_' . self::basename() );
+	}
+
+	/**
+	 * Link that installs the waiting Kbroo Hello update.
+	 */
+	public static function update_theme_url(): string {
+		return wp_nonce_url( self_admin_url( 'update.php?action=upgrade-theme&theme=' . rawurlencode( self::THEME ) ), 'upgrade-theme_' . self::THEME );
 	}
 }

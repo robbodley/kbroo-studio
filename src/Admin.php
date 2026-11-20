@@ -22,11 +22,15 @@ final class Admin {
 	/** admin-post action that creates a page and opens it in the editor. */
 	const NEW_PAGE = 'kbroo_new_page';
 
+	/** admin-post action that asks GitHub for Kbroo Studio and Kbroo Hello updates. */
+	const CHECK_UPDATES = 'kbroo_check_updates';
+
 	public function hooks(): void {
 		// Before admin_menu's default priority, so post types and other
 		// pages can add themselves under this menu.
 		add_action( 'admin_menu', array( $this, 'menu' ), 9 );
 		add_action( 'admin_post_' . self::NEW_PAGE, array( $this, 'new_page' ) );
+		add_action( 'admin_post_' . self::CHECK_UPDATES, array( $this, 'check_updates' ) );
 		add_action( 'admin_notices', array( $this, 'old_theme_notice' ) );
 	}
 
@@ -67,9 +71,27 @@ final class Admin {
 					$version
 				)
 			),
-			esc_url( admin_url( 'update-core.php?force-check=1' ) ),
+			esc_url( self::check_updates_url() ),
 			esc_html__( 'Check for updates', 'kbroo-studio' )
 		);
+	}
+
+	/**
+	 * The "Check for updates" link: asks GitHub for Kbroo updates and comes
+	 * back to the overview, without going through Dashboard > Updates.
+	 */
+	public static function check_updates_url(): string {
+		return wp_nonce_url( admin_url( 'admin-post.php?action=' . self::CHECK_UPDATES ), self::CHECK_UPDATES );
+	}
+
+	public function check_updates(): void {
+		check_admin_referer( self::CHECK_UPDATES );
+		if ( ! current_user_can( 'update_plugins' ) && ! current_user_can( 'update_themes' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to update plugins or themes.', 'kbroo-studio' ), 403 );
+		}
+		Updater::check_now();
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::MENU . '&kbroo-checked=1#kbroo-updates' ) );
+		exit;
 	}
 
 	public function menu(): void {
@@ -254,31 +276,51 @@ final class Admin {
 						<p><a class="button" href="<?php echo esc_url( admin_url( 'edit.php?post_type=' . Forms::POST_TYPE ) ); ?>"><?php esc_html_e( 'View messages', 'kbroo-studio' ); ?></a></p>
 					</div>
 				<?php endif; ?>
-				<div class="card">
+				<div class="card" id="kbroo-updates">
 					<h2 class="title"><?php esc_html_e( 'Updates', 'kbroo-studio' ); ?></h2>
 					<?php
-					$release = current_user_can( 'update_plugins' ) ? Updater::latest() : null;
+					$can_plugins = current_user_can( 'update_plugins' );
+					$can_themes  = current_user_can( 'update_themes' ) && '' !== self::hello_version();
+					$release     = $can_plugins ? Updater::latest() : null;
+					$plugin_next = $can_plugins ? Updater::pending_plugin_version() : '';
+					$plugin_next = '' !== $plugin_next && version_compare( $plugin_next, KBROO_STUDIO_VERSION, '>' ) ? $plugin_next : '';
+					$theme_next  = $can_themes ? Updater::pending_theme_version() : '';
+					$theme_next  = '' !== $theme_next && version_compare( $theme_next, self::hello_version(), '>' ) ? $theme_next : '';
+					if ( ! empty( $_GET['kbroo-checked'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only picks a message.
+						echo '<p><em>' . esc_html__( 'Checked GitHub for updates just now.', 'kbroo-studio' ) . '</em></p>';
+					}
 					/* translators: %s: version number. */
-					echo '<p>' . esc_html( sprintf( __( 'Version %s.', 'kbroo-studio' ), KBROO_STUDIO_VERSION ) ) . ' ';
-					if ( $release && version_compare( $release['version'], KBROO_STUDIO_VERSION, '>' ) ) {
+					echo '<p>' . esc_html( sprintf( __( 'Kbroo Studio %s.', 'kbroo-studio' ), KBROO_STUDIO_VERSION ) ) . ' ';
+					if ( '' !== $plugin_next ) {
 						/* translators: %s: version number. */
-						echo '<strong>' . esc_html( sprintf( __( 'Version %s is out.', 'kbroo-studio' ), $release['version'] ) ) . '</strong>';
+						echo '<strong>' . esc_html( sprintf( __( 'Version %s is out.', 'kbroo-studio' ), $plugin_next ) ) . '</strong>';
+					} elseif ( $release && version_compare( $release['version'], KBROO_STUDIO_VERSION, '>' ) ) {
+						/* translators: %s: version number. */
+						echo '<strong>' . esc_html( sprintf( __( 'Version %s is out. Check for updates to get it.', 'kbroo-studio' ), $release['version'] ) ) . '</strong>';
 					} elseif ( $release ) {
 						esc_html_e( 'This is the latest release.', 'kbroo-studio' );
 					}
 					echo '</p>';
+					if ( '' !== self::hello_version() ) {
+						/* translators: %s: version number. */
+						echo '<p>' . esc_html( sprintf( __( 'Kbroo Hello theme %s.', 'kbroo-studio' ), self::hello_version() ) ) . ' ';
+						if ( '' !== $theme_next ) {
+							/* translators: %s: version number. */
+							echo '<strong>' . esc_html( sprintf( __( 'Version %s is out.', 'kbroo-studio' ), $theme_next ) ) . '</strong>';
+						}
+						echo '</p>';
+					}
 					?>
-					<?php if ( '' !== self::hello_version() ) : ?>
-						<?php /* translators: %s: version number. */ ?>
-						<p><?php echo esc_html( sprintf( __( 'Kbroo Hello theme %s.', 'kbroo-studio' ), self::hello_version() ) ); ?></p>
-					<?php endif; ?>
 					<p class="description"><?php esc_html_e( 'New versions come from GitHub releases and install like any plugin update. Turn on auto-updates for Kbroo Studio on the Plugins screen to have them installed for you.', 'kbroo-studio' ); ?></p>
-					<?php if ( current_user_can( 'update_plugins' ) ) : ?>
+					<?php if ( $can_plugins || $can_themes ) : ?>
 						<p>
-							<?php if ( $release && version_compare( $release['version'], KBROO_STUDIO_VERSION, '>' ) ) : ?>
-								<a class="button button-primary" href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>"><?php esc_html_e( 'Update now', 'kbroo-studio' ); ?></a>
+							<?php if ( '' !== $plugin_next ) : ?>
+								<a class="button button-primary" href="<?php echo esc_url( Updater::update_plugin_url() ); ?>"><?php esc_html_e( 'Update Kbroo Studio', 'kbroo-studio' ); ?></a>
 							<?php endif; ?>
-							<a class="button" href="<?php echo esc_url( admin_url( 'update-core.php?force-check=1' ) ); ?>"><?php esc_html_e( 'Check for updates', 'kbroo-studio' ); ?></a>
+							<?php if ( '' !== $theme_next ) : ?>
+								<a class="button button-primary" href="<?php echo esc_url( Updater::update_theme_url() ); ?>"><?php esc_html_e( 'Update Kbroo Hello', 'kbroo-studio' ); ?></a>
+							<?php endif; ?>
+							<a class="button" href="<?php echo esc_url( self::check_updates_url() ); ?>"><?php esc_html_e( 'Check for updates', 'kbroo-studio' ); ?></a>
 						</p>
 					<?php endif; ?>
 				</div>
