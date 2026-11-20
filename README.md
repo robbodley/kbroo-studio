@@ -33,9 +33,13 @@ The **Kbroo Hello** theme updates the same way, from the same releases (see [the
 
 ### Making a release
 
-1. Set the new version in `kbroo-studio.php`, in both the `Version:` header and `KBROO_STUDIO_VERSION`, and merge it to `main`. If the theme changed, also raise its version in `theme/kbroo-hello/style.css`, `KBROO_HELLO_VERSION` in its `functions.php` and `Stable tag` in its `readme.txt` (all three the same; the theme's version doesn't have to match the plugin's). If one now needs the other's newer version, raise `KBROO_STUDIO_MIN_HELLO` or `KBROO_HELLO_MIN_STUDIO`.
-2. On GitHub, **Releases > Draft a new release**, with a new tag `v` + the version (e.g. `v0.2.0`), notes about what changed, then **Publish release**.
-3. The *Release zip* workflow checks the versions, builds `kbroo-studio.zip` (the plugin, without the docs and starter theme) and `kbroo-hello-<version>.zip` (the theme) with `bin/build-zip.sh`, and attaches both to the release. Sites offer the updates once the zips are attached; a theme update is offered only when the theme's version went up. If the versions don't match, the workflow fails and nothing is offered.
+Releases happen by themselves when `main` gets a new version:
+
+1. Changes are merged to `main` as usual, without changing the version. Nothing is released.
+2. When a batch is ready, a small pull request raises the version: in `kbroo-studio.php`, both the `Version:` header and `KBROO_STUDIO_VERSION`. If the theme changed, also its version in `theme/kbroo-hello/style.css`, `KBROO_HELLO_VERSION` in its `functions.php` and `Stable tag` in its `readme.txt` (all three the same; the theme's version doesn't have to match the plugin's, but a theme change always goes out with a new plugin version). If one now needs the other's newer version, raise `KBROO_STUDIO_MIN_HELLO` or `KBROO_HELLO_MIN_STUDIO`.
+3. Merging it runs the *Release* workflow: it checks the versions, builds `kbroo-studio.zip` (the plugin, without the docs and starter theme) and `kbroo-hello-<version>.zip` (the theme) with `bin/build-zip.sh`, and publishes release `v<version>` with both attached and notes listing the merged pull requests. Sites then offer the updates; a theme update is offered only when the theme's version went up.
+
+If the versions don't match, the workflow fails and nothing is released. A failed release can be retried from the Actions tab (*Release > Run workflow*). Publishing a release by hand on GitHub still works too: its zips are attached when it is published.
 
 Requires WordPress 6.2+ and PHP 7.4+.
 
