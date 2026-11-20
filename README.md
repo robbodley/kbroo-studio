@@ -23,7 +23,7 @@ Download `kbroo-studio.zip` from the [latest release](https://github.com/robbodl
 
 ### Updates
 
-Kbroo Studio updates itself from this repository's GitHub releases, like any plugin from WordPress.org: when a newer release is out, it shows on **Dashboard > Updates** and the Plugins screen (with its release notes under *View details*), and **Enable auto-updates** on the Plugins screen installs new versions in the background. The Kbroo Studio overview page shows the installed version and has a *Check for updates* button. GitHub is asked at most every few hours.
+Kbroo Studio updates itself from this repository's GitHub releases, like any plugin from WordPress.org: when a newer release is out, it shows on **Dashboard > Updates** and the Plugins screen (with its release notes under *View details*), and **Enable auto-updates** on the Plugins screen installs new versions in the background. The Kbroo Studio overview page shows the installed plugin and theme versions, and its *Check for updates* button asks GitHub straight away and offers *Update Kbroo Studio* and *Update Kbroo Hello* buttons when newer versions are out (WordPress itself is not checked or updated from there). Otherwise GitHub is asked at most every few hours.
 
 Sites running 0.1.0 have no updater yet, so update those once by hand (upload the 0.2.0 zip; WordPress offers to replace the installed version). From 0.2.0 on, updates arrive by themselves.
 
