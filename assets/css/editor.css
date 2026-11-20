@@ -1854,3 +1854,7 @@ span.kb-unit {
 .kb-template-filter {
 	flex-wrap: wrap;
 }
+
+.kb-page-settings .kb-page-more {
+	margin-top: 20px;
+}

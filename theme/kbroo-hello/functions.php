@@ -105,6 +105,25 @@ function kbroo_hello_is_builder_page( $post = null ) {
 }
 
 /**
+ * Whether a builder page shows the theme's title. Builder pages hide it
+ * unless the page turned Hide title off in Kbroo Studio's Page settings.
+ *
+ * @param int|WP_Post|null $post Post to check. Defaults to the current post.
+ */
+function kbroo_hello_show_builder_title( $post = null ) {
+	$post = get_post( $post );
+	$show = $post && 'no' === get_post_meta( $post->ID, '_kbroo_hide_title', true );
+
+	/**
+	 * Filters whether a builder page shows the theme's title.
+	 *
+	 * @param bool         $show Whether to show the title.
+	 * @param WP_Post|null $post The post.
+	 */
+	return (bool) apply_filters( 'kbroo_hello_show_builder_title', $show, $post );
+}
+
+/**
  * Body classes the stylesheet and the builder can key off.
  *
  * @param string[] $classes Body classes.

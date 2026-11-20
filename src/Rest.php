@@ -59,13 +59,17 @@ final class Rest {
 						'status' => array(
 							'required' => false,
 							'type'     => 'string',
-							'enum'     => array( 'draft', 'publish' ),
+							'enum'     => PageSettings::STATUSES,
 						),
 						'title'  => array(
 							'required' => false,
 							'type'     => 'string',
 						),
 						'display' => array(
+							'required' => false,
+							'type'     => 'object',
+						),
+						'page'    => array(
 							'required' => false,
 							'type'     => 'object',
 						),
@@ -251,16 +255,20 @@ final class Rest {
 			'post_content' => $this->renderer->render( $layout, $post->ID ),
 		);
 
-		if ( 'publish' === $status && 'publish' !== $post->post_status ) {
+		if ( is_string( $status ) && $status !== $post->post_status ) {
 			$type = get_post_type_object( $post->post_type );
-			if ( ! $type || ! current_user_can( $type->cap->publish_posts ) ) {
+			if ( in_array( $status, array( 'publish', 'private' ), true ) && ( ! $type || ! current_user_can( $type->cap->publish_posts ) ) ) {
 				return new WP_Error( 'kbroo_cannot_publish', __( 'You are not allowed to publish this post.', 'kbroo-studio' ), array( 'status' => rest_authorization_required_code() ) );
 			}
-			$update['post_status'] = 'publish';
+			$update['post_status'] = $status;
 		} elseif ( 'auto-draft' === $post->post_status ) {
 			// A brand new post opened straight in the builder.
 			$update['post_status'] = 'draft';
 		}
+
+		// Page settings: hide title and layout are stored now; excerpt and
+		// comments go into the post update.
+		$update += PageSettings::save( $post, $request->get_param( 'page' ) );
 
 		$title = $request->get_param( 'title' );
 		if ( is_string( $title ) && '' !== trim( $title ) && $title !== $post->post_title ) {
@@ -286,6 +294,7 @@ final class Rest {
 			'status'    => $post->post_status,
 			'permalink' => get_permalink( $post ),
 			'layout'    => Document::get_layout( $post ),
+			'page'      => PageSettings::applies_to( $post ) ? PageSettings::for_editor( $post ) : null,
 		);
 	}
 }

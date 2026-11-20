@@ -48,6 +48,7 @@ final class Plugin {
 		$this->theme_builder = new ThemeBuilder( $frontend );
 		$this->theme_builder->hooks();
 		( new Revisions() )->hooks();
+		( new PageSettings() )->hooks();
 		if ( is_admin() ) {
 			( new Admin() )->hooks();
 		}

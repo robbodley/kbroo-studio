@@ -22,6 +22,7 @@ namespace KbrooStudio\Elementor;
 
 use KbrooStudio\Admin;
 use KbrooStudio\Document;
+use KbrooStudio\PageSettings;
 use KbrooStudio\Renderer;
 use KbrooStudio\Templates;
 use KbrooStudio\ThemeBuilder;
@@ -103,6 +104,7 @@ final class Migration {
 
 		$result = ( new Converter( $this->widgets ) )->convert( $data, $post_id );
 		Document::save_layout( $post_id, $result['layout'] );
+		PageSettings::save_meta( $post_id, PageSettings::from_elementor( $post_id ) );
 		update_post_meta( $post_id, self::META_REPORT, $result['report'] );
 		$this->write_content( $post_id, $result['layout'] );
 		return $result['report'];

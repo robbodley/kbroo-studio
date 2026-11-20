@@ -283,6 +283,10 @@ final class ThemeBuilder {
 		if ( is_admin() || is_feed() || is_embed() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 			return null;
 		}
+		// A Canvas page has no header or footer at all.
+		if ( in_array( $area, self::AREAS, true ) && PageSettings::is_canvas_request() ) {
+			return null;
+		}
 		$posts = get_posts(
 			array(
 				'post_type'      => Templates::POST_TYPE,

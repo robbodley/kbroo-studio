@@ -47,6 +47,7 @@
 		title: config.title || '',
 		templateDraft: null, // { elements, label } waiting to be saved as a template.
 		display: config.display ? JSON.parse( JSON.stringify( config.display ) ) : null, // Header/footer display settings.
+		page: config.page ? JSON.parse( JSON.stringify( config.page ) ) : null, // Page settings (pages and posts only).
 		globals: JSON.parse( JSON.stringify( config.globals ) ),
 		globalsDirty: false,
 		preview: null, // { id, label, layout } while previewing a revision.
@@ -895,8 +896,9 @@
 	 * ------------------------------------------------------------------ */
 
 	function renderTopbar() {
-		var published = state.status === 'publish' || config.isTemplate;
-		var saveLabel = state.saving ? 'Saving…' : config.isTemplate ? 'Save' : published ? 'Update' : 'Save draft';
+		var published = isPublished( state.status ) || config.isTemplate;
+		var target = state.page ? state.page.status : state.status; // Status after saving.
+		var saveLabel = state.saving ? 'Saving…' : config.isTemplate ? 'Save' : published ? 'Update' : target === 'draft' ? 'Save draft' : 'Save';
 
 		var devices = el( 'div', { class: 'kb-segmented', role: 'group', 'aria-label': 'Preview device' } );
 		Object.keys( DEVICES ).forEach( function ( device ) {
@@ -965,7 +967,7 @@
 					? el( 'span', { class: 'kb-badge is-template', text: ( config.templateTypes[ config.templateType ] || 'Page' ) + ' template' } )
 					: el( 'span', {
 							class: 'kb-badge' + ( published ? ' is-live' : '' ),
-							text: published ? 'Published' : 'Draft',
+							text: STATUS_LABELS[ state.status ] || 'Draft',
 					  } ),
 				state.dirty || state.globalsDirty ? el( 'span', { class: 'kb-unsaved', text: 'Unsaved changes' } ) : null,
 			] )
@@ -974,6 +976,7 @@
 			el( 'div', { class: 'kb-topbar-end' }, [
 				panelButton( 'globals', 'dashicons-admin-site-alt3', 'Site colours, fonts and CSS' ),
 				state.display ? panelButton( 'display', 'dashicons-visibility', 'Where it shows' ) : null,
+				state.page ? panelButton( 'page', 'dashicons-admin-generic', ( config.postTypeLabel || 'Page' ) + ' settings' ) : null,
 				panelButton( 'templates', 'dashicons-category', 'Templates' ),
 				panelButton( 'revisions', 'dashicons-backup', 'Revisions' ),
 				el(
@@ -1077,6 +1080,8 @@
 				renderTemplatesPanel();
 			} else if ( state.panelView === 'display' && state.display ) {
 				renderDisplayPanel();
+			} else if ( state.panelView === 'page' && state.page ) {
+				renderPagePanel();
 			} else {
 				renderWidgetsPanel();
 			}
@@ -2824,6 +2829,173 @@
 	}
 
 	/* ------------------------------------------------------------------ *
+	 * Page settings
+	 * ------------------------------------------------------------------ */
+
+	var STATUS_LABELS = { publish: 'Published', draft: 'Draft', pending: 'Pending review', private: 'Private', future: 'Scheduled' };
+
+	function isPublished( status ) {
+		return status === 'publish' || status === 'private' || status === 'future';
+	}
+
+	var PAGE_LAYOUTS = {
+		'': {
+			label: 'Default',
+			note: 'The theme\'s own page template.',
+		},
+		full_width: {
+			label: 'Full width',
+			note: 'The site header and footer, and the content edge to edge with no theme title.',
+		},
+		canvas: {
+			label: 'Canvas',
+			note: 'A blank page: no header, footer or title. Only what you build here.',
+		},
+	};
+
+	/** A page setting changed. Text fields keep their focus (no panel redraw). */
+	function pageChanged( redraw ) {
+		state.dirty = true;
+		renderTopbar();
+		if ( redraw ) {
+			renderPanel();
+		}
+	}
+
+	function pageField( id, label, input, note ) {
+		return el( 'div', { class: 'kb-control', 'data-page-setting': id }, [
+			el( 'label', { for: 'kb-page-' + id, text: label } ),
+			input,
+			note ? el( 'p', { class: 'kb-control-note', text: note } ) : null,
+		] );
+	}
+
+	function pageSwitch( id, label, checked, onChange, note ) {
+		var box = el( 'input', { type: 'checkbox', id: 'kb-page-' + id, class: 'kb-switch' } );
+		box.checked = !! checked;
+		box.addEventListener( 'change', function () {
+			onChange( box.checked );
+			pageChanged( true );
+		} );
+		return el( 'div', { class: 'kb-control', 'data-page-setting': id }, [
+			el( 'div', { class: 'kb-control-switcher' }, [ el( 'label', { for: 'kb-page-' + id, text: label } ), box ] ),
+			note ? el( 'p', { class: 'kb-control-note', text: note } ) : null,
+		] );
+	}
+
+	function renderPagePanel() {
+		var p = state.page;
+		var noun = ( config.postTypeLabel || 'page' ).toLowerCase();
+		var body = el( 'div', { class: 'kb-panel-body kb-page-settings' } );
+
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'General' } ) );
+
+		var title = el( 'input', { type: 'text', id: 'kb-page-title', maxlength: 200 } );
+		title.value = state.title;
+		title.addEventListener( 'input', function () {
+			if ( title.value.trim() ) {
+				state.title = title.value.trim();
+				pageChanged( false );
+			}
+		} );
+		body.appendChild( pageField( 'title', 'Title', title ) );
+
+		var status = el( 'select', { id: 'kb-page-status' } );
+		var choices = p.canPublish ? [ 'draft', 'pending', 'private', 'publish' ] : [ 'draft', 'pending' ];
+		if ( choices.indexOf( p.status ) === -1 ) {
+			choices.push( p.status ); // Such as a scheduled post.
+		}
+		choices.forEach( function ( value ) {
+			var option = el( 'option', { value: value, text: STATUS_LABELS[ value ] || value } );
+			option.selected = value === p.status;
+			status.appendChild( option );
+		} );
+		status.addEventListener( 'change', function () {
+			p.status = status.value;
+			pageChanged( true );
+		} );
+		body.appendChild(
+			pageField(
+				'status',
+				'Status',
+				status,
+				p.status !== state.status ? 'Changes to ' + ( STATUS_LABELS[ p.status ] || p.status ).toLowerCase() + ' when you save.' : ''
+			)
+		);
+
+		if ( p.supports.excerpt ) {
+			var excerpt = el( 'textarea', { id: 'kb-page-excerpt', rows: 4 } );
+			excerpt.value = p.excerpt || '';
+			excerpt.addEventListener( 'input', function () {
+				p.excerpt = excerpt.value;
+				pageChanged( false );
+			} );
+			body.appendChild( pageField( 'excerpt', 'Excerpt', excerpt, 'A short summary, shown in post lists and search results.' ) );
+		}
+
+		if ( p.supports.featured ) {
+			var media = renderMedia( { media_type: 'image' }, 'kb-page-featured', p.featured, function ( value ) {
+				p.featured = { id: value.id || '', url: value.id ? value.url : '' };
+				pageChanged( true );
+			} );
+			// Only Media Library images can be featured images.
+			var address = media.querySelector( 'input[type="url"]' );
+			if ( address ) {
+				address.remove();
+			}
+			body.appendChild(
+				el( 'div', { class: 'kb-control', 'data-page-setting': 'featured' }, [ el( 'label', { text: 'Featured image' } ), media ] )
+			);
+		}
+
+		if ( p.supports.comments ) {
+			body.appendChild(
+				pageSwitch( 'comments', 'Allow comments', p.comments, function ( on ) {
+					p.comments = on;
+				}, p.comments ? 'Visitors can comment. The comments show under the ' + noun + '.' : '' )
+			);
+		}
+
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Layout' } ) );
+
+		var titleNote = '';
+		if ( p.layout ) {
+			titleNote = PAGE_LAYOUTS[ p.layout ].label + ' never shows the theme\'s title.';
+		} else if ( ! p.hide_title ) {
+			titleNote = 'The theme shows the ' + noun + ' title above your layout.';
+		}
+		body.appendChild(
+			pageSwitch( 'hide_title', 'Hide title', p.hide_title, function ( on ) {
+				p.hide_title = on;
+			}, titleNote )
+		);
+
+		var layout = el( 'select', { id: 'kb-page-layout' } );
+		Object.keys( PAGE_LAYOUTS ).forEach( function ( value ) {
+			var option = el( 'option', { value: value, text: PAGE_LAYOUTS[ value ].label } );
+			option.selected = value === ( p.layout || '' );
+			layout.appendChild( option );
+		} );
+		layout.addEventListener( 'change', function () {
+			p.layout = layout.value;
+			pageChanged( true );
+		} );
+		body.appendChild( pageField( 'layout', 'Page layout', layout, PAGE_LAYOUTS[ p.layout || '' ].note ) );
+
+		if ( config.wpEditUrl ) {
+			body.appendChild(
+				el( 'p', { class: 'kb-control-note kb-page-more' }, [
+					el( 'a', { href: config.wpEditUrl, target: '_blank', rel: 'noopener', text: 'More settings in WordPress' } ),
+					document.createTextNode( ' (categories, tags, author, URL…)' ),
+				] )
+			);
+		}
+
+		ui.panel.appendChild( panelHeader( ( config.postTypeLabel || 'Page' ) + ' settings' ) );
+		ui.panel.appendChild( body );
+	}
+
+	/* ------------------------------------------------------------------ *
 	 * Template library
 	 * ------------------------------------------------------------------ */
 
@@ -4221,6 +4393,18 @@
 		if ( state.display ) {
 			body.display = state.display;
 		}
+		if ( state.page ) {
+			body.page = {
+				excerpt: state.page.excerpt,
+				featured: state.page.featured.id || 0,
+				comments: state.page.comments,
+				hide_title: state.page.hide_title,
+				layout: state.page.layout,
+			};
+			if ( ! status && state.page.status !== state.status ) {
+				status = state.page.status; // Chosen in Page settings.
+			}
+		}
 		if ( status ) {
 			body.status = status;
 		}
@@ -4239,6 +4423,10 @@
 				revisions.items = null; // A save adds a revision; reload the list when shown.
 				state.status = data.status;
 				state.permalink = data.permalink;
+				if ( state.page && data.page ) {
+					state.page.status = data.status;
+					state.page.featured = data.page.featured;
+				}
 				config.title = data.title;
 				if ( state.title === body.title ) {
 					state.title = data.title;

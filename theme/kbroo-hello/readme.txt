@@ -11,8 +11,10 @@ A near-blank starter theme for the Kbroo Studio page builder.
 == Description ==
 
 Kbroo Hello stays out of the builder's way. It adds almost no styling, shows
-pages built with Kbroo Studio edge to edge with no theme title, and leaves
-clean spots (header, footer, single, archive) for the builder's own templates.
+pages built with Kbroo Studio edge to edge with no theme title (unless the
+page turns Hide title off in Kbroo Studio's Page settings), with comments
+underneath when the page allows them, and leaves clean spots (header, footer,
+single, archive) for the builder's own templates.
 
 It also works without the plugin, as a plain minimal theme.
 

@@ -88,6 +88,22 @@ a {
 	padding: 0;
 }
 
+/* A builder page's title and comments, when shown: back to content width. */
+.site-main--builder > .site-main__inner {
+	max-width: 1140px;
+	margin-left: auto;
+	margin-right: auto;
+	padding: 40px 20px;
+}
+
+.site-main--builder > .entry-header.site-main__inner {
+	padding-bottom: 0;
+}
+
+.site-main--builder .comments-area {
+	margin-top: 0;
+}
+
 /* Fallback header and footer. */
 .site-header__inner,
 .site-footer__inner {
