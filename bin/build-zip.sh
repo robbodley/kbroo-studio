@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Builds kbroo-studio.zip, the file WordPress installs: one kbroo-studio/
-# folder with the plugin, without the docs, the starter theme or git files.
+# Builds the files WordPress installs:
+#   kbroo-studio.zip               the plugin, one kbroo-studio/ folder, without
+#                                  the docs, the starter theme or git files
+#   kbroo-hello-<version>.zip      the Kbroo Hello theme, one kbroo-hello/ folder
 # Usage: bin/build-zip.sh [output-dir]   (default: build/)
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,3 +20,8 @@ tar -C "$root" \
 rm -f "$out/kbroo-studio.zip"
 (cd "$stage" && zip -qr "$out/kbroo-studio.zip" kbroo-studio)
 echo "$out/kbroo-studio.zip"
+
+hello="$(sed -n 's/^Version: *//p' "$root/theme/kbroo-hello/style.css" | tr -d '[:space:]')"
+rm -f "$out"/kbroo-hello-*.zip
+(cd "$root/theme" && zip -qr "$out/kbroo-hello-$hello.zip" kbroo-hello -x '*.DS_Store' '*.log')
+echo "$out/kbroo-hello-$hello.zip"

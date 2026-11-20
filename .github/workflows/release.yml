@@ -1,5 +1,6 @@
-# When a release is published on GitHub, build kbroo-studio.zip and attach
-# it to the release. Sites running Kbroo Studio then offer the update.
+# When a release is published on GitHub, build kbroo-studio.zip (the plugin)
+# and kbroo-hello-<version>.zip (the theme) and attach them to the release.
+# Sites running Kbroo Studio or Kbroo Hello then offer the update.
 name: Release zip
 
 on:
@@ -28,14 +29,25 @@ jobs:
             exit 1
           fi
 
-      - name: Check PHP syntax
-        run: find . -name '*.php' -not -path './theme/*' -print0 | xargs -0 -n1 php -l > /dev/null
+      - name: Check the theme's version is the same everywhere
+        run: |
+          css="$(sed -n 's/^Version: *//p' theme/kbroo-hello/style.css | tr -d '[:space:]')"
+          constant="$(sed -n "s/^define( 'KBROO_HELLO_VERSION', '\(.*\)' );/\1/p" theme/kbroo-hello/functions.php)"
+          stable="$(sed -n 's/^Stable tag: *//p' theme/kbroo-hello/readme.txt | tr -d '[:space:]')"
+          echo "theme: style.css $css, constant $constant, readme $stable"
+          if [ -z "$css" ] || [ "$css" != "$constant" ] || [ "$css" != "$stable" ]; then
+            echo "::error::Set the same Kbroo Hello version in style.css, KBROO_HELLO_VERSION (functions.php) and Stable tag (readme.txt)."
+            exit 1
+          fi
 
-      - name: Build the zip
+      - name: Check PHP syntax
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Build the zips
         run: bin/build-zip.sh build
 
-      - name: Attach it to the release
+      - name: Attach them to the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" build/kbroo-studio.zip --clobber
+        run: gh release upload "$TAG" build/kbroo-studio.zip build/kbroo-hello-*.zip --clobber

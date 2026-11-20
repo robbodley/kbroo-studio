@@ -3,13 +3,14 @@ Theme Name:        Kbroo Hello
 Theme URI:         https://github.com/robbodley/kbroo-studio
 Description:       A near-blank starter theme for the Kbroo Studio page builder. It adds almost no styling, shows builder pages edge to edge, and gives the builder clean spots for its own header, footer and archive templates. Works without the plugin too, as a plain minimal theme.
 Author:            Kbroo Studio
-Version:           0.1.0
+Version:           0.2.0
 Requires at least: 6.2
 Tested up to:      6.8
 Requires PHP:      7.4
 License:           GNU General Public License v2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 Text Domain:       kbroo-hello
+Update URI:        https://github.com/robbodley/kbroo-studio
 Tags:              one-column, custom-logo, custom-menu, featured-images, full-width-template, threaded-comments, translation-ready
 */
 

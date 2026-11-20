@@ -27,6 +27,49 @@ final class Admin {
 		// pages can add themselves under this menu.
 		add_action( 'admin_menu', array( $this, 'menu' ), 9 );
 		add_action( 'admin_post_' . self::NEW_PAGE, array( $this, 'new_page' ) );
+		add_action( 'admin_notices', array( $this, 'old_theme_notice' ) );
+	}
+
+	/**
+	 * The Kbroo Hello version in use (as the theme or a child theme's
+	 * parent), or '' when the site doesn't use Kbroo Hello.
+	 */
+	public static function hello_version(): string {
+		$theme = wp_get_theme();
+		if ( 'kbroo-hello' !== $theme->get_template() ) {
+			return '';
+		}
+		$hello = $theme->parent() ? $theme->parent() : $theme;
+		return (string) $hello->get( 'Version' );
+	}
+
+	/**
+	 * When the site uses a Kbroo Hello older than this plugin needs, say so
+	 * on the Dashboard, Themes, Plugins, Updates and Kbroo Studio screens.
+	 */
+	public function old_theme_notice(): void {
+		$version = self::hello_version();
+		if ( '' === $version || version_compare( $version, KBROO_STUDIO_MIN_HELLO, '>=' ) || ! current_user_can( 'update_themes' ) ) {
+			return;
+		}
+		$screen = get_current_screen();
+		if ( ! $screen || ! in_array( $screen->id, array( 'dashboard', 'themes', 'plugins', 'update-core', 'toplevel_page_' . self::MENU ), true ) ) {
+			return;
+		}
+		printf(
+			'<div class="notice notice-warning kbroo-old-theme"><p>%s</p><p><a class="button button-primary" href="%s">%s</a></p></div>',
+			esc_html(
+				sprintf(
+					/* translators: 1: plugin version, 2: theme version it needs, 3: installed theme version. */
+					__( 'Kbroo Studio %1$s needs the Kbroo Hello theme %2$s or newer, and this site has %3$s. Update the theme so the two work together.', 'kbroo-studio' ),
+					KBROO_STUDIO_VERSION,
+					KBROO_STUDIO_MIN_HELLO,
+					$version
+				)
+			),
+			esc_url( admin_url( 'update-core.php?force-check=1' ) ),
+			esc_html__( 'Check for updates', 'kbroo-studio' )
+		);
 	}
 
 	public function menu(): void {
@@ -225,6 +268,10 @@ final class Admin {
 					}
 					echo '</p>';
 					?>
+					<?php if ( '' !== self::hello_version() ) : ?>
+						<?php /* translators: %s: version number. */ ?>
+						<p><?php echo esc_html( sprintf( __( 'Kbroo Hello theme %s.', 'kbroo-studio' ), self::hello_version() ) ); ?></p>
+					<?php endif; ?>
 					<p class="description"><?php esc_html_e( 'New versions come from GitHub releases and install like any plugin update. Turn on auto-updates for Kbroo Studio on the Plugins screen to have them installed for you.', 'kbroo-studio' ); ?></p>
 					<?php if ( current_user_can( 'update_plugins' ) ) : ?>
 						<p>
