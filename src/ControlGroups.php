@@ -674,7 +674,7 @@ final class ControlGroups {
 			'default' => '',
 		);
 
-		return array(
+		$before = array(
 			$prefix . 'margin'      => $layout + array(
 				'type'       => 'dimensions',
 				'label'      => __( 'Margin', 'kbroo-studio' ),
@@ -722,6 +722,12 @@ final class ControlGroups {
 			'hide_desktop'          => $visibility + array( 'label' => __( 'Hide on desktop', 'kbroo-studio' ) ),
 			'hide_tablet'           => $visibility + array( 'label' => __( 'Hide on tablet', 'kbroo-studio' ) ),
 			'hide_mobile'           => $visibility + array( 'label' => __( 'Hide on mobile', 'kbroo-studio' ) ),
+		);
+
+		return array_merge(
+			$before,
+			Visibility::controls(),
+			array(
 			'custom_css'            => array(
 				'tab'         => 'advanced',
 				'section'     => __( 'Custom CSS', 'kbroo-studio' ),
@@ -730,6 +736,7 @@ final class ControlGroups {
 				'description' => __( 'Write "selector" for this element, e.g. selector a { color: red; }', 'kbroo-studio' ),
 				'default'     => '',
 			),
+			)
 		);
 	}
 

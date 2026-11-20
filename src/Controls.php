@@ -416,6 +416,12 @@ final class Controls {
 			case 'switcher':
 				return 'yes' === $value ? 'yes' : '';
 
+			case 'datetime':
+				return Visibility::sanitize_datetime( $value );
+
+			case 'time':
+				return Visibility::sanitize_time( $value );
+
 			case 'text':
 			default:
 				$value = sanitize_text_field( (string) $value );

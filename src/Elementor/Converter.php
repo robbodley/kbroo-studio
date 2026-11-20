@@ -20,6 +20,7 @@ use KbrooStudio\ControlGroups;
 use KbrooStudio\Controls;
 use KbrooStudio\Fonts;
 use KbrooStudio\Layout;
+use KbrooStudio\Visibility;
 use KbrooStudio\Widgets\ElementorFallback;
 use KbrooStudio\Widgets\Registry;
 
@@ -186,6 +187,22 @@ final class Converter {
 				$settings[ 'hide_' . $device ] = 'yes';
 			}
 		}
+		// Premium Addons' Display Conditions become show and hide rules.
+		list( $rules, $dropped ) = Visibility::from_premium_addons( $settings );
+		foreach ( $dropped as $name ) {
+			$this->drop( $name );
+		}
+		foreach ( array_keys( $settings ) as $key ) {
+			if ( 0 === strpos( (string) $key, 'pa_display_' ) || 0 === strpos( (string) $key, 'pa_condition' ) ) {
+				unset( $settings[ $key ] );
+			}
+		}
+		$settings = $rules + $settings;
+		// Elementor Pro's own display conditions are not read yet.
+		if ( ! empty( $settings['e_display_conditions'] ) && '[]' !== $settings['e_display_conditions'] ) {
+			$this->drop( 'Elementor display conditions' );
+		}
+		unset( $settings['e_display_conditions'] );
 		// Colours in rgba() become #rrggbbaa (see Controls::sanitize_color()).
 		foreach ( $settings as $key => $value ) {
 			if ( is_string( $value ) && 0 === strpos( $value, 'rgb' ) ) {
@@ -402,7 +419,7 @@ final class Converter {
 		);
 
 		$keep = array();
-		foreach ( array( '_margin', '_margin_tablet', '_margin_mobile', '_padding', '_padding_tablet', '_padding_mobile', '_element_id', '_css_classes', 'hide_desktop', 'hide_tablet', 'hide_mobile' ) as $key ) {
+		foreach ( array( '_margin', '_margin_tablet', '_margin_mobile', '_padding', '_padding_tablet', '_padding_mobile', '_element_id', '_css_classes', 'hide_desktop', 'hide_tablet', 'hide_mobile', 'pa_display_conditions_switcher', 'pa_display_action', 'pa_display_when', 'pa_condition_repeater', 'e_display_conditions' ) as $key ) {
 			if ( isset( $settings[ $key ] ) ) {
 				$keep[ $key ] = $settings[ $key ];
 			}
