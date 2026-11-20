@@ -240,7 +240,7 @@ final class Rest {
 
 		Elementor\Migration::backup_content( $post );
 		Document::save_layout( $post->ID, $layout );
-		if ( Templates::is_template( $post ) && in_array( Templates::type_of( $post ), ThemeBuilder::AREAS, true ) && is_array( $request->get_param( 'display' ) ) ) {
+		if ( Templates::is_template( $post ) && in_array( Templates::type_of( $post ), ThemeBuilder::TYPES, true ) && is_array( $request->get_param( 'display' ) ) ) {
 			ThemeBuilder::save_display( $post->ID, $request->get_param( 'display' ) );
 		}
 

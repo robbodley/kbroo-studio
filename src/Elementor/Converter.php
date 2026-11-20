@@ -46,8 +46,10 @@ final class Converter {
 
 	/** Elementor Pro widgets that Kbroo Studio has under another name. */
 	const WIDGET_ALIASES = array(
-		'theme-site-logo'  => 'site-logo',
-		'theme-site-title' => 'site-title',
+		'theme-site-logo'     => 'site-logo',
+		'theme-site-title'    => 'site-title',
+		'theme-archive-title' => 'archive-title',
+		'archive-posts'       => 'posts',
 	);
 
 	/** Elementor settings with no visible effect, left out of the report. */
@@ -303,6 +305,14 @@ final class Converter {
 	 * logo, name and home URL), which these widgets do themselves.
 	 */
 	private function site_widget( string $type, array $settings ): array {
+		if ( 'posts' === $type ) {
+			// Archive posts: the archive's own posts, with "archive_" skins.
+			$clean = array( 'posts_post_type' => \KbrooStudio\Widgets\Posts::CURRENT_QUERY );
+			foreach ( $settings as $key => $value ) {
+				$clean[ preg_replace( '/^archive_/', '', (string) $key ) ] = '_skin' === $key ? preg_replace( '/^archive_/', '', (string) $value ) : $value;
+			}
+			return $clean;
+		}
 		unset( $settings['__dynamic__'], $settings['title'], $settings['link'] );
 		if ( 'site-logo' === $type ) {
 			$settings['link_to'] = 'none' === ( $settings['link_to'] ?? '' ) ? 'none' : 'home';
@@ -342,6 +352,13 @@ final class Converter {
 			$settings = $this->legacy_icons( $type, $settings );
 			if ( 'posts' === $type ) {
 				$settings = $this->posts( $settings );
+			}
+			if ( 0 === strpos( $type, 'wp-widget-' ) && isset( $settings['wp'] ) && is_array( $settings['wp'] ) ) {
+				// Elementor keeps a WordPress widget's own settings under "wp".
+				foreach ( $settings['wp'] as $key => $value ) {
+					$settings[ $key ] = in_array( $key, array( 'count', 'hierarchical', 'dropdown', 'show_date' ), true ) ? ( ! empty( $value ) ? 'yes' : '' ) : $value;
+				}
+				unset( $settings['wp'] );
 			}
 			if ( 'form' === $type ) {
 				$settings = $this->form( $settings );

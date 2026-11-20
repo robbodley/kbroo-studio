@@ -1,6 +1,6 @@
 <?php
 /**
- * Site headers and footers built with Kbroo Studio.
+ * Site headers, footers and blog archive pages built with Kbroo Studio.
  *
  * A header or footer is a template (see Templates) of type "header" or
  * "footer" with display settings: where it shows (the whole site, the front
@@ -19,6 +19,12 @@
  * - Block themes: the header and footer template parts are swapped as they
  *   render.
  *
+ * A blog archive template replaces the theme's template for the blog page,
+ * archives and search results it is set for: classic themes get a template
+ * that calls get_header() and get_footer() around it; block themes get a
+ * block template with the theme's header and footer parts around the
+ * kbroo/archive block.
+ *
  * @package KbrooStudio
  */
 
@@ -32,12 +38,20 @@ final class ThemeBuilder {
 
 	const META_DISPLAY = '_kbroo_display';
 
+	/** Template types that replace part of the theme. */
+	const TYPES = array( 'header', 'footer', 'archive' );
+
+	/** The ones that are template parts around every page. */
 	const AREAS = array( 'header', 'footer' );
 
 	/** How specific each target is; higher wins. */
 	const SPECIFICITY = array(
 		'entire_site' => 10,
 		'archives'    => 20,
+		'blog'        => 25,
+		'category'    => 25,
+		'tag'         => 25,
+		'search'      => 25,
 		'pages'       => 20,
 		'posts'       => 20,
 		'front_page'  => 30,
@@ -67,6 +81,8 @@ final class ThemeBuilder {
 		add_filter( 'render_block_core/template-part', array( $this, 'block_template_part' ), 10, 2 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ) );
 		add_filter( 'body_class', array( $this, 'body_class' ) );
+		add_filter( 'template_include', array( $this, 'archive_template' ), 999 );
+		add_action( 'init', array( $this, 'register_archive_block' ) );
 	}
 
 	/* ------------------------------------------------------------------ *
@@ -90,6 +106,35 @@ final class ThemeBuilder {
 	}
 
 	/**
+	 * Where a blog archive template can show.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function archive_targets(): array {
+		return array(
+			'archives' => __( 'All archives (blog, categories, tags, authors, dates, search)', 'kbroo-studio' ),
+			'blog'     => __( 'Blog page', 'kbroo-studio' ),
+			'category' => __( 'Category archives', 'kbroo-studio' ),
+			'tag'      => __( 'Tag archives', 'kbroo-studio' ),
+			'search'   => __( 'Search results', 'kbroo-studio' ),
+		);
+	}
+
+	/**
+	 * The targets offered for a template type.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function targets_for( string $type ): array {
+		return 'archive' === $type ? self::archive_targets() : self::targets();
+	}
+
+	/** Every target, with labels. */
+	private static function all_targets(): array {
+		return self::targets() + self::archive_targets();
+	}
+
+	/**
 	 * A template's display settings.
 	 *
 	 * @return array{active: bool, sticky: bool, include: string[], exclude: string[]}
@@ -109,7 +154,7 @@ final class ThemeBuilder {
 			$out = array();
 			foreach ( is_array( $list ) ? $list : array() as $target ) {
 				$target = is_string( $target ) ? $target : '';
-				if ( array_key_exists( $target, self::targets() ) ) {
+				if ( array_key_exists( $target, self::all_targets() ) ) {
 					$out[] = $target;
 				} elseif ( preg_match( '/^singular:(\d{1,12})$/', $target, $m ) && (int) $m[1] > 0 ) {
 					$out[] = 'singular:' . (int) $m[1];
@@ -154,7 +199,10 @@ final class ThemeBuilder {
 			$title = get_the_title( (int) substr( $target, 9 ) );
 			return '' !== $title ? '"' . $title . '"' : '#' . substr( $target, 9 );
 		}
-		return self::targets()[ $target ] ?? $target;
+		if ( 'archives' === $target ) {
+			return __( 'All archives', 'kbroo-studio' );
+		}
+		return self::all_targets()[ $target ] ?? $target;
 	}
 
 	/**
@@ -204,6 +252,14 @@ final class ThemeBuilder {
 				return is_archive() || is_home() || is_search();
 			case 'not_found':
 				return is_404();
+			case 'blog':
+				return is_home();
+			case 'category':
+				return is_category();
+			case 'tag':
+				return is_tag();
+			case 'search':
+				return is_search();
 		}
 		if ( 0 === strpos( $target, 'singular:' ) ) {
 			return is_singular() && (int) substr( $target, 9 ) === (int) get_queried_object_id();
@@ -284,6 +340,10 @@ final class ThemeBuilder {
 			return '';
 		}
 		$display = self::get_display( $post );
+		if ( 'archive' === $area ) {
+			$this->printed[ $area ] = true;
+			return sprintf( '<div class="kbroo-archive-template" data-kbroo-template="%d">%s</div>', $post->ID, $this->frontend->render_post( $post ) );
+		}
 		$tag     = 'header' === $area ? 'header' : 'footer';
 		$classes = array( 'kbroo-site-' . $area );
 		if ( 'header' === $area && $display['sticky'] ) {
@@ -303,7 +363,7 @@ final class ThemeBuilder {
 	 * Styles for the header and footer, in the head.
 	 */
 	public function enqueue(): void {
-		foreach ( self::AREAS as $area ) {
+		foreach ( self::TYPES as $area ) {
 			$post = $this->find( $area );
 			if ( $post ) {
 				$this->frontend->enqueue_layout( Document::get_layout( $post ) );
@@ -313,7 +373,7 @@ final class ThemeBuilder {
 
 	public function body_class( $classes ): array {
 		$classes = (array) $classes;
-		foreach ( self::AREAS as $area ) {
+		foreach ( self::TYPES as $area ) {
 			if ( $this->find( $area ) ) {
 				$classes[] = 'kbroo-has-' . $area;
 			}
@@ -369,6 +429,44 @@ final class ThemeBuilder {
 		ob_start();
 		locate_template( $templates, true );
 		ob_end_clean();
+	}
+
+	/** Whether this request is the blog page, an archive or search results. */
+	private static function is_archive_request(): bool {
+		return is_home() || is_archive() || is_search();
+	}
+
+	/**
+	 * Blog archive template: use ours instead of the theme's template.
+	 *
+	 * @param string $template Template file chosen so far.
+	 */
+	public function archive_template( $template ) {
+		if ( ! self::is_archive_request() || ! $this->find( 'archive' ) ) {
+			return $template;
+		}
+		if ( ! wp_is_block_theme() ) {
+			return KBROO_STUDIO_DIR . 'templates/site-archive.php';
+		}
+		// A block template: the theme's header and footer parts (which a
+		// Kbroo Studio header or footer then replaces) around ours.
+		global $_wp_current_template_content;
+		$theme = wp_json_encode( get_stylesheet() );
+		$_wp_current_template_content = '<!-- wp:template-part {"slug":"header","theme":' . $theme . ',"tagName":"header","area":"header"} /-->'
+			. '<!-- wp:kbroo/archive /-->'
+			. '<!-- wp:template-part {"slug":"footer","theme":' . $theme . ',"tagName":"footer","area":"footer"} /-->';
+		return ABSPATH . WPINC . '/template-canvas.php';
+	}
+
+	public function register_archive_block(): void {
+		register_block_type(
+			'kbroo/archive',
+			array(
+				'render_callback' => function () {
+					return '<main class="kbroo-archive">' . $this->render_area( 'archive' ) . '</main>';
+				},
+			)
+		);
 	}
 
 	/**

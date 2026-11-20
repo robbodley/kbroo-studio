@@ -1695,3 +1695,47 @@ textarea.kbroo-form__input {
 		padding-left: calc(var(--kbroo-nav-pad-x, 15px) * 2);
 	}
 }
+
+/* ------------------------------------------------------------------ *
+ * WordPress widgets and sidebars
+ * ------------------------------------------------------------------ */
+
+.kbroo-wp-widget__title {
+	margin: 0 0 0.75em;
+	font-size: 1.1em;
+}
+
+.kbroo-wp-widget ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.kbroo-wp-widget ul ul {
+	padding-left: 1em;
+}
+
+.kbroo-wp-widget li {
+	margin: 0 0 0.4em;
+}
+
+.kbroo-wp-widget .post-date {
+	display: block;
+	font-size: 0.85em;
+	opacity: 0.75;
+}
+
+.kbroo-wp-widget select,
+.kbroo-wp-widget input[type="search"] {
+	max-width: 100%;
+}
+
+.kbroo-wp-widget .search-form,
+.kbroo-wp-widget .wp-block-search__inside-wrapper {
+	display: flex;
+	gap: 6px;
+}
+
+.kbroo-archive {
+	display: block;
+}

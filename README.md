@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, a header and footer builder (with Nav menu, Site logo and Site title widgets), copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, a header and footer builder (with Nav menu, Site logo and Site title widgets), a blog archive template (with Archive title, WordPress widgets and a Sidebar widget), copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -12,7 +12,7 @@ In progress towards v1. Done so far: full-screen editor, sections and columns, i
 
 1. **Import colours and fonts** copies Elementor's Site Settings (global colours and fonts) into Kbroo Studio's, keeping their ids so converted pages stay linked to them. Fonts the pages use are added from Google Fonts.
 2. **Convert** each page (or use the *Convert to Kbroo Studio* row and bulk actions in the Pages list). Sections, inner sections, columns, containers and the widgets Kbroo Studio has keep their settings; widgets it does not have yet become fallback blocks that still show (live while Elementor is active, otherwise as they looked when converted). The report lists those blocks and any settings not carried over yet.
-3. **Saved templates**: Elementor's saved page, section and container templates, and Elementor Pro headers and footers, convert into Kbroo Studio's template library (one at a time or all at once). Converting again replaces the copy; Elementor's templates are left as they are. Headers and footers keep their display conditions but arrive switched off, so the site does not change until you check them and switch them on (and turn Elementor's off).
+3. **Saved templates**: Elementor's saved page, section and container templates, and Elementor Pro headers, footers and archive templates, convert into Kbroo Studio's template library (one at a time or all at once). Converting again replaces the copy; Elementor's templates are left as they are. Headers, footers and archives keep their display conditions but arrive switched off, so the site does not change until you check them and switch them on (and turn Elementor's off).
 4. **Switch back to Elementor** at any time. Elementor's data is never changed or deleted; switching back only turns the Kbroo Studio version off, and *Switch to Kbroo Studio* turns it on again.
 
 Opening an unconverted Elementor page in the Kbroo Studio editor converts it on the spot; nothing changes until you save. Exported Elementor template files (.json) import into the template library.
@@ -66,9 +66,15 @@ In the editor:
 - Click the page title in the top bar to rename the page or template.
 - **Header and footer**: under Kbroo Studio > Templates, *New header* or *New footer* opens one in the editor. Build it like any page; the **Nav menu** (a WordPress menu from Appearance > Menus, across or down, with drop-down submenus and a menu button on tablets or phones), **Site logo** and **Site title** widgets are made for it. The eye icon in the top bar sets **where it shows**: the entire site, the front page, all pages, all posts, the blog and archives, the 404 page, or chosen pages and posts, with exceptions. It can be switched off, and a header can stick to the top while scrolling. Where several fit a page, the most specific wins. It replaces the theme's own header or footer in classic themes (via `get_header` / `get_footer`) and in block themes (the header and footer template parts).
 
+- **Blog archive**: *New blog archive* under Kbroo Studio > Templates designs the blog page, category and tag pages and search results. Put a **Posts** widget in it with the source *Current archive*: it shows that archive's posts with WordPress's paging (Settings > Reading sets how many per page). **Archive title** shows "Category: News", "Search results for ..." and so on. Where it shows: all archives, the blog page, categories, tags or search results, with exceptions; the most specific wins, so a category template can sit beside a general one. The theme's header and footer (or Kbroo Studio's) stay around it, in classic and block themes.
+- **WordPress widgets**: **Categories** (list or drop-down, with post counts), **Recent posts** (with dates) and **Search** work in any page or template, and **Sidebar** shows a whole widget area from Appearance > Widgets. Elementor's WordPress widgets convert with their settings.
+
 ![A Kbroo Studio header with a drop-down submenu](docs/screenshots/site-header.png)
 ![The same header on a phone, with the menu open](docs/screenshots/site-phone.png)
 ![Where a header shows](docs/screenshots/site-display.png)
+
+![A blog archive template with posts, categories and recent posts](docs/screenshots/blog-archive.png)
+![Where a blog archive shows](docs/screenshots/archive-display.png)
 
 ![Saving a container as a template, with the library below](docs/screenshots/templates-panel.png)
 ![Kbroo Studio > Templates](docs/screenshots/templates-list.png)
@@ -96,7 +102,7 @@ In the editor:
 | Template library (`kbroo_template` posts, `GET/POST /wp-json/kbroo/v1/templates`) | `src/Templates.php` |
 | Admin menu and Overview | `src/Admin.php` |
 | Shape dividers | `src/ShapeDividers.php` |
-| Site header and footer (display rules, replacing the theme's) | `src/ThemeBuilder.php`, `templates/site-header.php`, `templates/site-footer.php` |
+| Site header, footer and blog archive (display rules, replacing the theme's) | `src/ThemeBuilder.php`, `templates/site-header.php`, `templates/site-footer.php`, `templates/site-archive.php` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |
 
 The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree follows Elementor's: the page holds sections and containers, sections hold columns, columns hold widgets, inner sections and containers, and containers hold widgets and containers (see `Layout::allowed_children()`):

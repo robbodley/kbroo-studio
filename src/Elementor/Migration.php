@@ -158,11 +158,11 @@ final class Migration {
 	}
 
 	/** Elementor template types the library takes. */
-	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer' );
+	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer', 'archive' );
 
 	/** The library type for an Elementor template type. */
 	private static function template_type( string $elementor_type ): string {
-		if ( in_array( $elementor_type, ThemeBuilder::AREAS, true ) ) {
+		if ( in_array( $elementor_type, ThemeBuilder::TYPES, true ) ) {
 			return $elementor_type;
 		}
 		return in_array( $elementor_type, array( 'section', 'container' ), true ) ? 'section' : 'page';
@@ -195,6 +195,10 @@ final class Migration {
 				'singular/page'          => array( 'pages' ),
 				'singular/post'          => array( 'posts' ),
 				'singular/not_found404'  => array( 'not_found' ),
+				'archive/posts_page'     => array( 'blog' ),
+				'archive/category'       => array( 'category' ),
+				'archive/post_tag'       => array( 'tag' ),
+				'archive/search'         => array( 'search' ),
 			);
 			if ( isset( $map[ $rest ] ) ) {
 				$targets = $map[ $rest ];
@@ -282,7 +286,7 @@ final class Migration {
 			}
 			update_post_meta( $id, Templates::META_SOURCE, (string) $elementor_id );
 		}
-		if ( in_array( $type, ThemeBuilder::AREAS, true ) ) {
+		if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
 			$converted = self::display_from_conditions( get_post_meta( $elementor_id, '_elementor_conditions', true ) );
 			ThemeBuilder::save_display( $id, $converted['display'] );
 			foreach ( $converted['dropped'] as $condition ) {
@@ -619,7 +623,7 @@ final class Migration {
 							<td>
 								<strong><?php echo esc_html( get_the_title( $source ) ); ?></strong>
 								<div><?php echo esc_html( ucfirst( (string) get_post_meta( $source->ID, '_elementor_template_type', true ) ) ); ?></div>
-								<?php if ( $converted && in_array( Templates::type_of( $converted ), ThemeBuilder::AREAS, true ) ) : ?>
+								<?php if ( $converted && in_array( Templates::type_of( $converted ), ThemeBuilder::TYPES, true ) ) : ?>
 									<div class="description"><?php echo esc_html( ThemeBuilder::summary( $converted ) ); ?></div>
 								<?php endif; ?>
 							</td>

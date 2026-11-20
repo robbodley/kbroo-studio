@@ -22,6 +22,9 @@ final class Plugin {
 	/** @var Renderer */
 	private $renderer;
 
+	/** @var ThemeBuilder */
+	private $theme_builder;
+
 	public static function instance(): Plugin {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -42,7 +45,8 @@ final class Plugin {
 		( new Editor( $this->widgets ) )->hooks();
 		$frontend = new Frontend( $this->renderer );
 		$frontend->hooks();
-		( new ThemeBuilder( $frontend ) )->hooks();
+		$this->theme_builder = new ThemeBuilder( $frontend );
+		$this->theme_builder->hooks();
 		( new Revisions() )->hooks();
 		if ( is_admin() ) {
 			( new Admin() )->hooks();
@@ -50,6 +54,10 @@ final class Plugin {
 		( new Forms( $this->widgets ) )->hooks();
 		( new Templates( $this->widgets, $this->renderer ) )->hooks();
 		( new Elementor\Migration( $this->widgets, $this->renderer ) )->hooks();
+	}
+
+	public function theme_builder(): ThemeBuilder {
+		return $this->theme_builder;
 	}
 
 	public function widgets(): Registry {

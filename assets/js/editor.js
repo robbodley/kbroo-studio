@@ -2706,7 +2706,7 @@
 			} );
 			select.appendChild( general );
 		}
-		[ [ 'page', 'Pages' ], [ 'post', 'Posts' ] ].forEach( function ( pair ) {
+		( config.displayPosts.length ? [ [ 'page', 'Pages' ], [ 'post', 'Posts' ] ] : [] ).forEach( function ( pair ) {
 			var group = el( 'optgroup', { label: pair[ 1 ] } );
 			config.displayPosts.forEach( function ( p ) {
 				if ( p.type === pair[ 0 ] && list.indexOf( 'singular:' + p.id ) === -1 ) {
@@ -2739,16 +2739,21 @@
 
 	function renderDisplayPanel() {
 		var d = state.display;
-		var area = config.templateType === 'footer' ? 'footer' : 'header';
+		var area = { header: 'header', footer: 'footer', archive: 'archive page' }[ config.templateType ] || 'header';
+		var everywhere = config.templateType === 'archive' ? 'archives' : 'entire_site';
+		var pickPosts = config.displayPosts.length > 0;
 		var body = el( 'div', { class: 'kb-panel-body kb-display' } );
 
 		var summary;
 		if ( ! d.active ) {
 			summary = 'Switched off: the theme\'s own ' + area + ' shows everywhere.';
+			if ( config.templateType === 'archive' ) {
+				summary = 'Switched off: the theme\'s own archive pages show.';
+			}
 		} else if ( ! d.include.length ) {
 			summary = 'Not shown anywhere yet. Choose where below.';
 		} else {
-			summary = 'Replaces the theme\'s ' + area + ' on: ' + d.include.map( displayLabel ).join( ', ' ) + ( d.exclude.length ? '; not on: ' + d.exclude.map( displayLabel ).join( ', ' ) : '' ) + '.';
+			summary = 'Replaces the theme\'s ' + ( config.templateType === 'archive' ? 'template' : area ) + ' on: ' + d.include.map( displayLabel ).join( ', ' ) + ( d.exclude.length ? '; not on: ' + d.exclude.map( displayLabel ).join( ', ' ) : '' ) + '.';
 		}
 		body.appendChild( el( 'p', { class: 'kb-hint kb-display-summary', text: summary } ) );
 
@@ -2781,7 +2786,9 @@
 			} );
 			body.appendChild( el( 'div', { class: 'kb-check' }, [ box, el( 'label', { for: id, text: config.displayTargets[ target ] } ) ] ) );
 		} );
-		body.appendChild( displayList( 'include', 'And on these pages and posts', null, 'Add a page or post…' ) );
+		if ( pickPosts ) {
+			body.appendChild( displayList( 'include', 'And on these pages and posts', null, 'Add a page or post…' ) );
+		}
 
 		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Except on' } ) );
 		body.appendChild(
@@ -2789,7 +2796,7 @@
 				'exclude',
 				'Exceptions',
 				Object.keys( config.displayTargets ).filter( function ( t ) {
-					return t !== 'entire_site';
+					return t !== everywhere;
 				} ),
 				'Add an exception…'
 			)
@@ -2797,11 +2804,13 @@
 		body.appendChild(
 			el( 'p', {
 				class: 'kb-control-note',
-				text: 'If more than one ' + area + ' fits a page, the most specific wins: a chosen page beats a kind of page, which beats the entire site. Changes apply when you save.',
+				text: config.templateType === 'archive'
+					? 'If more than one archive template fits a page, the most specific wins: "Category archives" beats "All archives". Changes apply when you save.'
+					: 'If more than one ' + area + ' fits a page, the most specific wins: a chosen page beats a kind of page, which beats the entire site. Changes apply when you save.',
 			} )
 		);
 
-		ui.panel.appendChild( panelHeader( 'Where this ' + area + ' shows' ) );
+		ui.panel.appendChild( panelHeader( config.templateType === 'archive' ? 'Where this template shows' : 'Where this ' + area + ' shows' ) );
 		ui.panel.appendChild( body );
 	}
 
