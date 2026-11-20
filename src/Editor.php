@@ -96,8 +96,16 @@ final class Editor {
 			);
 		}
 
+		$is_template = Templates::is_template( $post );
+
 		return array(
 			'conversion'     => $conversion,
+			'isTemplate'     => $is_template,
+			'templateType'   => $is_template ? Templates::type_of( $post ) : '',
+			'templateTypes'  => Templates::types(),
+			'templatesUrl'   => esc_url_raw( rest_url( Rest::NAMESPACE . '/templates' ) ),
+			'templatesAdminUrl' => admin_url( 'edit.php?post_type=' . Templates::POST_TYPE ),
+			'canSaveTemplates' => current_user_can( 'publish_pages' ),
 			'postId'         => $post->ID,
 			'title'          => get_the_title( $post ),
 			'status'         => $post->post_status,
@@ -105,7 +113,7 @@ final class Editor {
 			'canPublish'     => $type ? current_user_can( $type->cap->publish_posts ) : false,
 			'permalink'      => get_permalink( $post ),
 			'previewUrl'     => get_preview_post_link( $post ),
-			'wpEditUrl'      => get_edit_post_link( $post, 'raw' ),
+			'wpEditUrl'      => $is_template ? admin_url( 'edit.php?post_type=' . Templates::POST_TYPE ) : get_edit_post_link( $post, 'raw' ),
 			'restUrl'        => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID ) ),
 			'nonce'          => wp_create_nonce( 'wp_rest' ),
 			'layout'         => $layout,
@@ -199,7 +207,7 @@ final class Editor {
 	 * @param WP_Post $post   Post.
 	 */
 	public function post_state( $states, $post ): array {
-		if ( Document::is_built_with_kbroo( $post ) ) {
+		if ( Document::is_built_with_kbroo( $post ) && ! Templates::is_template( $post ) ) {
 			$states['kbroo'] = __( 'Kbroo Studio', 'kbroo-studio' );
 		}
 		return $states;

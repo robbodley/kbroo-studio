@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -12,9 +12,10 @@ In progress towards v1. Done so far: full-screen editor, sections and columns, i
 
 1. **Import colours and fonts** copies Elementor's Site Settings (global colours and fonts) into Kbroo Studio's, keeping their ids so converted pages stay linked to them. Fonts the pages use are added from Google Fonts.
 2. **Convert** each page (or use the *Convert to Kbroo Studio* row and bulk actions in the Pages list). Sections, inner sections, columns, containers and the widgets Kbroo Studio has keep their settings; widgets it does not have yet become fallback blocks that still show (live while Elementor is active, otherwise as they looked when converted). The report lists those blocks and any settings not carried over yet.
-3. **Switch back to Elementor** at any time. Elementor's data is never changed or deleted; switching back only turns the Kbroo Studio version off, and *Switch to Kbroo Studio* turns it on again.
+3. **Saved templates**: Elementor's saved page, section and container templates convert into Kbroo Studio's template library (one at a time or all at once). Converting again replaces the copy; Elementor's templates are left as they are.
+4. **Switch back to Elementor** at any time. Elementor's data is never changed or deleted; switching back only turns the Kbroo Studio version off, and *Switch to Kbroo Studio* turns it on again.
 
-Opening an unconverted Elementor page in the Kbroo Studio editor converts it on the spot; nothing changes until you save. Exported Elementor template files (.json) import as new draft pages.
+Opening an unconverted Elementor page in the Kbroo Studio editor converts it on the spot; nothing changes until you save. Exported Elementor template files (.json) import into the template library.
 
 ## Install
 
@@ -24,7 +25,7 @@ Requires WordPress 6.2+ and PHP 7.4+.
 
 ## Using it
 
-Kbroo Studio has its own menu in the WordPress admin sidebar. Its **Overview** page lists the pages built with Kbroo Studio, has a **New page** button that opens a blank page in the editor, and links to the site colours, fonts and CSS, **Move from Elementor** and **Form messages**.
+Kbroo Studio has its own menu in the WordPress admin sidebar. Its **Overview** page lists the pages built with Kbroo Studio, has a **New page** button that opens a blank page in the editor, and links to the site colours, fonts and CSS, **Templates**, **Move from Elementor** and **Form messages**.
 
 ![The Kbroo Studio admin menu and Overview page](docs/screenshots/admin-menu.png)
 
@@ -61,6 +62,12 @@ In the editor:
 
 ![Shape dividers and custom CSS converted from Elementor](docs/screenshots/shape-dividers.png)
 
+- **Templates** (folder icon in the top bar, or the Templates button under the page): save the whole page, or right-click a section or container and choose *Save as template*. Templates are sections or pages; search and filter them and insert one with a click (it goes at the end of the page and can be undone). An inserted template is a copy, so changing the template later leaves pages alone. Templates are listed under Kbroo Studio > **Templates**, where *New template* starts one from scratch in the editor; they never show on the site by themselves.
+- Click the page title in the top bar to rename the page or template.
+
+![Saving a container as a template, with the library below](docs/screenshots/templates-panel.png)
+![Kbroo Studio > Templates](docs/screenshots/templates-list.png)
+
 - Buttons and images have a **hover animation** (grow, float, sink, rotate...), and images have CSS filters (brightness, contrast, saturation, blur, hue), normal and on hover.
 - **Copy and paste**: right-click any element for Duplicate, Copy, Paste, Paste style and Delete, or use Ctrl+C / Ctrl+V (Ctrl+Shift+V pastes style only). Copied elements go on the system clipboard, so they paste into another page or another site running Kbroo Studio.
 - **Navigator** (list icon in the top bar): the page as a tree. Click to select, drag to reorder (widgets between columns, columns between sections), double-click to rename.
@@ -81,6 +88,9 @@ In the editor:
 | Widgets (PHP render + JS preview) | `src/Widgets/*`, `assets/js/widgets.js` |
 | Global colours and fonts, font list | `src/Globals.php`, `src/Fonts.php` |
 | Revisions | `src/Revisions.php` |
+| Template library (`kbroo_template` posts, `GET/POST /wp-json/kbroo/v1/templates`) | `src/Templates.php` |
+| Admin menu and Overview | `src/Admin.php` |
+| Shape dividers | `src/ShapeDividers.php` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |
 
 The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree follows Elementor's: the page holds sections and containers, sections hold columns, columns hold widgets, inner sections and containers, and containers hold widgets and containers (see `Layout::allowed_children()`):

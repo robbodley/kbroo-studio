@@ -61,6 +61,10 @@ final class Rest {
 							'type'     => 'string',
 							'enum'     => array( 'draft', 'publish' ),
 						),
+						'title'  => array(
+							'required' => false,
+							'type'     => 'string',
+						),
 					),
 				),
 			)
@@ -251,7 +255,10 @@ final class Rest {
 			$update['post_status'] = 'draft';
 		}
 
-		if ( 'auto-draft' === $post->post_status && '' === $post->post_title ) {
+		$title = $request->get_param( 'title' );
+		if ( is_string( $title ) && '' !== trim( $title ) && $title !== $post->post_title ) {
+			$update['post_title'] = sanitize_text_field( $title );
+		} elseif ( 'auto-draft' === $post->post_status && '' === $post->post_title ) {
 			/* translators: %d: post ID. */
 			$update['post_title'] = sprintf( __( 'Kbroo Studio #%d', 'kbroo-studio' ), $post->ID );
 		}

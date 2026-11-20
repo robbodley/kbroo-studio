@@ -46,6 +46,7 @@ final class Plugin {
 			( new Admin() )->hooks();
 		}
 		( new Forms( $this->widgets ) )->hooks();
+		( new Templates( $this->widgets, $this->renderer ) )->hooks();
 		( new Elementor\Migration( $this->widgets, $this->renderer ) )->hooks();
 	}
 
@@ -63,7 +64,7 @@ final class Plugin {
 	 * core REST API.
 	 */
 	public function register_meta(): void {
-		foreach ( Document::post_types() as $post_type ) {
+		foreach ( Document::editable_types() as $post_type ) {
 			register_post_meta(
 				$post_type,
 				Document::META_DATA,

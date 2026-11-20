@@ -31,9 +31,18 @@ final class Document {
 		return (array) apply_filters( 'kbroo_studio_post_types', array( 'page', 'post' ) );
 	}
 
+	/**
+	 * Post types the editor opens: the above and saved templates.
+	 *
+	 * @return string[]
+	 */
+	public static function editable_types(): array {
+		return array_merge( self::post_types(), array( Templates::POST_TYPE ) );
+	}
+
 	public static function supports( $post ): bool {
 		$post = get_post( $post );
-		return $post && in_array( $post->post_type, self::post_types(), true );
+		return $post && in_array( $post->post_type, self::editable_types(), true );
 	}
 
 	public static function is_built_with_kbroo( $post ): bool {

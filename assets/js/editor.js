@@ -43,7 +43,9 @@
 		saving: false,
 		revision: 0,
 		navigator: readPref( 'navigator' ) === '1',
-		panelView: 'widgets', // Shown when nothing is selected: widgets | globals | revisions.
+		panelView: 'widgets', // Shown when nothing is selected: widgets | globals | revisions | templates.
+		title: config.title || '',
+		templateDraft: null, // { elements, label } waiting to be saved as a template.
 		globals: JSON.parse( JSON.stringify( config.globals ) ),
 		globalsDirty: false,
 		preview: null, // { id, label, layout } while previewing a revision.
@@ -574,6 +576,16 @@
 					copyElement( node.id );
 				} ]
 			);
+			// The element itself if it is a section or container, otherwise
+			// the nearest one holding it.
+			var holder = ( pathTo( node.id ) || [] ).filter( function ( n ) {
+				return n.elType === 'section' || n.elType === 'container';
+			} ).pop();
+			if ( config.canSaveTemplates && holder ) {
+				items.push( [ holder === node ? 'Save as template' : 'Save ' + elementLabel( holder ).toLowerCase() + ' as template', 'dashicons-category', function () {
+					startTemplateSave( holder );
+				} ] );
+			}
 		}
 		items.push( [ copied ? 'Paste ' + elementLabel( copied ).toLowerCase() : 'Paste', 'dashicons-editor-paste-text', copied ? function () {
 			pasteElement( copied, node && node.id );
@@ -882,8 +894,8 @@
 	 * ------------------------------------------------------------------ */
 
 	function renderTopbar() {
-		var published = state.status === 'publish';
-		var saveLabel = state.saving ? 'Saving…' : published ? 'Update' : 'Save draft';
+		var published = state.status === 'publish' || config.isTemplate;
+		var saveLabel = state.saving ? 'Saving…' : config.isTemplate ? 'Save' : published ? 'Update' : 'Save draft';
 
 		var devices = el( 'div', { class: 'kb-segmented', role: 'group', 'aria-label': 'Preview device' } );
 		Object.keys( DEVICES ).forEach( function ( device ) {
@@ -909,9 +921,9 @@
 		ui.topbar.innerHTML = '';
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-start' }, [
-				el( 'a', { class: 'kb-icon-btn', href: config.wpEditUrl, title: 'Back to the WordPress editor' }, [
+				el( 'a', { class: 'kb-icon-btn', href: config.wpEditUrl, title: config.isTemplate ? 'Back to the templates' : 'Back to the WordPress editor' }, [
 					icon( 'dashicons-arrow-left-alt2' ),
-					el( 'span', { class: 'kb-hide-sm', text: 'WordPress editor' } ),
+					el( 'span', { class: 'kb-hide-sm', text: config.isTemplate ? 'Templates' : 'WordPress editor' } ),
 				] ),
 				el( 'span', { class: 'kb-brand', text: 'Kbroo Studio' } ),
 				el( 'div', { class: 'kb-segmented' }, [
@@ -947,17 +959,20 @@
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-title' }, [
 				devices,
-				el( 'span', { class: 'kb-doc-title', text: config.title || '(no title)' } ),
-				el( 'span', {
-					class: 'kb-badge' + ( published ? ' is-live' : '' ),
-					text: published ? 'Published' : 'Draft',
-				} ),
+				docTitle(),
+				config.isTemplate
+					? el( 'span', { class: 'kb-badge is-template', text: ( config.templateTypes[ config.templateType ] || 'Page' ) + ' template' } )
+					: el( 'span', {
+							class: 'kb-badge' + ( published ? ' is-live' : '' ),
+							text: published ? 'Published' : 'Draft',
+					  } ),
 				state.dirty || state.globalsDirty ? el( 'span', { class: 'kb-unsaved', text: 'Unsaved changes' } ) : null,
 			] )
 		);
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-end' }, [
 				panelButton( 'globals', 'dashicons-admin-site-alt3', 'Site colours, fonts and CSS' ),
+				panelButton( 'templates', 'dashicons-category', 'Templates' ),
 				panelButton( 'revisions', 'dashicons-backup', 'Revisions' ),
 				el(
 					'button',
@@ -977,7 +992,7 @@
 					},
 					[ icon( 'dashicons-list-view' ) ]
 				),
-				el( 'a', {
+				config.isTemplate ? null : el( 'a', {
 					class: 'kb-btn kb-btn-secondary',
 					href: published ? state.permalink : config.previewUrl,
 					target: '_blank',
@@ -994,7 +1009,7 @@
 						save();
 					},
 				} ),
-				! published && config.canPublish
+				! published && config.canPublish && ! config.isTemplate
 					? el( 'button', {
 							type: 'button',
 							class: 'kb-btn kb-btn-primary',
@@ -1056,6 +1071,8 @@
 				renderRevisionsPanel();
 			} else if ( state.panelView === 'globals' ) {
 				renderGlobalsPanel();
+			} else if ( state.panelView === 'templates' ) {
+				renderTemplatesPanel();
 			} else {
 				renderWidgetsPanel();
 			}
@@ -2573,6 +2590,301 @@
 	}
 
 	/* ------------------------------------------------------------------ *
+	 * Document title
+	 * ------------------------------------------------------------------ */
+
+	/** The page or template title; click to rename (saved with the page). */
+	function docTitle() {
+		var button = el( 'button', {
+			type: 'button',
+			class: 'kb-doc-title',
+			title: 'Rename',
+			'data-action': 'rename-document',
+			text: state.title || '(no title)',
+		} );
+		button.addEventListener( 'click', function () {
+			var input = el( 'input', { type: 'text', class: 'kb-doc-title-input', 'aria-label': 'Title', maxlength: 200 } );
+			input.value = state.title;
+			var done = false;
+			function commit( keep ) {
+				if ( done ) {
+					return;
+				}
+				done = true;
+				var value = input.value.trim();
+				if ( keep && value && value !== state.title ) {
+					state.title = value;
+					state.dirty = true;
+				}
+				renderTopbar();
+			}
+			input.addEventListener( 'keydown', function ( e ) {
+				if ( e.key === 'Enter' ) {
+					commit( true );
+				} else if ( e.key === 'Escape' ) {
+					e.stopPropagation();
+					commit( false );
+				}
+			} );
+			input.addEventListener( 'blur', function () {
+				commit( true );
+			} );
+			button.replaceWith( input );
+			input.focus();
+			input.select();
+		} );
+		return button;
+	}
+
+	/* ------------------------------------------------------------------ *
+	 * Template library
+	 * ------------------------------------------------------------------ */
+
+	var templates = { items: null, loading: false, error: '', filter: '', search: '', inserting: 0, saving: false };
+
+	function loadTemplates() {
+		templates.loading = true;
+		templates.error = '';
+		renderPanel();
+		window
+			.fetch( config.templatesUrl, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } } )
+			.then( parseResponse )
+			.then( function ( data ) {
+				templates.items = Array.isArray( data ) ? data : [];
+			} )
+			.catch( function ( error ) {
+				templates.error = error.message || 'The templates could not be loaded.';
+			} )
+			.then( function () {
+				templates.loading = false;
+				if ( state.panelView === 'templates' && ! state.selected ) {
+					renderPanel();
+				}
+			} );
+	}
+
+	/** Open the library with a section or container ready to save. */
+	function startTemplateSave( node ) {
+		state.templateDraft = { elements: [ clone( node ) ], label: elementLabel( node ) };
+		showPanel( 'templates' );
+		var name = document.getElementById( 'kb-template-name' );
+		if ( name ) {
+			name.focus();
+		}
+	}
+
+	function saveTemplate( title, type ) {
+		var elements = state.templateDraft ? state.templateDraft.elements : state.layout.elements;
+		if ( ! elements.length ) {
+			toast( 'There is nothing on the page to save yet.', true );
+			return;
+		}
+		templates.saving = true;
+		renderPanel();
+		window
+			.fetch( config.templatesUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce },
+				body: JSON.stringify( { title: title, type: type, layout: { elements: elements } } ),
+			} )
+			.then( parseResponse )
+			.then( function ( data ) {
+				state.templateDraft = null;
+				templates.items = [ data ].concat( templates.items || [] );
+				templates.search = ''; // Show the new one.
+				templates.filter = '';
+				toast( 'Saved "' + data.title + '" to your templates.' );
+			} )
+			.catch( function ( error ) {
+				toast( error.message || 'The template could not be saved.', true );
+			} )
+			.then( function () {
+				templates.saving = false;
+				renderPanel();
+			} );
+	}
+
+	/** Insert a template's sections at the end of the page. */
+	function insertTemplate( item ) {
+		templates.inserting = item.id;
+		renderPanel();
+		window
+			.fetch( config.templatesUrl + '/' + item.id, { credentials: 'same-origin', headers: { 'X-WP-Nonce': config.nonce } } )
+			.then( parseResponse )
+			.then( function ( data ) {
+				var nodes = ( ( data.layout && data.layout.elements ) || [] )
+					.map( function ( node ) {
+						return cleanElement( node, [ 'section', 'container' ] );
+					} )
+					.filter( Boolean );
+				if ( ! nodes.length ) {
+					toast( 'That template is empty.', true );
+					return;
+				}
+				var index = state.layout.elements.length;
+				nodes.forEach( function ( node, i ) {
+					setParent( node, null );
+					state.layout.elements.splice( index + i, 0, node );
+				} );
+				state.selected = null;
+				changed();
+				toast( 'Inserted "' + data.title + '".' );
+				var first = ui.canvas.querySelector( '[data-id="' + nodes[ 0 ].id + '"]' );
+				if ( first && first.scrollIntoView ) {
+					first.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+				}
+			} )
+			.catch( function ( error ) {
+				toast( error.message || 'The template could not be inserted.', true );
+			} )
+			.then( function () {
+				templates.inserting = 0;
+				renderPanel();
+			} );
+	}
+
+	function renderTemplatesPanel() {
+		var body = el( 'div', { class: 'kb-panel-body kb-templates' } );
+
+		// Save.
+		if ( config.canSaveTemplates ) {
+			var draft = state.templateDraft;
+			var name = el( 'input', { type: 'text', id: 'kb-template-name', maxlength: 200, placeholder: draft ? 'e.g. Hero with button' : 'e.g. Landing page' } );
+			var type = el( 'select', { id: 'kb-template-type' } );
+			Object.keys( config.templateTypes ).forEach( function ( key ) {
+				type.appendChild( el( 'option', { value: key, text: config.templateTypes[ key ] } ) );
+			} );
+			type.value = draft ? 'section' : 'page';
+			var form = el(
+				'form',
+				{
+					class: 'kb-template-save' + ( draft ? ' is-draft' : '' ),
+					onsubmit: function ( e ) {
+						e.preventDefault();
+						if ( ! name.value.trim() ) {
+							name.focus();
+							return;
+						}
+						saveTemplate( name.value.trim(), type.value );
+					},
+				},
+				[
+					el( 'h3', { class: 'kb-control-section', text: draft ? 'Save this ' + draft.label.toLowerCase() + ' as a template' : 'Save this page as a template' } ),
+					el( 'div', { class: 'kb-control' }, [ el( 'label', { for: 'kb-template-name', text: 'Template name' } ), name ] ),
+					el( 'div', { class: 'kb-control' }, [ el( 'label', { for: 'kb-template-type', text: 'Type' } ), type ] ),
+					el( 'div', { class: 'kb-panel-actions' }, [
+						el( 'button', { type: 'submit', class: 'kb-btn kb-btn-primary', disabled: templates.saving, 'data-action': 'save-template', text: templates.saving ? 'Saving…' : 'Save template' } ),
+						draft
+							? el( 'button', {
+									type: 'button',
+									class: 'kb-btn kb-btn-secondary',
+									text: 'Cancel',
+									onclick: function () {
+										state.templateDraft = null;
+										renderPanel();
+									},
+							  } )
+							: null,
+					] ),
+					draft ? null : el( 'p', { class: 'kb-control-note', text: 'To save one section, right-click it and choose Save as template.' } ),
+				]
+			);
+			body.appendChild( form );
+		}
+
+		// Library.
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Insert a template' } ) );
+		if ( templates.items === null && ! templates.loading && ! templates.error ) {
+			setTimeout( loadTemplates, 0 );
+		}
+		if ( templates.loading && ! templates.items ) {
+			body.appendChild( el( 'p', { class: 'kb-hint', text: 'Loading templates…' } ) );
+		} else if ( templates.error ) {
+			body.appendChild( el( 'p', { class: 'kb-hint', text: templates.error } ) );
+		} else if ( templates.items && ! templates.items.length ) {
+			body.appendChild( el( 'p', { class: 'kb-hint', text: 'No templates yet. Save a section or a whole page here and it can be inserted into any page.' } ) );
+		} else if ( templates.items ) {
+			var search = el( 'input', { type: 'search', class: 'kb-template-search', placeholder: 'Search templates', 'aria-label': 'Search templates' } );
+			search.value = templates.search;
+			var filters = el( 'div', { class: 'kb-segmented kb-template-filter', role: 'group', 'aria-label': 'Template type' } );
+			[ [ '', 'All' ] ].concat( Object.keys( config.templateTypes ).map( function ( k ) {
+				return [ k, config.templateTypes[ k ] + 's' ];
+			} ) ).forEach( function ( pair ) {
+				filters.appendChild(
+					el( 'button', {
+						type: 'button',
+						class: 'kb-btn kb-btn-small' + ( templates.filter === pair[ 0 ] ? ' is-active' : '' ),
+						'aria-pressed': templates.filter === pair[ 0 ] ? 'true' : 'false',
+						'data-filter': pair[ 0 ] || 'all',
+						text: pair[ 1 ],
+						onclick: function () {
+							templates.filter = pair[ 0 ];
+							renderPanel();
+						},
+					} )
+				);
+			} );
+			var list = el( 'ul', { class: 'kb-template-list' } );
+			function draw() {
+				list.innerHTML = '';
+				var words = templates.search.toLowerCase().split( /\s+/ ).filter( Boolean );
+				var shown = templates.items.filter( function ( item ) {
+					var title = ( item.title || '' ).toLowerCase();
+					return ( ! templates.filter || item.type === templates.filter ) && words.every( function ( w ) {
+						return title.indexOf( w ) > -1;
+					} );
+				} );
+				if ( ! shown.length ) {
+					list.appendChild( el( 'li', { class: 'kb-hint', text: 'No templates match.' } ) );
+				}
+				shown.forEach( function ( item ) {
+					var when = new Date( item.modified );
+					list.appendChild(
+						el( 'li', { class: 'kb-template', 'data-template': item.id }, [
+							el( 'div', { class: 'kb-template-text' }, [
+								el( 'span', { class: 'kb-template-title', text: item.title || '(no title)' } ),
+								el( 'span', {
+									class: 'kb-template-meta',
+									text: ( config.templateTypes[ item.type ] || '' ) + ' · ' + when.toLocaleDateString( undefined, { dateStyle: 'medium' } ),
+								} ),
+							] ),
+							item.editUrl && item.id !== config.postId
+								? el( 'a', { class: 'kb-icon-btn', href: item.editUrl, target: '_blank', rel: 'noopener', title: 'Edit template (opens in a new tab)', 'aria-label': 'Edit ' + item.title }, [ icon( 'dashicons-edit' ) ] )
+								: null,
+							el( 'button', {
+								type: 'button',
+								class: 'kb-btn kb-btn-secondary kb-btn-small',
+								disabled: !! templates.inserting || !! state.preview,
+								'data-action': 'insert-template',
+								text: templates.inserting === item.id ? 'Inserting…' : 'Insert',
+								onclick: function () {
+									insertTemplate( item );
+								},
+							} ),
+						] )
+					);
+				} );
+			}
+			search.addEventListener( 'input', function () {
+				templates.search = search.value;
+				draw();
+			} );
+			draw();
+			body.appendChild( search );
+			body.appendChild( filters );
+			body.appendChild( list );
+			body.appendChild( el( 'p', { class: 'kb-control-note', text: 'Inserted at the end of the page; drag it from there. Changing a template later does not change pages it was inserted into.' } ) );
+		}
+		body.appendChild(
+			el( 'p', { class: 'kb-control-note' }, [ el( 'a', { href: config.templatesAdminUrl, target: '_blank', rel: 'noopener', text: 'Manage templates' } ) ] )
+		);
+
+		ui.panel.appendChild( panelHeader( 'Templates' ) );
+		ui.panel.appendChild( body );
+	}
+
+	/* ------------------------------------------------------------------ *
 	 * Navigator (layer tree)
 	 * ------------------------------------------------------------------ */
 
@@ -3368,8 +3680,21 @@
 			},
 			[ icon( 'dashicons-plus-alt2' ), el( 'span', { text: 'Add section' } ) ]
 		);
+		var library = el(
+			'button',
+			{
+				type: 'button',
+				class: 'kb-add-template-btn',
+				'data-action': 'add-template',
+				title: 'Insert a saved template',
+				onclick: function () {
+					showPanel( 'templates' );
+				},
+			},
+			[ icon( 'dashicons-category' ), el( 'span', { text: 'Templates' } ) ]
+		);
 
-		return el( 'div', { class: 'kb-add-section' }, [ toggle, picker ] );
+		return el( 'div', { class: 'kb-add-section' }, [ el( 'div', { class: 'kb-add-section-buttons' }, [ toggle, library ] ), picker ] );
 	}
 
 	function addWidgetByClick( type ) {
@@ -3634,8 +3959,11 @@
 		state.saving = true;
 		renderTopbar();
 
+		if ( config.isTemplate && config.canPublish ) {
+			status = 'publish'; // Templates have no drafts: saving adds them to the library.
+		}
 		var revision = state.revision;
-		var body = { layout: state.layout };
+		var body = { layout: state.layout, title: state.title };
 		if ( status ) {
 			body.status = status;
 		}
@@ -3655,6 +3983,9 @@
 				state.status = data.status;
 				state.permalink = data.permalink;
 				config.title = data.title;
+				if ( state.title === body.title ) {
+					state.title = data.title;
+				}
 				// Adopt the server's sanitized copy unless the user kept editing
 				// meanwhile. Undo history stays; this point becomes "saved".
 				if ( state.revision === revision ) {
@@ -3672,7 +4003,7 @@
 				if ( ! state.selected && state.panelView === 'revisions' ) {
 					renderPanel();
 				}
-				toast( status === 'publish' ? 'Published' : 'Saved' );
+				toast( status === 'publish' && ! config.isTemplate ? 'Published' : 'Saved' );
 			} )
 			.catch( function ( error ) {
 				toast( error.message || 'Saving failed.', true );
