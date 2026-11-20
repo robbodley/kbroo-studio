@@ -46,6 +46,7 @@
 		panelView: 'widgets', // Shown when nothing is selected: widgets | globals | revisions | templates.
 		title: config.title || '',
 		templateDraft: null, // { elements, label } waiting to be saved as a template.
+		display: config.display ? JSON.parse( JSON.stringify( config.display ) ) : null, // Header/footer display settings.
 		globals: JSON.parse( JSON.stringify( config.globals ) ),
 		globalsDirty: false,
 		preview: null, // { id, label, layout } while previewing a revision.
@@ -972,6 +973,7 @@
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-end' }, [
 				panelButton( 'globals', 'dashicons-admin-site-alt3', 'Site colours, fonts and CSS' ),
+				state.display ? panelButton( 'display', 'dashicons-visibility', 'Where it shows' ) : null,
 				panelButton( 'templates', 'dashicons-category', 'Templates' ),
 				panelButton( 'revisions', 'dashicons-backup', 'Revisions' ),
 				el(
@@ -1073,6 +1075,8 @@
 				renderGlobalsPanel();
 			} else if ( state.panelView === 'templates' ) {
 				renderTemplatesPanel();
+			} else if ( state.panelView === 'display' && state.display ) {
+				renderDisplayPanel();
 			} else {
 				renderWidgetsPanel();
 			}
@@ -2637,6 +2641,171 @@
 	}
 
 	/* ------------------------------------------------------------------ *
+	 * Where a header or footer shows
+	 * ------------------------------------------------------------------ */
+
+	function displayChanged() {
+		state.dirty = true;
+		renderTopbar();
+		renderPanel();
+	}
+
+	function displayLabel( target ) {
+		if ( target.indexOf( 'singular:' ) === 0 ) {
+			var id = parseInt( target.slice( 9 ), 10 );
+			var found = config.displayPosts.filter( function ( p ) {
+				return p.id === id;
+			} )[ 0 ];
+			return found ? found.title + ( found.type === 'post' ? ' (post)' : '' ) : '#' + id;
+		}
+		return config.displayTargets[ target ] || target;
+	}
+
+	/** Chosen items with remove buttons, and a select to add one. */
+	function displayList( listKey, title, generalTargets, addLabel ) {
+		var list = state.display[ listKey ];
+		var wrap = el( 'div', { class: 'kb-control kb-display-list', 'data-display': listKey } );
+		var selectId = 'kb-display-add-' + listKey;
+		wrap.appendChild( el( 'label', { for: selectId, text: title } ) );
+		var chips = el( 'ul', { class: 'kb-chips' } );
+		list.forEach( function ( target, index ) {
+			if ( generalTargets === null && target.indexOf( 'singular:' ) !== 0 ) {
+				return; // Shown as checkboxes instead.
+			}
+			chips.appendChild(
+				el( 'li', { class: 'kb-chip' }, [
+					el( 'span', { text: displayLabel( target ) } ),
+					el(
+						'button',
+						{
+							type: 'button',
+							class: 'kb-chip-remove',
+							title: 'Remove',
+							'aria-label': 'Remove ' + displayLabel( target ),
+							onclick: function () {
+								list.splice( index, 1 );
+								displayChanged();
+							},
+						},
+						[ icon( 'dashicons-no-alt' ) ]
+					),
+				] )
+			);
+		} );
+		if ( chips.children.length ) {
+			wrap.appendChild( chips );
+		}
+		var select = el( 'select', { id: selectId } );
+		select.appendChild( el( 'option', { value: '', text: addLabel } ) );
+		if ( generalTargets ) {
+			var general = el( 'optgroup', { label: 'Kinds of page' } );
+			generalTargets.forEach( function ( t ) {
+				if ( list.indexOf( t ) === -1 ) {
+					general.appendChild( el( 'option', { value: t, text: config.displayTargets[ t ] } ) );
+				}
+			} );
+			select.appendChild( general );
+		}
+		[ [ 'page', 'Pages' ], [ 'post', 'Posts' ] ].forEach( function ( pair ) {
+			var group = el( 'optgroup', { label: pair[ 1 ] } );
+			config.displayPosts.forEach( function ( p ) {
+				if ( p.type === pair[ 0 ] && list.indexOf( 'singular:' + p.id ) === -1 ) {
+					group.appendChild( el( 'option', { value: 'singular:' + p.id, text: p.title } ) );
+				}
+			} );
+			if ( group.children.length ) {
+				select.appendChild( group );
+			}
+		} );
+		select.addEventListener( 'change', function () {
+			if ( select.value ) {
+				list.push( select.value );
+				displayChanged();
+			}
+		} );
+		wrap.appendChild( select );
+		return wrap;
+	}
+
+	function displaySwitch( id, label, checked, onChange ) {
+		var box = el( 'input', { type: 'checkbox', id: id, class: 'kb-switch' } );
+		box.checked = checked;
+		box.addEventListener( 'change', function () {
+			onChange( box.checked );
+			displayChanged();
+		} );
+		return el( 'div', { class: 'kb-control kb-control-switcher' }, [ el( 'label', { for: id, text: label } ), box ] );
+	}
+
+	function renderDisplayPanel() {
+		var d = state.display;
+		var area = config.templateType === 'footer' ? 'footer' : 'header';
+		var body = el( 'div', { class: 'kb-panel-body kb-display' } );
+
+		var summary;
+		if ( ! d.active ) {
+			summary = 'Switched off: the theme\'s own ' + area + ' shows everywhere.';
+		} else if ( ! d.include.length ) {
+			summary = 'Not shown anywhere yet. Choose where below.';
+		} else {
+			summary = 'Replaces the theme\'s ' + area + ' on: ' + d.include.map( displayLabel ).join( ', ' ) + ( d.exclude.length ? '; not on: ' + d.exclude.map( displayLabel ).join( ', ' ) : '' ) + '.';
+		}
+		body.appendChild( el( 'p', { class: 'kb-hint kb-display-summary', text: summary } ) );
+
+		body.appendChild(
+			displaySwitch( 'kb-display-active', 'Show on the site', d.active, function ( on ) {
+				d.active = on;
+			} )
+		);
+		if ( area === 'header' ) {
+			body.appendChild(
+				displaySwitch( 'kb-display-sticky', 'Stick to the top when scrolling', d.sticky, function ( on ) {
+					d.sticky = on;
+				} )
+			);
+		}
+
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Show on' } ) );
+		Object.keys( config.displayTargets ).forEach( function ( target ) {
+			var id = 'kb-display-include-' + target;
+			var box = el( 'input', { type: 'checkbox', id: id, 'data-target': target } );
+			box.checked = d.include.indexOf( target ) > -1;
+			box.addEventListener( 'change', function () {
+				var i = d.include.indexOf( target );
+				if ( box.checked && i === -1 ) {
+					d.include.push( target );
+				} else if ( ! box.checked && i > -1 ) {
+					d.include.splice( i, 1 );
+				}
+				displayChanged();
+			} );
+			body.appendChild( el( 'div', { class: 'kb-check' }, [ box, el( 'label', { for: id, text: config.displayTargets[ target ] } ) ] ) );
+		} );
+		body.appendChild( displayList( 'include', 'And on these pages and posts', null, 'Add a page or post…' ) );
+
+		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Except on' } ) );
+		body.appendChild(
+			displayList(
+				'exclude',
+				'Exceptions',
+				Object.keys( config.displayTargets ).filter( function ( t ) {
+					return t !== 'entire_site';
+				} ),
+				'Add an exception…'
+			)
+		);
+		body.appendChild(
+			el( 'p', {
+				class: 'kb-control-note',
+				text: 'If more than one ' + area + ' fits a page, the most specific wins: a chosen page beats a kind of page, which beats the entire site. Changes apply when you save.',
+			} )
+		);
+
+		ui.panel.appendChild( panelHeader( 'Where this ' + area + ' shows' ) );
+		ui.panel.appendChild( body );
+	}
+
+	/* ------------------------------------------------------------------ *
 	 * Template library
 	 * ------------------------------------------------------------------ */
 
@@ -3964,6 +4133,9 @@
 		}
 		var revision = state.revision;
 		var body = { layout: state.layout, title: state.title };
+		if ( state.display ) {
+			body.display = state.display;
+		}
 		if ( status ) {
 			body.status = status;
 		}

@@ -3,6 +3,7 @@
  *
  * - Entrance animations: elements with data-kbroo-animation stay hidden
  *   (see frontend.css) until they scroll into view, then play once.
+ * - Nav menus (.kbroo-nav): the menu button opens and closes the menu.
  * - Carousels (.kbroo-carousel): arrows, dots or a counter, autoplay and
  *   looping on top of a scroll-snap strip that works without this script.
  * - Forms (.kbroo-form): send without reloading and show field errors.
@@ -437,8 +438,34 @@
 			var overlay = e.target.closest && e.target.closest( '.kbroo-video__overlay' );
 			if ( overlay ) {
 				playVideo( overlay );
+				return;
+			}
+			var toggle = e.target.closest && e.target.closest( '.kbroo-nav__toggle' );
+			if ( toggle ) {
+				toggleNav( toggle.closest( '.kbroo-nav' ) );
 			}
 		} );
+		// Esc closes an open menu and returns focus to its button.
+		document.addEventListener( 'keydown', function ( e ) {
+			if ( e.key !== 'Escape' ) {
+				return;
+			}
+			var open = document.querySelector( '.kbroo-nav.is-open' );
+			if ( open ) {
+				toggleNav( open, false );
+				open.querySelector( '.kbroo-nav__toggle' ).focus();
+			}
+		} );
+	}
+
+	/** Open or close a nav menu's phone menu. */
+	function toggleNav( nav, force ) {
+		if ( ! nav ) {
+			return;
+		}
+		var open = typeof force === 'boolean' ? force : ! nav.classList.contains( 'is-open' );
+		nav.classList.toggle( 'is-open', open );
+		nav.querySelector( '.kbroo-nav__toggle' ).setAttribute( 'aria-expanded', open ? 'true' : 'false' );
 	}
 
 	window.KbrooStudio = window.KbrooStudio || {};

@@ -65,6 +65,10 @@ final class Rest {
 							'required' => false,
 							'type'     => 'string',
 						),
+						'display' => array(
+							'required' => false,
+							'type'     => 'object',
+						),
 					),
 				),
 			)
@@ -236,6 +240,9 @@ final class Rest {
 
 		Elementor\Migration::backup_content( $post );
 		Document::save_layout( $post->ID, $layout );
+		if ( Templates::is_template( $post ) && in_array( Templates::type_of( $post ), ThemeBuilder::AREAS, true ) && is_array( $request->get_param( 'display' ) ) ) {
+			ThemeBuilder::save_display( $post->ID, $request->get_param( 'display' ) );
+		}
 
 		// Keep a plain HTML copy in post_content, so the content still shows
 		// if the plugin is deactivated and stays visible to search and feeds.

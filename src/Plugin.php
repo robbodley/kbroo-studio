@@ -40,7 +40,9 @@ final class Plugin {
 
 		( new Rest( $this->widgets, $this->renderer ) )->hooks();
 		( new Editor( $this->widgets ) )->hooks();
-		( new Frontend( $this->renderer ) )->hooks();
+		$frontend = new Frontend( $this->renderer );
+		$frontend->hooks();
+		( new ThemeBuilder( $frontend ) )->hooks();
 		( new Revisions() )->hooks();
 		if ( is_admin() ) {
 			( new Admin() )->hooks();

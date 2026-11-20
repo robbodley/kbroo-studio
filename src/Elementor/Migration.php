@@ -24,6 +24,7 @@ use KbrooStudio\Admin;
 use KbrooStudio\Document;
 use KbrooStudio\Renderer;
 use KbrooStudio\Templates;
+use KbrooStudio\ThemeBuilder;
 use KbrooStudio\Widgets\Registry;
 use WP_Post;
 
@@ -157,11 +158,60 @@ final class Migration {
 	}
 
 	/** Elementor template types the library takes. */
-	const LIBRARY_TYPES = array( 'page', 'section', 'container' );
+	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer' );
 
 	/** The library type for an Elementor template type. */
 	private static function template_type( string $elementor_type ): string {
+		if ( in_array( $elementor_type, ThemeBuilder::AREAS, true ) ) {
+			return $elementor_type;
+		}
 		return in_array( $elementor_type, array( 'section', 'container' ), true ) ? 'section' : 'page';
+	}
+
+	/**
+	 * Display settings from an Elementor Pro header or footer's conditions
+	 * ("include/general", "include/singular/page/12", ...). Converted ones
+	 * start switched off, so nothing changes on the site until they are
+	 * checked and switched on.
+	 *
+	 * @param mixed $conditions The _elementor_conditions meta.
+	 * @return array{display: array, dropped: string[]}
+	 */
+	public static function display_from_conditions( $conditions ): array {
+		$display = array(
+			'active'  => false,
+			'include' => array(),
+			'exclude' => array(),
+		);
+		$dropped = array();
+		foreach ( is_array( $conditions ) ? $conditions : array() as $condition ) {
+			$parts = explode( '/', (string) $condition );
+			$list  = 'exclude' === ( $parts[0] ?? '' ) ? 'exclude' : 'include';
+			$rest  = implode( '/', array_slice( $parts, 1 ) );
+			$map   = array(
+				'general'                => array( 'entire_site' ),
+				'singular'               => array( 'pages', 'posts' ),
+				'singular/front_page'    => array( 'front_page' ),
+				'singular/page'          => array( 'pages' ),
+				'singular/post'          => array( 'posts' ),
+				'singular/not_found404'  => array( 'not_found' ),
+			);
+			if ( isset( $map[ $rest ] ) ) {
+				$targets = $map[ $rest ];
+			} elseif ( preg_match( '#^singular/(?:page|post|by_id)/(\d+)$#', $rest, $m ) ) {
+				$targets = array( 'singular:' . $m[1] );
+			} elseif ( 0 === strpos( $rest, 'archive' ) ) {
+				$targets = array( 'archives' );
+			} else {
+				$dropped[] = (string) $condition;
+				continue;
+			}
+			$display[ $list ] = array_merge( $display[ $list ], $targets );
+		}
+		return array(
+			'display' => ThemeBuilder::sanitize_display( $display ),
+			'dropped' => $dropped,
+		);
 	}
 
 	/**
@@ -231,6 +281,14 @@ final class Migration {
 				return null;
 			}
 			update_post_meta( $id, Templates::META_SOURCE, (string) $elementor_id );
+		}
+		if ( in_array( $type, ThemeBuilder::AREAS, true ) ) {
+			$converted = self::display_from_conditions( get_post_meta( $elementor_id, '_elementor_conditions', true ) );
+			ThemeBuilder::save_display( $id, $converted['display'] );
+			foreach ( $converted['dropped'] as $condition ) {
+				/* translators: %s: Elementor display condition. */
+				$result['report']['dropped'][ sprintf( __( 'display condition %s', 'kbroo-studio' ), $condition ) ] = 1;
+			}
 		}
 		update_post_meta( $id, self::META_REPORT, $result['report'] );
 		$this->write_content( $id, $result['layout'] );
@@ -541,9 +599,10 @@ final class Migration {
 
 			<h2><?php esc_html_e( '3. Saved templates', 'kbroo-studio' ); ?></h2>
 			<?php if ( ! $library ) : ?>
-				<p><?php esc_html_e( 'No Elementor saved templates (pages, sections or containers) were found on this site.', 'kbroo-studio' ); ?></p>
+				<p><?php esc_html_e( 'No Elementor saved templates (pages, sections, containers, headers or footers) were found on this site.', 'kbroo-studio' ); ?></p>
 			<?php else : ?>
 				<p><?php esc_html_e( 'Copy Elementor\'s saved templates into Kbroo Studio > Templates, so they can be inserted into any page from the editor.', 'kbroo-studio' ); ?></p>
+				<p><?php esc_html_e( 'Headers and footers keep their display conditions but start switched off, so the site does not change yet. Check each one, then switch it on under "Where it shows" in its editor (and turn off Elementor\'s).', 'kbroo-studio' ); ?></p>
 				<p><a class="button" href="<?php echo esc_url( self::action_url( 'library-all' ) ); ?>"><?php esc_html_e( 'Convert all templates', 'kbroo-studio' ); ?></a></p>
 				<table class="widefat striped">
 					<thead>
@@ -560,6 +619,9 @@ final class Migration {
 							<td>
 								<strong><?php echo esc_html( get_the_title( $source ) ); ?></strong>
 								<div><?php echo esc_html( ucfirst( (string) get_post_meta( $source->ID, '_elementor_template_type', true ) ) ); ?></div>
+								<?php if ( $converted && in_array( Templates::type_of( $converted ), ThemeBuilder::AREAS, true ) ) : ?>
+									<div class="description"><?php echo esc_html( ThemeBuilder::summary( $converted ) ); ?></div>
+								<?php endif; ?>
 							</td>
 							<td><?php $this->render_report( $converted ? self::report( $converted->ID ) : null ); ?></td>
 							<td class="row-actions-static">

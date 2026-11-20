@@ -49,6 +49,8 @@ final class Templates {
 		return array(
 			'section' => __( 'Section', 'kbroo-studio' ),
 			'page'    => __( 'Page', 'kbroo-studio' ),
+			'header'  => __( 'Header', 'kbroo-studio' ),
+			'footer'  => __( 'Footer', 'kbroo-studio' ),
 		);
 	}
 
@@ -71,6 +73,37 @@ final class Templates {
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( $this, 'column' ), 10, 2 );
 		add_action( 'restrict_manage_posts', array( $this, 'type_filter' ) );
 		add_action( 'pre_get_posts', array( $this, 'filter_by_type' ) );
+		add_action( 'admin_footer-edit.php', array( $this, 'new_buttons' ) );
+	}
+
+	/**
+	 * "New header" and "New footer" next to "New template" in the list.
+	 */
+	public function new_buttons(): void {
+		$screen = get_current_screen();
+		if ( ! $screen || 'edit-' . self::POST_TYPE !== $screen->id || ! current_user_can( 'publish_pages' ) ) {
+			return;
+		}
+		$links = '';
+		foreach ( ThemeBuilder::AREAS as $area ) {
+			$links .= sprintf(
+				' <a href="%s" class="page-title-action" data-kbroo-new="%s">%s</a>',
+				esc_url( admin_url( 'post-new.php?post_type=' . self::POST_TYPE . '&template_type=' . $area ) ),
+				esc_attr( $area ),
+				/* translators: %s: Header or Footer. */
+				esc_html( sprintf( __( 'New %s', 'kbroo-studio' ), strtolower( self::types()[ $area ] ) ) )
+			);
+		}
+		?>
+		<script>
+			( function () {
+				var add = document.querySelector( '.wrap .page-title-action' );
+				if ( add ) {
+					add.insertAdjacentHTML( 'afterend', <?php echo wp_json_encode( $links ); ?> );
+				}
+			} )();
+		</script>
+		<?php
 	}
 
 	public function register_post_type(): void {
@@ -125,6 +158,17 @@ final class Templates {
 		if ( is_wp_error( $id ) ) {
 			wp_die( esc_html( $id->get_error_message() ) );
 		}
+		if ( in_array( $type, ThemeBuilder::AREAS, true ) ) {
+			// A new header or footer is for the whole site unless changed.
+			ThemeBuilder::save_display( $id, array( 'include' => array( 'entire_site' ) ) );
+			wp_update_post(
+				array(
+					'ID'         => $id,
+					/* translators: %s: Header or Footer. */
+					'post_title' => sprintf( __( 'New %s', 'kbroo-studio' ), strtolower( self::types()[ $type ] ) ),
+				)
+			);
+		}
 		wp_safe_redirect( Document::editor_url( $id ) );
 		exit;
 	}
@@ -152,7 +196,11 @@ final class Templates {
 
 	public function column( $column, $post_id ): void {
 		if ( 'kbroo_type' === $column ) {
-			echo esc_html( self::types()[ self::type_of( $post_id ) ] );
+			$type = self::type_of( $post_id );
+			echo esc_html( self::types()[ $type ] );
+			if ( in_array( $type, ThemeBuilder::AREAS, true ) ) {
+				echo '<br /><span class="description">' . esc_html( ThemeBuilder::summary( $post_id ) ) . '</span>';
+			}
 			$source = (int) get_post_meta( $post_id, self::META_SOURCE, true );
 			if ( $source ) {
 				echo '<br /><span class="description">' . esc_html__( 'From Elementor', 'kbroo-studio' ) . '</span>';

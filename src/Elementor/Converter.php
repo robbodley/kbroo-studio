@@ -44,6 +44,12 @@ final class Converter {
 		'wp-widget-recent-posts' => 'Recent posts (WordPress widget)',
 	);
 
+	/** Elementor Pro widgets that Kbroo Studio has under another name. */
+	const WIDGET_ALIASES = array(
+		'theme-site-logo'  => 'site-logo',
+		'theme-site-title' => 'site-title',
+	);
+
 	/** Elementor settings with no visible effect, left out of the report. */
 	const QUIET_SETTINGS = array( '_column_size', 'structure', 'typography_typography', 'background_background', 'pa_condition_repeater', '_skin', 'slides_name' );
 
@@ -292,6 +298,29 @@ final class Converter {
 		return $settings;
 	}
 
+	/**
+	 * Site logo and title: Elementor fills them from dynamic tags (the site
+	 * logo, name and home URL), which these widgets do themselves.
+	 */
+	private function site_widget( string $type, array $settings ): array {
+		unset( $settings['__dynamic__'], $settings['title'], $settings['link'] );
+		if ( 'site-logo' === $type ) {
+			$settings['link_to'] = 'none' === ( $settings['link_to'] ?? '' ) ? 'none' : 'home';
+			if ( isset( $settings['space'] ) ) {
+				$settings['max_width'] = $settings['space'];
+				unset( $settings['space'] );
+			}
+			foreach ( array( 'image', 'caption_source', 'caption' ) as $key ) {
+				if ( 'image' === $key && empty( $settings['image']['id'] ) ) {
+					unset( $settings['image'] ); // The theme's logo.
+				} elseif ( 'image' !== $key ) {
+					unset( $settings[ $key ] );
+				}
+			}
+		}
+		return $settings;
+	}
+
 	private function widget( array $element, array $settings ): ?array {
 		$type = (string) ( $element['widgetType'] ?? '' );
 		if ( '' === $type ) {
@@ -299,6 +328,10 @@ final class Converter {
 		}
 		$this->report['elements']++;
 		$this->report['widgets'][ $type ] = ( $this->report['widgets'][ $type ] ?? 0 ) + 1;
+		if ( isset( self::WIDGET_ALIASES[ $type ] ) ) {
+			$type     = self::WIDGET_ALIASES[ $type ];
+			$settings = $this->site_widget( $type, $settings );
+		}
 
 		$widget = $this->widgets->get( $type );
 		if ( 'video' === $type && ! in_array( $settings['video_type'] ?? 'youtube', array( 'youtube', 'vimeo', 'hosted' ), true ) ) {
