@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, a header and footer builder (with Nav menu, Site logo and Site title widgets), a blog archive template (with Archive title, WordPress widgets and a Sidebar widget), show and hide by date, day, time or login, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, a header and footer builder (with Nav menu, Site logo and Site title widgets), a blog archive template (with Archive title, WordPress widgets and a Sidebar widget), show and hide by date, day, time or login, updates from GitHub releases, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -19,7 +19,21 @@ Opening an unconverted Elementor page in the Kbroo Studio editor converts it on 
 
 ## Install
 
-Copy this folder to `wp-content/plugins/kbroo-studio` and activate **Kbroo Studio**. There is no build step: the editor is plain JavaScript and CSS.
+Download `kbroo-studio.zip` from the [latest release](https://github.com/robbodley/kbroo-studio/releases/latest) and upload it in **Plugins > Add New Plugin > Upload Plugin**, then activate **Kbroo Studio**. (Or copy this folder to `wp-content/plugins/kbroo-studio`.) There is no build step: the editor is plain JavaScript and CSS.
+
+### Updates
+
+Kbroo Studio updates itself from this repository's GitHub releases, like any plugin from WordPress.org: when a newer release is out, it shows on **Dashboard > Updates** and the Plugins screen (with its release notes under *View details*), and **Enable auto-updates** on the Plugins screen installs new versions in the background. The Kbroo Studio overview page shows the installed version and has a *Check for updates* button. GitHub is asked at most every few hours.
+
+Sites running 0.1.0 have no updater yet, so update those once by hand (upload the 0.2.0 zip; WordPress offers to replace the installed version). From 0.2.0 on, updates arrive by themselves.
+
+![An update from GitHub on the Plugins screen](docs/screenshots/update-available.png)
+
+### Making a release
+
+1. Set the new version in `kbroo-studio.php`, in both the `Version:` header and `KBROO_STUDIO_VERSION`, and merge it to `main`.
+2. On GitHub, **Releases > Draft a new release**, with a new tag `v` + the version (e.g. `v0.2.0`), notes about what changed, then **Publish release**.
+3. The *Release zip* workflow checks the version matches the tag, builds `kbroo-studio.zip` (`bin/build-zip.sh`, without the docs and starter theme) and attaches it to the release. Sites offer the update once the zip is attached; if the versions don't match, the workflow fails and nothing is offered.
 
 Requires WordPress 6.2+ and PHP 7.4+.
 
@@ -107,6 +121,7 @@ In the editor:
 | Shape dividers | `src/ShapeDividers.php` |
 | Site header, footer and blog archive (display rules, replacing the theme's) | `src/ThemeBuilder.php`, `templates/site-header.php`, `templates/site-footer.php`, `templates/site-archive.php` |
 | Show and hide rules | `src/Visibility.php` |
+| Updates from GitHub releases, release zip | `src/Updater.php`, `bin/build-zip.sh`, `.github/workflows/release.yml` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |
 
 The layout is stored as JSON in the `_kbroo_data` post meta, and `_kbroo_edit_mode = builder` marks a page as built with Kbroo Studio. The tree follows Elementor's: the page holds sections and containers, sections hold columns, columns hold widgets, inner sections and containers, and containers hold widgets and containers (see `Layout::allowed_children()`):
