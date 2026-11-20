@@ -318,6 +318,21 @@
 		state.layout.elements.push( wrapper );
 	}
 
+	/** A new one-column section just before the given section, in the same place. */
+	function addSectionAbove( id ) {
+		var found = find( id );
+		if ( ! found ) {
+			return;
+		}
+		var section = found.node.isInner ? makeInnerSection() : makeSection( [ 100 ] );
+		if ( found.node.isInner ) {
+			section.elements = [ makeColumn( 100 ) ];
+		}
+		setParent( section, found.parent );
+		found.list.splice( found.index, 0, section );
+		select( section.id, 'section', true );
+	}
+
 	function makeWidget( type ) {
 		return {
 			id: uid(),
@@ -3675,6 +3690,10 @@
 					dragHandle( section, function () {
 						return sectionEl;
 					} ),
+					toolButton( 'dashicons-plus-alt2', 'Add section above', function () {
+						addSectionAbove( section.id );
+						changed();
+					} ),
 					section.elements.length < config.maxColumns
 						? toolButton( 'dashicons-columns', 'Add column', function () {
 								addColumn( section.id );
@@ -3748,13 +3767,6 @@
 				toolbar( container, [
 					dragHandle( container, function () {
 						return node;
-					} ),
-					toolButton( 'dashicons-plus-alt2', 'Add container inside', function () {
-						var child = makeContainer();
-						setParent( child, container );
-						container.elements.push( child );
-						select( child.id, 'container', true );
-						changed();
 					} ),
 					toolButton( 'dashicons-admin-page', 'Duplicate', function () {
 						duplicateElement( container.id );
