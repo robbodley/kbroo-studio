@@ -3797,6 +3797,7 @@
 			} )
 				.then( parseResponse )
 				.then( function ( data ) {
+					addPreviewStyles( data.styles );
 					serverCache[ key ] = String( data.html || '' );
 				} )
 				.catch( function ( error ) {
@@ -3805,6 +3806,28 @@
 				.then( renderCanvas );
 		}, 400 );
 		return serverLast[ widget.id ] != null ? serverLast[ widget.id ] || empty : window.KbrooStudio.hint( definition.icon, 'Loading preview…' );
+	}
+
+	/* Stylesheets plugins load on the front end for the previewed output
+	 * (a gallery's grid, say), sent with the preview. Each is added to the
+	 * editor once, after its own styles, in the order the front end prints
+	 * them, so the output looks as it does on the page. */
+	function addPreviewStyles( markup ) {
+		if ( ! markup ) {
+			return;
+		}
+		var template = document.createElement( 'template' );
+		template.innerHTML = String( markup );
+		Array.prototype.slice.call( template.content.children ).forEach( function ( node ) {
+			var tag = node.tagName;
+			if ( ( tag !== 'LINK' && tag !== 'STYLE' ) || ( node.id && document.getElementById( node.id ) ) ) {
+				return;
+			}
+			if ( tag === 'LINK' && node.getAttribute( 'rel' ) !== 'stylesheet' ) {
+				return;
+			}
+			document.head.appendChild( node );
+		} );
 	}
 
 	/** Captions for images linked to the Media Library, fetched once each. */

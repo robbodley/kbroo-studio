@@ -151,7 +151,7 @@ Every save is sanitized server side against each element's control definitions (
 ### Adding a widget
 
 1. Subclass `KbrooStudio\Widgets\Widget` (name, title, icon, `widget_controls()`, `render()`), and register it on the `kbroo_studio_register_widgets` action. The Advanced tab is added automatically; `ControlGroups` has typography, border, background and alignment sets.
-2. Register a matching preview with `KbrooStudio.registerWidget( name, settings => html )` in a script that loads after `kbroo-widgets` in the editor. Or return true from `server_preview()` and the editor shows HTML rendered by your PHP `render()` instead (used by the Shortcode widget).
+2. Register a matching preview with `KbrooStudio.registerWidget( name, settings => html )` in a script that loads after `kbroo-widgets` in the editor. Or return true from `server_preview()` and the editor shows HTML rendered by your PHP `render()` instead (used by the Shortcode widget). Server previews also bring the stylesheets plugins enqueue for that output on the front end (on `wp_enqueue_scripts` or from inside a shortcode), so a gallery or form from another plugin looks the same in the editor as on the page. The theme's own styles are left out so they can't restyle the editor; the `kbroo_studio_preview_style_handles` filter changes which stylesheets are added.
 
 Global colours and fonts are stored in the `kbroo_global_styles` option in the shape of Elementor's kit (`colors` / `typography` lists with `_id` and `title`). Elements link to them through Elementor's `__globals__` setting, e.g. `"__globals__": { "title_color": "globals/colors?id=primary" }`, and the CSS uses `var(--kbroo-global-color-primary)`.
 

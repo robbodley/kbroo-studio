@@ -212,18 +212,18 @@ final class Rest {
 		$controls = $widget->get_controls();
 		$settings = Controls::with_defaults( $controls, Controls::sanitize( $controls, $request->get_param( 'settings' ) ) );
 
-		// Shortcodes often read the current post, so render inside its loop.
-		global $post;
-		$previous = $post;
-		$post     = get_post( (int) $request['id'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-		setup_postdata( $post );
-		$html = $widget->render( $settings );
-		$post = $previous; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
-		if ( $previous ) {
-			setup_postdata( $previous );
-		}
+		// Render as the post's own page would, inside its query and loop
+		// (shortcodes often read the current post), and collect the
+		// stylesheets plugins enqueue for the output so the editor can load
+		// them too.
+		$preview = PreviewStyles::render(
+			function () use ( $widget, $settings ) {
+				return $widget->render( $settings );
+			},
+			get_post( (int) $request['id'] )
+		);
 
-		return rest_ensure_response( array( 'html' => $html ) );
+		return rest_ensure_response( $preview );
 	}
 
 	public function get_document( WP_REST_Request $request ): WP_REST_Response {
