@@ -1,53 +1,116 @@
-# When a release is published on GitHub, build kbroo-studio.zip (the plugin)
-# and kbroo-hello-<version>.zip (the theme) and attach them to the release.
-# Sites running Kbroo Studio or Kbroo Hello then offer the update.
-name: Release zip
+# Releases Kbroo Studio and the Kbroo Hello theme.
+#
+# When main gets a plugin version that has no release yet (the Version in
+# kbroo-studio.php went up), this publishes release v<version> with
+# kbroo-studio.zip (the plugin) and kbroo-hello-<version>.zip (the theme)
+# attached. Sites running them then offer the update. Pushes that don't
+# raise the version release nothing.
+#
+# A release made by hand on GitHub still works: its zips are built and
+# attached when it is published. "Run workflow" on the Actions tab retries
+# a release that failed.
+name: Release
 
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  zip:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the version matches the tag
-        env:
-          TAG: ${{ github.event.release.tag_name }}
+      - name: Read and check the versions
+        id: versions
         run: |
-          want="${TAG#v}"
-          header="$(sed -n 's/^ \* Version: *//p' kbroo-studio.php | tr -d '[:space:]')"
-          constant="$(sed -n "s/^define( 'KBROO_STUDIO_VERSION', '\(.*\)' );/\1/p" kbroo-studio.php)"
-          echo "tag $want, header $header, constant $constant"
-          if [ "$header" != "$want" ] || [ "$constant" != "$want" ]; then
-            echo "::error::Set Version and KBROO_STUDIO_VERSION in kbroo-studio.php to $want before releasing."
+          plugin="$(sed -n 's/^ \* Version: *//p' kbroo-studio.php | tr -d '[:space:]')"
+          plugin_constant="$(sed -n "s/^define( 'KBROO_STUDIO_VERSION', '\(.*\)' );/\1/p" kbroo-studio.php)"
+          theme="$(sed -n 's/^Version: *//p' theme/kbroo-hello/style.css | tr -d '[:space:]')"
+          theme_constant="$(sed -n "s/^define( 'KBROO_HELLO_VERSION', '\(.*\)' );/\1/p" theme/kbroo-hello/functions.php)"
+          theme_stable="$(sed -n 's/^Stable tag: *//p' theme/kbroo-hello/readme.txt | tr -d '[:space:]')"
+          echo "plugin: header $plugin, constant $plugin_constant"
+          echo "theme: style.css $theme, constant $theme_constant, readme $theme_stable"
+          if [ -z "$plugin" ] || [ "$plugin" != "$plugin_constant" ]; then
+            echo "::error::Set the same version in the Version header and KBROO_STUDIO_VERSION in kbroo-studio.php."
             exit 1
           fi
-
-      - name: Check the theme's version is the same everywhere
-        run: |
-          css="$(sed -n 's/^Version: *//p' theme/kbroo-hello/style.css | tr -d '[:space:]')"
-          constant="$(sed -n "s/^define( 'KBROO_HELLO_VERSION', '\(.*\)' );/\1/p" theme/kbroo-hello/functions.php)"
-          stable="$(sed -n 's/^Stable tag: *//p' theme/kbroo-hello/readme.txt | tr -d '[:space:]')"
-          echo "theme: style.css $css, constant $constant, readme $stable"
-          if [ -z "$css" ] || [ "$css" != "$constant" ] || [ "$css" != "$stable" ]; then
+          if [ -z "$theme" ] || [ "$theme" != "$theme_constant" ] || [ "$theme" != "$theme_stable" ]; then
             echo "::error::Set the same Kbroo Hello version in style.css, KBROO_HELLO_VERSION (functions.php) and Stable tag (readme.txt)."
             exit 1
           fi
+          echo "plugin=$plugin" >> "$GITHUB_OUTPUT"
+          echo "theme=$theme" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to release
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          PLUGIN: ${{ steps.versions.outputs.plugin }}
+        run: |
+          if [ "$EVENT" = "release" ]; then
+            if [ "${RELEASE_TAG#v}" != "$PLUGIN" ]; then
+              echo "::error::The release is $RELEASE_TAG but kbroo-studio.php says $PLUGIN. Set the version in kbroo-studio.php first."
+              exit 1
+            fi
+            echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "mode=attach" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="v$PLUGIN"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
+            if echo "$assets" | grep -qx 'kbroo-studio.zip'; then
+              echo "Release $tag already exists. Nothing to release (raise the version in kbroo-studio.php to release)."
+              echo "mode=none" >> "$GITHUB_OUTPUT"
+            else
+              echo "Release $tag exists without its zip: attaching it."
+              echo "tag=$tag" >> "$GITHUB_OUTPUT"
+              echo "mode=attach" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No release for $tag yet: releasing."
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "mode=create" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check PHP syntax
+        if: steps.decide.outputs.mode != 'none'
         run: find . -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
 
       - name: Build the zips
+        if: steps.decide.outputs.mode != 'none'
         run: bin/build-zip.sh build
 
-      - name: Attach them to the release
+      - name: Publish the release
+        if: steps.decide.outputs.mode == 'create'
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ steps.decide.outputs.tag }}
+          PLUGIN: ${{ steps.versions.outputs.plugin }}
+          THEME: ${{ steps.versions.outputs.theme }}
+        run: |
+          gh release create "$TAG" build/kbroo-studio.zip build/kbroo-hello-*.zip \
+            --target "$GITHUB_SHA" \
+            --title "Kbroo Studio $PLUGIN" \
+            --notes "Kbroo Studio $PLUGIN and the Kbroo Hello theme $THEME." \
+            --generate-notes
+
+      - name: Attach the zips to the release
+        if: steps.decide.outputs.mode == 'attach'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.decide.outputs.tag }}
         run: gh release upload "$TAG" build/kbroo-studio.zip build/kbroo-hello-*.zip --clobber
