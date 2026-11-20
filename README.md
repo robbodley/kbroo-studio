@@ -4,7 +4,7 @@ A visual, drag-and-drop page builder plugin for WordPress.
 
 ## Status
 
-In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, a header and footer builder (with Nav menu, Site logo and Site title widgets), a blog archive template (with Archive title, WordPress widgets and a Sidebar widget), show and hide by date, day, time or login, updates from GitHub releases, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, page settings (hide title, full width and canvas layouts, comments, status, excerpt, featured image), and global colours and fonts.
+In progress towards v1. Done so far: full-screen editor, sections and columns, inner sections and flexbox containers (nested any depth), widgets (Heading, Text, Image, Button, Spacer, Divider, HTML, Shortcode, Menu anchor, Icon, Social icons, Testimonial carousel, Posts, Form, Icon list, Icon box, Image box, Video, Image gallery, Image carousel), backgrounds (colour, image per device, gradient, video, hover) and background overlays, entrance animations and hover effects, shape dividers, custom CSS per element and site-wide, a Kbroo Studio admin menu, a template library, a header and footer builder (with Nav menu, Site logo and Site title widgets), a theme builder: blog archive, search results, single post, single page and 404 templates with display conditions (with Archive title, Post title, Post content, Featured image, Post excerpt, Post info, Author box, Post navigation, Post comments, WordPress widgets and a Sidebar widget), show and hide by date, day, time or login, updates from GitHub releases, copy and paste between pages, JSON layout storage, front-end rendering, undo/redo, Content/Style/Advanced settings tabs, desktop/tablet/mobile settings, the Navigator, revision history, page settings (hide title, full width and canvas layouts, comments, status, excerpt, featured image), and global colours and fonts.
 
 ## Moving from Elementor
 
@@ -12,7 +12,7 @@ In progress towards v1. Done so far: full-screen editor, sections and columns, i
 
 1. **Import colours and fonts** copies Elementor's Site Settings (global colours and fonts) into Kbroo Studio's, keeping their ids so converted pages stay linked to them. Fonts the pages use are added from Google Fonts.
 2. **Convert** each page (or use the *Convert to Kbroo Studio* row and bulk actions in the Pages list). Sections, inner sections, columns, containers and the widgets Kbroo Studio has keep their settings; widgets it does not have yet become fallback blocks that still show (live while Elementor is active, otherwise as they looked when converted). The report lists those blocks and any settings not carried over yet. The page's *Hide title* and page layout carry over too (Elementor Canvas becomes Canvas, Elementor Full Width becomes Full width); Elementor's own page template is left as it was.
-3. **Saved templates**: Elementor's saved page, section and container templates, and Elementor Pro headers, footers and archive templates, convert into Kbroo Studio's template library (one at a time or all at once). Converting again replaces the copy; Elementor's templates are left as they are. Headers, footers and archives keep their display conditions but arrive switched off, so the site does not change until you check them and switch them on (and turn Elementor's off).
+3. **Saved templates**: Elementor's saved page, section and container templates, and Elementor Pro theme builder templates (headers, footers, single post and page, archive, search results and 404), convert into Kbroo Studio's template library (one at a time or all at once). Converting again replaces the copy; Elementor's templates are left as they are. Theme templates keep their display conditions but arrive switched off, so the site does not change until you check them and switch them on (and turn Elementor's off).
 4. **Switch back to Elementor** at any time. Elementor's data is never changed or deleted; switching back only turns the Kbroo Studio version off, and *Switch to Kbroo Studio* turns it on again.
 
 Opening an unconverted Elementor page in the Kbroo Studio editor converts it on the spot; nothing changes until you save. Exported Elementor template files (.json) import into the template library.
@@ -98,6 +98,11 @@ In the editor:
 
 ![A blog archive template with posts, categories and recent posts](docs/screenshots/blog-archive.png)
 ![Where a blog archive shows](docs/screenshots/archive-display.png)
+- **Single post and page templates**: *New theme template: Single post* (or *Single page*) under Kbroo Studio > Templates designs how posts and pages look, around their content. The **Post title**, **Post content**, **Featured image**, **Post excerpt**, **Post info** (author, date, time, comments, categories or tags, custom text, each with an icon or the author's picture), **Author box**, **Post navigation** (previous and next post) and **Post comments** widgets show the post being viewed; while editing, a recent post (or page) stands in so you see real content. Where it shows: all posts and pages, all posts, all pages, the front page, other public post types (such as products), or chosen posts, pages, categories, tags or authors, with exceptions. The most specific wins: a chosen post beats a category, which beats all posts. Canvas pages never use one.
+- **Search results** and **404** templates: a Search results template beats an archive template on search results; a 404 template replaces the theme's page not found page.
+
+![A single post template on the site](docs/screenshots/single-post-frontend.png)
+![Where a single post template shows](docs/screenshots/single-template-editor.png)
 
 ![Saving a container as a template, with the library below](docs/screenshots/templates-panel.png)
 ![Kbroo Studio > Templates](docs/screenshots/templates-list.png)
@@ -129,7 +134,8 @@ In the editor:
 | Template library (`kbroo_template` posts, `GET/POST /wp-json/kbroo/v1/templates`) | `src/Templates.php` |
 | Admin menu and Overview | `src/Admin.php` |
 | Shape dividers | `src/ShapeDividers.php` |
-| Site header, footer and blog archive (display rules, replacing the theme's) | `src/ThemeBuilder.php`, `templates/site-header.php`, `templates/site-footer.php`, `templates/site-archive.php` |
+| Theme builder: header, footer, archive, search results, single and 404 templates (display rules, replacing the theme's) | `src/ThemeBuilder.php`, `templates/site-header.php`, `templates/site-footer.php`, `templates/site-template.php` |
+| Dynamic post widgets (Post title, content, featured image, info...) | `src/Widgets/DynamicPost.php`, `src/Widgets/Post*.php`, `src/Widgets/AuthorBox.php` |
 | Show and hide rules | `src/Visibility.php` |
 | Updates from GitHub releases, release zips | `src/Updater.php`, `theme/kbroo-hello/inc/updater.php`, `bin/build-zip.sh`, `.github/workflows/release.yml` |
 | Front-end rendering | `src/Renderer.php`, `src/Frontend.php`, `assets/css/frontend.css` |

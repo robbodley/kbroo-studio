@@ -220,11 +220,17 @@ final class Rest {
 		// (shortcodes often read the current post), and collect the
 		// stylesheets plugins enqueue for the output so the editor can load
 		// them too.
+		// A single post or page template previews with a recent post, so
+		// Post title, Post content and the like show something real.
+		$post = get_post( (int) $request['id'] );
+		if ( Templates::is_template( $post ) && 'single' === ThemeBuilder::area_of( Templates::type_of( $post ) ) ) {
+			$post = Widgets\DynamicPost::sample( $post ) ?? $post;
+		}
 		$preview = PreviewStyles::render(
 			function () use ( $widget, $settings ) {
 				return $widget->render( $settings );
 			},
-			get_post( (int) $request['id'] )
+			$post
 		);
 
 		return rest_ensure_response( $preview );

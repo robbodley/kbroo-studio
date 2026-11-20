@@ -60,6 +60,14 @@ final class Registry {
 		$this->register( new SiteLogo() );
 		$this->register( new SiteTitle() );
 		$this->register( new ArchiveTitle() );
+		$this->register( new PostTitle() );
+		$this->register( new PostContent() );
+		$this->register( new PostFeaturedImage() );
+		$this->register( new PostExcerpt() );
+		$this->register( new PostInfo() );
+		$this->register( new AuthorBox() );
+		$this->register( new PostNavigation() );
+		$this->register( new PostComments() );
 		$this->register( new WpCategories() );
 		$this->register( new WpRecentPosts() );
 		$this->register( new WpSearch() );
