@@ -1,8 +1,9 @@
 <?php
 /**
  * Nav menu widget: a WordPress menu (Appearance > Menus), across or down,
- * with drop-down submenus and a menu button on smaller screens. Settings
- * match Elementor Pro's Nav Menu widget.
+ * with drop-down submenus and a burger menu on smaller screens (a drop-down,
+ * side panel or full-screen menu). Settings match Elementor Pro's Nav Menu
+ * widget.
  *
  * @package KbrooStudio
  */
@@ -10,6 +11,7 @@
 namespace KbrooStudio\Widgets;
 
 use KbrooStudio\ControlGroups;
+use KbrooStudio\Icons;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,11 +47,17 @@ class NavMenu extends Widget {
 	}
 
 	protected function widget_controls(): array {
-		$nav      = '{{WRAPPER}} .kbroo-nav';
-		$content  = __( 'Menu', 'kbroo-studio' );
-		$items    = __( 'Menu items', 'kbroo-studio' );
-		$dropdown = __( 'Submenus and phone menu', 'kbroo-studio' );
-		$toggle   = __( 'Menu button', 'kbroo-studio' );
+		$nav       = '{{WRAPPER}} .kbroo-nav';
+		$content   = __( 'Menu', 'kbroo-studio' );
+		$burger    = __( 'Burger menu', 'kbroo-studio' );
+		$items     = __( 'Menu items', 'kbroo-studio' );
+		$dropdown  = __( 'Burger menu and drop-downs', 'kbroo-studio' );
+		$toggle    = __( 'Burger button', 'kbroo-studio' );
+		$text_only = array( 'layout!' => 'dropdown' );
+		// The opened burger menu, and the drop-downs of the menu across.
+		$drop_links = '{{WRAPPER}} .kbroo-nav__menu .sub-menu a, {{WRAPPER}} .kbroo-nav.is-open .kbroo-nav__menu a';
+		$drop_box   = '{{WRAPPER}} .kbroo-nav--horizontal:not(.is-open) .kbroo-nav__menu .sub-menu, {{WRAPPER}} .kbroo-nav.is-open > .kbroo-nav__menu';
+		$panel      = array( 'menu_panel' => array( 'side', 'fullscreen' ) );
 
 		return array_merge(
 			array(
@@ -69,7 +77,7 @@ class NavMenu extends Widget {
 					'options' => array(
 						'horizontal' => __( 'Across', 'kbroo-studio' ),
 						'vertical'   => __( 'Down', 'kbroo-studio' ),
-						'dropdown'   => __( 'Menu button only', 'kbroo-studio' ),
+						'dropdown'   => __( 'Burger menu only', 'kbroo-studio' ),
 					),
 				),
 				'align_items'  => array(
@@ -77,6 +85,7 @@ class NavMenu extends Widget {
 					'label'                => __( 'Alignment', 'kbroo-studio' ),
 					'section'              => $content,
 					'default'              => '',
+					'condition'            => $text_only,
 					'options'              => array(
 						''        => __( 'Default', 'kbroo-studio' ),
 						'left'    => __( 'Left', 'kbroo-studio' ),
@@ -92,22 +101,25 @@ class NavMenu extends Widget {
 					),
 					'selectors'            => array( $nav => '--kbroo-nav-justify: {{VALUE}};' ),
 				),
-				'dropdown'     => array(
+
+				// The burger menu.
+				'dropdown'           => array(
 					'type'        => 'select',
-					'label'       => __( 'Menu button from', 'kbroo-studio' ),
-					'section'     => $content,
+					'label'       => __( 'Burger menu from', 'kbroo-studio' ),
+					'section'     => $burger,
 					'default'     => 'tablet',
+					'condition'   => $text_only,
 					'options'     => array(
 						'tablet' => __( 'Tablet and smaller', 'kbroo-studio' ),
 						'mobile' => __( 'Phones', 'kbroo-studio' ),
 						'none'   => __( 'Never', 'kbroo-studio' ),
 					),
-					'description' => __( 'Below this size the menu folds into a button that opens it.', 'kbroo-studio' ),
+					'description' => __( 'Below this size the menu folds into a burger button that opens it.', 'kbroo-studio' ),
 				),
-				'toggle_align' => array(
+				'toggle_align'       => array(
 					'type'                 => 'select',
-					'label'                => __( 'Menu button position', 'kbroo-studio' ),
-					'section'              => $content,
+					'label'                => __( 'Button position', 'kbroo-studio' ),
+					'section'              => $burger,
 					'default'              => 'center',
 					'options'              => array(
 						'left'   => __( 'Left', 'kbroo-studio' ),
@@ -121,6 +133,70 @@ class NavMenu extends Widget {
 						'right'  => 'flex-end; --kbroo-nav-drop-left: auto; --kbroo-nav-drop-right: 0; --kbroo-nav-drop-shift: 0',
 					),
 					'selectors'            => array( $nav => '--kbroo-nav-toggle-align: {{VALUE}};' ),
+				),
+				'toggle_icon_normal' => array(
+					'type'        => 'icons',
+					'label'       => __( 'Button icon', 'kbroo-studio' ),
+					'section'     => $burger,
+					'description' => __( 'Leave empty for the three-line burger.', 'kbroo-studio' ),
+				),
+				'toggle_icon_active' => array(
+					'type'        => 'icons',
+					'label'       => __( 'Close icon', 'kbroo-studio' ),
+					'section'     => $burger,
+					'description' => __( 'Shown while the menu is open. Leave empty for a cross.', 'kbroo-studio' ),
+				),
+				'menu_panel'         => array(
+					'type'    => 'select',
+					'label'   => __( 'Menu opens as', 'kbroo-studio' ),
+					'section' => $burger,
+					'default' => 'dropdown',
+					'options' => array(
+						'dropdown'   => __( 'Drop-down under the button', 'kbroo-studio' ),
+						'side'       => __( 'Side panel', 'kbroo-studio' ),
+						'fullscreen' => __( 'Full screen', 'kbroo-studio' ),
+					),
+				),
+				'full_width'         => array(
+					'type'        => 'select',
+					'label'       => __( 'Drop-down width', 'kbroo-studio' ),
+					'section'     => $burger,
+					'default'     => '',
+					'condition'   => array( 'menu_panel' => 'dropdown' ),
+					'options'     => array(
+						''        => __( 'Fit the menu', 'kbroo-studio' ),
+						'stretch' => __( 'Full width of the page', 'kbroo-studio' ),
+					),
+				),
+				'side_panel_position' => array(
+					'type'      => 'select',
+					'label'     => __( 'Slides in from', 'kbroo-studio' ),
+					'section'   => $burger,
+					'default'   => 'right',
+					'condition' => array( 'menu_panel' => 'side' ),
+					'options'   => array(
+						'left'  => __( 'Left', 'kbroo-studio' ),
+						'right' => __( 'Right', 'kbroo-studio' ),
+					),
+				),
+				'text_align'         => array(
+					'type'                 => 'select',
+					'label'                => __( 'Text alignment', 'kbroo-studio' ),
+					'section'              => $burger,
+					'default'              => '',
+					'options'              => array(
+						''       => __( 'Default', 'kbroo-studio' ),
+						'aside'  => __( 'Left', 'kbroo-studio' ),
+						'center' => __( 'Center', 'kbroo-studio' ),
+						'right'  => __( 'Right', 'kbroo-studio' ),
+					),
+					// Submenus are indented only when the text is on the left.
+					'selectors_dictionary' => array(
+						'aside'  => 'left; --kbroo-nav-sub-step: var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px))',
+						'center' => 'center; --kbroo-nav-sub-step: 0px',
+						'right'  => 'right; --kbroo-nav-sub-step: 0px',
+					),
+					'selectors'            => array( $nav => '--kbroo-nav-drop-align: {{VALUE}};' ),
 				),
 
 				// Menu items.
@@ -138,6 +214,7 @@ class NavMenu extends Widget {
 					'tab'       => 'style',
 					'section'   => $items,
 					'default'   => '',
+					'condition' => $text_only,
 					'selectors' => array( $nav => '--kbroo-nav-hover: {{VALUE}};' ),
 				),
 				'color_menu_item_active'      => array(
@@ -146,6 +223,7 @@ class NavMenu extends Widget {
 					'tab'       => 'style',
 					'section'   => $items,
 					'default'   => '',
+					'condition' => $text_only,
 					'selectors' => array( $nav => '--kbroo-nav-active: {{VALUE}};' ),
 				),
 				'padding_horizontal_menu_item' => array(
@@ -173,6 +251,7 @@ class NavMenu extends Widget {
 					'section'    => $items,
 					'units'      => array( 'px', 'em' ),
 					'responsive' => true,
+					'condition'  => $text_only,
 					'selectors'  => array( $nav => '--kbroo-nav-gap: {{SIZE}}{{UNIT}};' ),
 				),
 			),
@@ -185,15 +264,90 @@ class NavMenu extends Widget {
 				)
 			),
 			array(
-				// Submenus and the opened phone menu.
-				'color_dropdown_item'                  => array(
+				// Burger button.
+				'toggle_color'                  => array(
 					'type'      => 'color',
-					'label'     => __( 'Text color', 'kbroo-studio' ),
+					'label'     => __( 'Color', 'kbroo-studio' ),
 					'tab'       => 'style',
-					'section'   => $dropdown,
+					'section'   => $toggle,
 					'default'   => '',
-					'selectors' => array( $nav => '--kbroo-nav-sub-color: {{VALUE}};' ),
+					'selectors' => array( $nav => '--kbroo-nav-toggle-color: {{VALUE}};' ),
 				),
+				'toggle_background_color'       => array(
+					'type'      => 'color',
+					'label'     => __( 'Background', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $toggle,
+					'default'   => '',
+					'selectors' => array( $nav => '--kbroo-nav-toggle-bg: {{VALUE}};' ),
+				),
+				'toggle_color_hover'            => array(
+					'type'      => 'color',
+					'label'     => __( 'Color on hover', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $toggle,
+					'default'   => '',
+					'selectors' => array( $nav => '--kbroo-nav-toggle-hover: {{VALUE}};' ),
+				),
+				'toggle_background_color_hover' => array(
+					'type'      => 'color',
+					'label'     => __( 'Background on hover', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $toggle,
+					'default'   => '',
+					'selectors' => array( $nav => '--kbroo-nav-toggle-hover-bg: {{VALUE}};' ),
+				),
+				'toggle_size'                   => array(
+					'type'       => 'slider',
+					'label'      => __( 'Size', 'kbroo-studio' ),
+					'tab'        => 'style',
+					'section'    => $toggle,
+					'units'      => array( 'px' ),
+					'min'        => 10,
+					'max'        => 80,
+					'responsive' => true,
+					'selectors'  => array( $nav => '--kbroo-nav-toggle-size: {{SIZE}}{{UNIT}};' ),
+				),
+				'toggle_padding'                => array(
+					'type'       => 'slider',
+					'label'      => __( 'Padding', 'kbroo-studio' ),
+					'tab'        => 'style',
+					'section'    => $toggle,
+					'units'      => array( 'px' ),
+					'min'        => 0,
+					'max'        => 40,
+					'responsive' => true,
+					'selectors'  => array( $nav => '--kbroo-nav-toggle-pad: {{SIZE}}{{UNIT}};' ),
+				),
+				'toggle_border_width'           => array(
+					'type'      => 'slider',
+					'label'     => __( 'Border width', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $toggle,
+					'units'     => array( 'px' ),
+					'min'       => 0,
+					'max'       => 10,
+					'selectors' => array( $nav => '--kbroo-nav-toggle-border-width: {{SIZE}}{{UNIT}};' ),
+				),
+				'toggle_border_color'           => array(
+					'type'      => 'color',
+					'label'     => __( 'Border color', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $toggle,
+					'default'   => '',
+					'selectors' => array( $nav => '--kbroo-nav-toggle-border-color: {{VALUE}};' ),
+				),
+				'toggle_border_radius'          => array(
+					'type'      => 'slider',
+					'label'     => __( 'Rounded corners', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $toggle,
+					'units'     => array( 'px', '%' ),
+					'min'       => 0,
+					'selectors' => array( $nav => '--kbroo-nav-toggle-radius: {{SIZE}}{{UNIT}};' ),
+				),
+
+				// The opened burger menu (and drop-downs of the menu across).
 				'background_color_dropdown_item'       => array(
 					'type'      => 'color',
 					'label'     => __( 'Background', 'kbroo-studio' ),
@@ -201,6 +355,14 @@ class NavMenu extends Widget {
 					'section'   => $dropdown,
 					'default'   => '',
 					'selectors' => array( $nav => '--kbroo-nav-sub-bg: {{VALUE}};' ),
+				),
+				'color_dropdown_item'                  => array(
+					'type'      => 'color',
+					'label'     => __( 'Text color', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $dropdown,
+					'default'   => '',
+					'selectors' => array( $nav => '--kbroo-nav-sub-color: {{VALUE}};' ),
 				),
 				'color_dropdown_item_hover'            => array(
 					'type'      => 'color',
@@ -212,39 +374,166 @@ class NavMenu extends Widget {
 				),
 				'background_color_dropdown_item_hover' => array(
 					'type'      => 'color',
-					'label'     => __( 'Background on hover', 'kbroo-studio' ),
+					'label'     => __( 'Item background on hover', 'kbroo-studio' ),
 					'tab'       => 'style',
 					'section'   => $dropdown,
 					'default'   => '',
 					'selectors' => array( $nav => '--kbroo-nav-sub-hover-bg: {{VALUE}};' ),
 				),
-
-				// Menu button.
-				'toggle_color'            => array(
+				'color_dropdown_item_active'           => array(
 					'type'      => 'color',
-					'label'     => __( 'Color', 'kbroo-studio' ),
+					'label'     => __( 'Current page color', 'kbroo-studio' ),
 					'tab'       => 'style',
-					'section'   => $toggle,
+					'section'   => $dropdown,
 					'default'   => '',
-					'selectors' => array( $nav => '--kbroo-nav-toggle-color: {{VALUE}};' ),
+					'selectors' => array( $nav => '--kbroo-nav-sub-active: {{VALUE}};' ),
 				),
-				'toggle_background_color' => array(
+				'background_color_dropdown_item_active' => array(
 					'type'      => 'color',
-					'label'     => __( 'Background', 'kbroo-studio' ),
+					'label'     => __( 'Current page background', 'kbroo-studio' ),
 					'tab'       => 'style',
-					'section'   => $toggle,
+					'section'   => $dropdown,
 					'default'   => '',
-					'selectors' => array( $nav => '--kbroo-nav-toggle-bg: {{VALUE}};' ),
+					'selectors' => array( $nav => '--kbroo-nav-sub-active-bg: {{VALUE}};' ),
 				),
-				'toggle_size'             => array(
+			),
+			ControlGroups::typography(
+				'dropdown_typography',
+				$drop_links,
+				array(
+					'tab'     => 'style',
+					'section' => $dropdown,
+				)
+			),
+			array(
+				'padding_horizontal_dropdown_item' => array(
+					'type'       => 'slider',
+					'label'      => __( 'Item padding across', 'kbroo-studio' ),
+					'tab'        => 'style',
+					'section'    => $dropdown,
+					'units'      => array( 'px', 'em' ),
+					'responsive' => true,
+					'selectors'  => array( $nav => '--kbroo-nav-drop-pad-x: {{SIZE}}{{UNIT}};' ),
+				),
+				'padding_vertical_dropdown_item'   => array(
+					'type'       => 'slider',
+					'label'      => __( 'Item padding up and down', 'kbroo-studio' ),
+					'tab'        => 'style',
+					'section'    => $dropdown,
+					'units'      => array( 'px', 'em' ),
+					'responsive' => true,
+					'selectors'  => array( $nav => '--kbroo-nav-drop-pad-y: {{SIZE}}{{UNIT}};' ),
+				),
+				'dropdown_divider_color'           => array(
+					'type'      => 'color',
+					'label'     => __( 'Line between items', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $dropdown,
+					'default'   => '',
+					'selectors' => array( $nav => '--kbroo-nav-divider-color: {{VALUE}}; --kbroo-nav-divider-on: 1px;' ),
+				),
+				'dropdown_divider_size'            => array(
 					'type'      => 'slider',
-					'label'     => __( 'Size', 'kbroo-studio' ),
+					'label'     => __( 'Line thickness', 'kbroo-studio' ),
 					'tab'       => 'style',
-					'section'   => $toggle,
+					'section'   => $dropdown,
 					'units'     => array( 'px' ),
-					'selectors' => array( $nav => '--kbroo-nav-toggle-size: {{SIZE}}{{UNIT}};' ),
+					'min'       => 0,
+					'max'       => 10,
+					'condition' => array( 'dropdown_divider_color!' => '' ),
+					'selectors' => array( $nav => '--kbroo-nav-divider-width: {{SIZE}}{{UNIT}};' ),
 				),
+				'dropdown_width'                   => array(
+					'type'        => 'slider',
+					'label'       => __( 'Menu width', 'kbroo-studio' ),
+					'tab'         => 'style',
+					'section'     => $dropdown,
+					'units'       => array( 'px', 'vw', '%' ),
+					'responsive'  => true,
+					'description' => __( 'For the drop-down and the side panel.', 'kbroo-studio' ),
+					'selectors'   => array( $nav => '--kbroo-nav-drop-width: {{SIZE}}{{UNIT}};' ),
+				),
+				'dropdown_top_distance'            => array(
+					'type'       => 'slider',
+					'label'      => __( 'Gap below the button', 'kbroo-studio' ),
+					'tab'        => 'style',
+					'section'    => $dropdown,
+					'units'      => array( 'px' ),
+					'responsive' => true,
+					'condition'  => array( 'menu_panel' => 'dropdown' ),
+					'selectors'  => array( $nav => '--kbroo-nav-drop-distance: {{SIZE}}{{UNIT}};' ),
+				),
+				'dropdown_shadow'                  => array(
+					'type'                 => 'select',
+					'label'                => __( 'Shadow', 'kbroo-studio' ),
+					'tab'                  => 'style',
+					'section'              => $dropdown,
+					'default'              => '',
+					'options'              => array(
+						''       => __( 'Soft', 'kbroo-studio' ),
+						'strong' => __( 'Strong', 'kbroo-studio' ),
+						'none'   => __( 'None', 'kbroo-studio' ),
+					),
+					'selectors_dictionary' => array(
+						'strong' => '0 16px 48px rgba(15, 23, 42, 0.35)',
+					),
+					'selectors'            => array( $nav => '--kbroo-nav-drop-shadow: {{VALUE}};' ),
+				),
+				'overlay_color'                    => array(
+					'type'      => 'color',
+					'label'     => __( 'Page shade behind the panel', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $dropdown,
+					'default'   => '',
+					'condition' => array( 'menu_panel' => 'side' ),
+					'selectors' => array( $nav => '--kbroo-nav-overlay: {{VALUE}};' ),
+				),
+				'close_color'                      => array(
+					'type'      => 'color',
+					'label'     => __( 'Close button color', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $dropdown,
+					'default'   => '',
+					'condition' => $panel,
+					'selectors' => array( $nav => '--kbroo-nav-close-color: {{VALUE}};' ),
+				),
+				'close_size'                       => array(
+					'type'      => 'slider',
+					'label'     => __( 'Close button size', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $dropdown,
+					'units'     => array( 'px' ),
+					'min'       => 10,
+					'max'       => 80,
+					'condition' => $panel,
+					'selectors' => array( $nav => '--kbroo-nav-close-size: {{SIZE}}{{UNIT}};' ),
+				),
+			),
+			ControlGroups::border(
+				$drop_box,
+				array(
+					'tab'     => 'style',
+					'section' => $dropdown,
+				),
+				'dropdown_border'
 			)
+		);
+	}
+
+	/**
+	 * The burger button's insides: the icon, and the close icon while open.
+	 */
+	private static function toggle_inner( array $settings ): string {
+		$normal = Icons::svg( $settings['toggle_icon_normal'] ?? null, 'kbroo-nav__icon' );
+		$active = Icons::svg( $settings['toggle_icon_active'] ?? null, 'kbroo-nav__icon' );
+		$bars   = '<span class="kbroo-nav__toggle-bars" aria-hidden="true"></span>';
+		if ( '' === $normal && '' === $active ) {
+			return $bars; // The three lines turn into a cross.
+		}
+		return sprintf(
+			'<span class="kbroo-nav__toggle-open" aria-hidden="true">%1$s</span><span class="kbroo-nav__toggle-close" aria-hidden="true">%2$s</span>',
+			'' !== $normal ? $normal : $bars,
+			'' !== $active ? $active : '<span class="kbroo-nav__cross"></span>'
 		);
 	}
 
@@ -280,18 +569,35 @@ class NavMenu extends Widget {
 			return '';
 		}
 		\KbrooStudio\Frontend::enqueue_script(); // Opens and closes the menu button.
+		$panel   = in_array( $settings['menu_panel'] ?? '', array( 'dropdown', 'side', 'fullscreen' ), true ) ? $settings['menu_panel'] : 'dropdown';
 		$classes = array(
 			'kbroo-nav',
 			'kbroo-nav--' . ( 'vertical' === $layout ? 'vertical' : 'horizontal' ),
 			'kbroo-nav--break-' . $breaks,
+			'kbroo-nav--panel-' . $panel,
+		);
+		if ( 'side' === $panel ) {
+			$classes[] = 'kbroo-nav--from-' . ( 'left' === ( $settings['side_panel_position'] ?? '' ) ? 'left' : 'right' );
+		}
+		if ( 'dropdown' === $panel && 'stretch' === ( $settings['full_width'] ?? '' ) ) {
+			$classes[] = 'kbroo-nav--stretch';
+		}
+		$cross = Icons::svg( $settings['toggle_icon_active'] ?? null, 'kbroo-nav__icon' );
+		$close = 'dropdown' === $panel ? '' : sprintf(
+			'<button type="button" class="kbroo-nav__close" aria-controls="%1$s"><span aria-hidden="true">%2$s</span><span class="kbroo-sr-only">%3$s</span></button>',
+			esc_attr( $list_id ),
+			'' !== $cross ? $cross : '<span class="kbroo-nav__cross"></span>',
+			esc_html__( 'Close menu', 'kbroo-studio' )
 		);
 
 		return sprintf(
-			'<nav class="%1$s" aria-label="%2$s"><button type="button" class="kbroo-nav__toggle" aria-expanded="false" aria-controls="%3$s"><span class="kbroo-nav__toggle-bars" aria-hidden="true"></span><span class="kbroo-sr-only">%4$s</span></button>%5$s</nav>',
+			'<nav class="%1$s" aria-label="%2$s"><button type="button" class="kbroo-nav__toggle" aria-expanded="false" aria-controls="%3$s">%4$s<span class="kbroo-sr-only">%5$s</span></button>%6$s%7$s</nav>',
 			esc_attr( implode( ' ', $classes ) ),
 			esc_attr( $menu->name ),
 			esc_attr( $list_id ),
+			self::toggle_inner( $settings ),
 			esc_html__( 'Menu', 'kbroo-studio' ),
+			$close,
 			$items
 		);
 	}

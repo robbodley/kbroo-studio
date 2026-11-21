@@ -3,7 +3,8 @@
  *
  * - Entrance animations: elements with data-kbroo-animation stay hidden
  *   (see frontend.css) until they scroll into view, then play once.
- * - Nav menus (.kbroo-nav): the menu button opens and closes the menu.
+ * - Nav menus (.kbroo-nav): the burger button opens and closes the menu
+ *   (a drop-down, side panel or full-screen menu).
  * - Carousels (.kbroo-carousel): arrows, dots or a counter, autoplay and
  *   looping on top of a scroll-snap strip that works without this script.
  * - Forms (.kbroo-form): send without reloading and show field errors.
@@ -443,7 +444,35 @@
 			var toggle = e.target.closest && e.target.closest( '.kbroo-nav__toggle' );
 			if ( toggle ) {
 				toggleNav( toggle.closest( '.kbroo-nav' ) );
+				return;
 			}
+			var close = e.target.closest && e.target.closest( '.kbroo-nav__close' );
+			if ( close ) {
+				toggleNav( close.closest( '.kbroo-nav' ), false );
+				return;
+			}
+			// A click on the shade beside a side panel lands on the nav itself.
+			// On the live site a click on a link (often a #section on the same
+			// page) or anywhere else closes an open burger menu too; in the
+			// editor it stays open while its settings change.
+			Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-nav.is-open' ), function ( nav ) {
+				var live = ! nav.closest( '.kb-canvas' );
+				if ( e.target === nav || ( live && ( ! nav.contains( e.target ) || e.target.closest( 'a[href]' ) ) ) ) {
+					toggleNav( nav, false );
+				}
+			} );
+		} );
+		// Grown past the burger size: close it. A full-width drop-down
+		// follows the page's edges.
+		window.addEventListener( 'resize', function () {
+			Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-nav.is-open' ), function ( nav ) {
+				var toggle = nav.querySelector( '.kbroo-nav__toggle' );
+				if ( ! toggle || ! toggle.offsetParent ) {
+					toggleNav( nav, false );
+				} else {
+					stretchNav( nav );
+				}
+			} );
 		} );
 		// Esc closes an open menu and returns focus to its button.
 		document.addEventListener( 'keydown', function ( e ) {
@@ -458,18 +487,44 @@
 		} );
 	}
 
-	/** Open or close a nav menu's phone menu. */
+	/** Open or close a nav menu's burger menu. */
 	function toggleNav( nav, force ) {
 		if ( ! nav ) {
 			return;
 		}
 		var open = typeof force === 'boolean' ? force : ! nav.classList.contains( 'is-open' );
+		var panel = nav.classList.contains( 'kbroo-nav--panel-side' ) || nav.classList.contains( 'kbroo-nav--panel-fullscreen' );
 		nav.classList.toggle( 'is-open', open );
 		nav.querySelector( '.kbroo-nav__toggle' ).setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+		if ( open ) {
+			stretchNav( nav );
+		}
+		if ( panel && ! nav.closest( '.kb-canvas' ) ) {
+			// The page stays put behind a side panel or full-screen menu.
+			document.documentElement.classList.toggle( 'kbroo-nav-locked', open );
+			var close = nav.querySelector( '.kbroo-nav__close' );
+			if ( open && close ) {
+				close.focus();
+			} else if ( ! open && nav.contains( document.activeElement ) ) {
+				nav.querySelector( '.kbroo-nav__toggle' ).focus();
+			}
+		}
+	}
+
+	/** A full-width drop-down spans the page, wherever the button is. */
+	function stretchNav( nav ) {
+		if ( ! nav.classList.contains( 'kbroo-nav--stretch' ) ) {
+			return;
+		}
+		var page = nav.closest( '.kb-canvas' );
+		var edge = page ? page.getBoundingClientRect() : { left: 0, width: document.documentElement.clientWidth };
+		nav.style.setProperty( '--kbroo-nav-stretch-left', ( edge.left - nav.getBoundingClientRect().left ) + 'px' );
+		nav.style.setProperty( '--kbroo-nav-stretch-width', edge.width + 'px' );
 	}
 
 	window.KbrooStudio = window.KbrooStudio || {};
 	window.KbrooStudio.initCarousels = initCarousels;
+	window.KbrooStudio.stretchNav = stretchNav;
 
 	function ready() {
 		initAnimations();
