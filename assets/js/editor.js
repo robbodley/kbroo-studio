@@ -3733,6 +3733,9 @@
 		if ( window.KbrooStudio.initCarousels ) {
 			window.KbrooStudio.initCarousels( ui.canvas, { autoplay: 0 } );
 		}
+		if ( window.KbrooStudio.stretchNav ) {
+			Array.prototype.forEach.call( ui.canvas.querySelectorAll( '.kbroo-nav.is-open' ), window.KbrooStudio.stretchNav );
+		}
 		ui.canvasWrap.scrollTop = scroll;
 		renderNavigator();
 	}
@@ -3982,6 +3985,9 @@
 	 * from the server, fetched shortly after their settings stop changing. */
 	var serverCache = {};
 	var serverLast = {};
+	/** Nav menus whose burger menu is open in the canvas, by widget id, so
+	 * it stays open while its settings change. */
+	var openNavs = {};
 	var serverTimers = {};
 
 	function serverPreview( widget, s ) {
@@ -4096,6 +4102,11 @@
 		while ( holder.firstChild ) {
 			node.appendChild( holder.firstChild );
 		}
+		var nav = openNavs[ widget.id ] && node.querySelector( '.kbroo-nav' );
+		if ( nav ) {
+			nav.classList.add( 'is-open' );
+			nav.querySelector( '.kbroo-nav__toggle' ).setAttribute( 'aria-expanded', 'true' );
+		}
 		return node;
 	}
 
@@ -4175,6 +4186,16 @@
 			// Links inside the preview should not navigate away from the editor.
 			if ( e.target.closest( 'a' ) ) {
 				e.preventDefault();
+			}
+			// The burger button opens its menu here too (frontend.js does the
+			// opening); remember it, as selecting the widget redraws the canvas.
+			var nav = e.target.closest( '.kbroo-nav' );
+			var navWidget = nav && nav.closest( '.kb-el' );
+			if ( navWidget && e.target.closest( '.kbroo-nav__toggle, .kbroo-nav__close' ) ) {
+				var navId = navWidget.getAttribute( 'data-id' );
+				openNavs[ navId ] = ! e.target.closest( '.kbroo-nav__close' ) && ! nav.classList.contains( 'is-open' );
+			} else if ( navWidget && e.target === nav ) {
+				openNavs[ navWidget.getAttribute( 'data-id' ) ] = false;
 			}
 			var target = e.target.closest( '.kb-el' );
 			if ( ! target ) {

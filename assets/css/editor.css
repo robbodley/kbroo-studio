@@ -1500,6 +1500,33 @@ input[type="checkbox"].kb-switch:focus-visible {
 	flex-wrap: wrap;
 }
 
+/* Nav menus fold into the burger button at tablet and phone width too. */
+:where(.kb-canvas-wrap[data-device="tablet"], .kb-canvas-wrap[data-device="mobile"]) .kbroo-nav--break-tablet,
+:where(.kb-canvas-wrap[data-device="mobile"]) .kbroo-nav--break-mobile {
+	display: flex;
+	flex-direction: column;
+	align-items: var(--kbroo-nav-toggle-align, center);
+}
+
+:where(.kb-canvas-wrap[data-device="tablet"], .kb-canvas-wrap[data-device="mobile"]) .kbroo-nav--break-tablet .kbroo-nav__toggle,
+:where(.kb-canvas-wrap[data-device="mobile"]) .kbroo-nav--break-mobile .kbroo-nav__toggle {
+	display: inline-flex;
+}
+
+:where(.kb-canvas-wrap[data-device="tablet"], .kb-canvas-wrap[data-device="mobile"]) .kbroo-nav--break-tablet .kbroo-nav__menu,
+:where(.kb-canvas-wrap[data-device="mobile"]) .kbroo-nav--break-mobile .kbroo-nav__menu {
+	display: none;
+}
+
+/* In the editor a side panel or full-screen menu opens over the canvas only. */
+.kb-canvas:has(.kbroo-nav--panel-side.is-open, .kbroo-nav--panel-fullscreen.is-open) {
+	contain: layout;
+}
+
+.kb-canvas .kbroo-nav {
+	--kbroo-nav-top: 0px;
+}
+
 /* Background video stand-in (see backgroundVideo() in editor.js). */
 .kb-bg-video-preview {
 	background: #1e1e1e center / cover no-repeat;

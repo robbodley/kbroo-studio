@@ -1445,8 +1445,13 @@ textarea.kbroo-form__input {
 }
 
 .kbroo-nav__menu .sub-menu a {
+	padding: var(--kbroo-nav-drop-pad-y, var(--kbroo-nav-pad-y, 10px)) var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px));
 	color: var(--kbroo-nav-sub-color, #1f2937);
 	background: var(--kbroo-nav-sub-bg, #fff);
+}
+
+.kbroo-nav__menu .sub-menu li + li > a {
+	border-top: var(--kbroo-nav-divider-width, var(--kbroo-nav-divider-on, 0px)) solid var(--kbroo-nav-divider-color, transparent);
 }
 
 .kbroo-nav__menu .sub-menu a:hover,
@@ -1490,49 +1495,90 @@ textarea.kbroo-form__input {
 	padding-left: calc(var(--kbroo-nav-pad-x, 15px) * 2);
 }
 
-/* The menu button. */
+/* The burger button. */
 .kbroo-nav__toggle {
+	--kbroo-nav-s: var(--kbroo-nav-toggle-size, 22px);
 	display: none;
 	align-items: center;
 	justify-content: center;
-	width: calc(var(--kbroo-nav-toggle-size, 22px) + 18px);
-	height: calc(var(--kbroo-nav-toggle-size, 22px) + 18px);
-	padding: 0;
-	border: 0;
-	border-radius: 4px;
+	box-sizing: content-box;
+	width: var(--kbroo-nav-s);
+	height: var(--kbroo-nav-s);
+	padding: var(--kbroo-nav-toggle-pad, 9px);
+	border: var(--kbroo-nav-toggle-border-width, 0) solid var(--kbroo-nav-toggle-border-color, currentColor);
+	border-radius: var(--kbroo-nav-toggle-radius, 4px);
 	background: var(--kbroo-nav-toggle-bg, transparent);
 	color: var(--kbroo-nav-toggle-color, currentColor);
+	font-size: var(--kbroo-nav-s);
+	line-height: 1;
 	cursor: pointer;
+	transition: color 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
+.kbroo-nav__toggle:hover,
+.kbroo-nav__toggle:focus-visible {
+	background: var(--kbroo-nav-toggle-hover-bg, var(--kbroo-nav-toggle-bg, transparent));
+	color: var(--kbroo-nav-toggle-hover, var(--kbroo-nav-toggle-color, currentColor));
+}
+
+.kbroo-nav__toggle-open,
+.kbroo-nav__toggle-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+}
+
+.kbroo-nav__toggle-close,
+.kbroo-nav.is-open .kbroo-nav__toggle-open {
+	display: none;
+}
+
+.kbroo-nav.is-open .kbroo-nav__toggle-close {
+	display: inline-flex;
+}
+
+.kbroo-nav__icon {
+	width: 1em;
+	height: 1em;
+	object-fit: contain;
+}
+
+/* Three lines; the lines and the spaces between them grow with the size. */
 .kbroo-nav__toggle-bars,
 .kbroo-nav__toggle-bars::before,
-.kbroo-nav__toggle-bars::after {
+.kbroo-nav__toggle-bars::after,
+.kbroo-nav__cross::before,
+.kbroo-nav__cross::after {
 	display: block;
-	width: var(--kbroo-nav-toggle-size, 22px);
-	height: 2px;
+	width: var(--kbroo-nav-s, 22px);
+	height: max(2px, calc(var(--kbroo-nav-s, 22px) * 0.09));
 	border-radius: 2px;
 	background: currentColor;
 	transition: transform 0.2s, background-color 0.2s;
 }
 
-.kbroo-nav__toggle-bars {
+.kbroo-nav__toggle-bars,
+.kbroo-nav__cross {
 	position: relative;
 }
 
 .kbroo-nav__toggle-bars::before,
-.kbroo-nav__toggle-bars::after {
+.kbroo-nav__toggle-bars::after,
+.kbroo-nav__cross::before,
+.kbroo-nav__cross::after {
 	content: "";
 	position: absolute;
 	left: 0;
 }
 
 .kbroo-nav__toggle-bars::before {
-	top: -7px;
+	top: calc(var(--kbroo-nav-s, 22px) * -0.3);
 }
 
 .kbroo-nav__toggle-bars::after {
-	top: 7px;
+	top: calc(var(--kbroo-nav-s, 22px) * 0.3);
 }
 
 .kbroo-nav.is-open .kbroo-nav__toggle-bars {
@@ -1540,16 +1586,33 @@ textarea.kbroo-form__input {
 }
 
 .kbroo-nav.is-open .kbroo-nav__toggle-bars::before {
-	transform: translateY(7px) rotate(45deg);
+	transform: translateY(calc(var(--kbroo-nav-s, 22px) * 0.3)) rotate(45deg);
 }
 
 .kbroo-nav.is-open .kbroo-nav__toggle-bars::after {
-	transform: translateY(-7px) rotate(-45deg);
+	transform: translateY(calc(var(--kbroo-nav-s, 22px) * -0.3)) rotate(-45deg);
+}
+
+/* A cross on its own (the close button, or after a custom button icon). */
+.kbroo-nav__cross {
+	display: block;
+	width: var(--kbroo-nav-s, 22px);
+	height: max(2px, calc(var(--kbroo-nav-s, 22px) * 0.09));
+}
+
+.kbroo-nav__cross::before,
+.kbroo-nav__cross::after {
+	top: 0;
+	transform: rotate(45deg);
+}
+
+.kbroo-nav__cross::after {
+	transform: rotate(-45deg);
 }
 
 /*
- * Folded: below the chosen size the menu hides behind the button and
- * opens as a drop-down panel under it, lined up with the button.
+ * Folded: below the chosen size the menu hides behind the burger button.
+ * How it looks once opened is below, under .is-open.
  */
 .kbroo-nav--break-always {
 	display: flex;
@@ -1563,39 +1626,6 @@ textarea.kbroo-form__input {
 
 .kbroo-nav--break-always .kbroo-nav__menu {
 	display: none;
-	position: absolute;
-	top: 100%;
-	left: var(--kbroo-nav-drop-left, 50%);
-	right: var(--kbroo-nav-drop-right, auto);
-	z-index: 30;
-	flex-direction: column;
-	flex-wrap: nowrap;
-	gap: 0;
-	min-width: 240px;
-	max-width: calc(100vw - 32px);
-	background: var(--kbroo-nav-sub-bg, #fff);
-	box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
-	transform: translateX(var(--kbroo-nav-drop-shift, -50%));
-}
-
-.kbroo-nav--break-always.is-open .kbroo-nav__menu {
-	display: flex;
-}
-
-.kbroo-nav--break-always .kbroo-nav__menu a {
-	color: var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937));
-}
-
-.kbroo-nav--break-always .kbroo-nav__menu .sub-menu {
-	position: static;
-	min-width: 0;
-	box-shadow: none;
-	visibility: visible;
-	opacity: 1;
-}
-
-.kbroo-nav--break-always .kbroo-nav__menu .sub-menu a {
-	padding-left: calc(var(--kbroo-nav-pad-x, 15px) * 2);
 }
 
 @media (max-width: 1024px) {
@@ -1611,39 +1641,6 @@ textarea.kbroo-form__input {
 
 	.kbroo-nav--break-tablet .kbroo-nav__menu {
 		display: none;
-		position: absolute;
-		top: 100%;
-		left: var(--kbroo-nav-drop-left, 50%);
-		right: var(--kbroo-nav-drop-right, auto);
-		z-index: 30;
-		flex-direction: column;
-		flex-wrap: nowrap;
-		gap: 0;
-		min-width: 240px;
-		max-width: calc(100vw - 32px);
-		background: var(--kbroo-nav-sub-bg, #fff);
-		box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
-		transform: translateX(var(--kbroo-nav-drop-shift, -50%));
-	}
-
-	.kbroo-nav--break-tablet.is-open .kbroo-nav__menu {
-		display: flex;
-	}
-
-	.kbroo-nav--break-tablet .kbroo-nav__menu a {
-		color: var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937));
-	}
-
-	.kbroo-nav--break-tablet .kbroo-nav__menu .sub-menu {
-		position: static;
-		min-width: 0;
-		box-shadow: none;
-		visibility: visible;
-		opacity: 1;
-	}
-
-	.kbroo-nav--break-tablet .kbroo-nav__menu .sub-menu a {
-		padding-left: calc(var(--kbroo-nav-pad-x, 15px) * 2);
 	}
 }
 
@@ -1660,39 +1657,213 @@ textarea.kbroo-form__input {
 
 	.kbroo-nav--break-mobile .kbroo-nav__menu {
 		display: none;
-		position: absolute;
-		top: 100%;
-		left: var(--kbroo-nav-drop-left, 50%);
-		right: var(--kbroo-nav-drop-right, auto);
-		z-index: 30;
-		flex-direction: column;
-		flex-wrap: nowrap;
-		gap: 0;
-		min-width: 240px;
-		max-width: calc(100vw - 32px);
-		background: var(--kbroo-nav-sub-bg, #fff);
-		box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
-		transform: translateX(var(--kbroo-nav-drop-shift, -50%));
 	}
+}
 
-	.kbroo-nav--break-mobile.is-open .kbroo-nav__menu {
-		display: flex;
+/* The opened burger menu: a drop-down under the button, lined up with it. */
+.kbroo-nav.is-open > .kbroo-nav__menu {
+	display: flex;
+	position: absolute;
+	top: calc(100% + var(--kbroo-nav-drop-distance, 0px));
+	left: var(--kbroo-nav-drop-left, 50%);
+	right: var(--kbroo-nav-drop-right, auto);
+	z-index: 30;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	gap: 0;
+	box-sizing: border-box;
+	width: var(--kbroo-nav-drop-width, auto);
+	min-width: min(var(--kbroo-nav-drop-width, 240px), calc(100vw - 32px));
+	max-width: calc(100vw - 32px);
+	overflow: hidden;
+	background: var(--kbroo-nav-sub-bg, #fff);
+	box-shadow: var(--kbroo-nav-drop-shadow, 0 8px 24px rgba(15, 23, 42, 0.18));
+	transform: translateX(var(--kbroo-nav-drop-shift, -50%));
+	animation: kbroo-nav-fade 0.15s ease-out;
+}
+
+.kbroo-nav.is-open .kbroo-nav__menu a {
+	padding: var(--kbroo-nav-drop-pad-y, var(--kbroo-nav-pad-y, 10px)) var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px));
+	border-top: var(--kbroo-nav-divider-width, var(--kbroo-nav-divider-on, 0px)) solid var(--kbroo-nav-divider-color, transparent);
+	background: transparent;
+	color: var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937));
+	text-align: var(--kbroo-nav-drop-align, left);
+}
+
+.kbroo-nav.is-open .kbroo-nav__menu > li:first-child > a {
+	border-top: 0;
+}
+
+.kbroo-nav.is-open .kbroo-nav__menu a:hover,
+.kbroo-nav.is-open .kbroo-nav__menu a:focus-visible {
+	background: var(--kbroo-nav-sub-hover-bg, transparent);
+	color: var(--kbroo-nav-sub-hover, var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937)));
+}
+
+.kbroo-nav.is-open .kbroo-nav__menu .current-menu-item > a,
+.kbroo-nav.is-open .kbroo-nav__menu .current-menu-ancestor > a,
+.kbroo-nav__menu .sub-menu .current-menu-item > a {
+	background: var(--kbroo-nav-sub-active-bg, var(--kbroo-nav-sub-hover-bg, transparent));
+	color: var(--kbroo-nav-sub-active, var(--kbroo-nav-sub-hover, var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937))));
+}
+
+.kbroo-nav.is-open .kbroo-nav__menu .sub-menu {
+	position: static;
+	min-width: 0;
+	border: 0;
+	box-shadow: none;
+	visibility: visible;
+	opacity: 1;
+}
+
+/* Submenus are indented, unless the text is centred or on the right. */
+.kbroo-nav.is-open .kbroo-nav__menu .sub-menu a {
+	padding-left: calc(var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px)) + var(--kbroo-nav-sub-step, var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px))));
+}
+
+.kbroo-nav.is-open .kbroo-nav__menu .sub-menu .sub-menu a {
+	padding-left: calc(var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px)) + 2 * var(--kbroo-nav-sub-step, var(--kbroo-nav-drop-pad-x, var(--kbroo-nav-pad-x, 15px))));
+}
+
+/* Full width: frontend.js lines it up with the page's edges. */
+.kbroo-nav--stretch.is-open > .kbroo-nav__menu {
+	left: var(--kbroo-nav-stretch-left, 0);
+	right: auto;
+	width: var(--kbroo-nav-stretch-width, 100vw);
+	min-width: 0;
+	max-width: none;
+	transform: none;
+}
+
+/* Side panel and full screen. */
+.kbroo-nav--panel-side.is-open > .kbroo-nav__menu,
+.kbroo-nav--panel-fullscreen.is-open > .kbroo-nav__menu {
+	position: fixed;
+	top: var(--kbroo-nav-top, 0px);
+	bottom: 0;
+	z-index: 100000;
+	min-width: 0;
+	max-width: 85vw;
+	padding: calc(var(--kbroo-nav-close-size, 22px) + 40px) 0 24px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	transform: none;
+}
+
+.kbroo-nav--panel-side.is-open > .kbroo-nav__menu {
+	right: 0;
+	left: auto;
+	width: var(--kbroo-nav-drop-width, 320px);
+	animation: kbroo-nav-from-right 0.25s ease-out;
+}
+
+.kbroo-nav--from-left.is-open > .kbroo-nav__menu {
+	right: auto;
+	left: 0;
+	animation-name: kbroo-nav-from-left;
+}
+
+.kbroo-nav--panel-fullscreen.is-open > .kbroo-nav__menu {
+	right: 0;
+	left: 0;
+	width: auto;
+	max-width: none;
+	justify-content: safe center;
+	box-shadow: none;
+	animation: kbroo-nav-fade 0.2s ease-out;
+}
+
+.kbroo-nav--panel-fullscreen {
+	--kbroo-nav-sub-step: 0px;
+}
+
+.kbroo-nav--panel-fullscreen.is-open .kbroo-nav__menu a {
+	text-align: var(--kbroo-nav-drop-align, center);
+}
+
+/* The page behind a side panel is shaded; clicking it closes the menu. */
+.kbroo-nav--panel-side.is-open::before {
+	content: "";
+	position: fixed;
+	inset: var(--kbroo-nav-top, 0px) 0 0 0;
+	z-index: 99999;
+	background: var(--kbroo-nav-overlay, rgba(15, 23, 42, 0.5));
+	animation: kbroo-nav-fade 0.25s ease-out;
+}
+
+.kbroo-nav__close {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	box-sizing: content-box;
+	width: var(--kbroo-nav-close-size, 22px);
+	height: var(--kbroo-nav-close-size, 22px);
+	padding: 10px;
+	border: 0;
+	background: transparent;
+	color: var(--kbroo-nav-close-color, var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937)));
+	font-size: var(--kbroo-nav-close-size, 22px);
+	cursor: pointer;
+}
+
+.kbroo-nav__close > span {
+	--kbroo-nav-s: var(--kbroo-nav-close-size, 22px);
+	display: inline-flex;
+}
+
+.kbroo-nav--panel-side.is-open > .kbroo-nav__close,
+.kbroo-nav--panel-fullscreen.is-open > .kbroo-nav__close {
+	display: inline-flex;
+	position: fixed;
+	top: calc(var(--kbroo-nav-top, 0px) + 10px);
+	right: 10px;
+	z-index: 100001;
+	animation: kbroo-nav-fade 0.25s ease-out;
+}
+
+.kbroo-nav--from-left.is-open > .kbroo-nav__close {
+	right: auto;
+	left: calc(min(var(--kbroo-nav-drop-width, 320px), 85vw) - var(--kbroo-nav-close-size, 22px) - 30px);
+}
+
+/* Below the WordPress toolbar when it shows. */
+.admin-bar .kbroo-nav {
+	--kbroo-nav-top: 32px;
+}
+
+@media (max-width: 782px) {
+	.admin-bar .kbroo-nav {
+		--kbroo-nav-top: 46px;
 	}
+}
 
-	.kbroo-nav--break-mobile .kbroo-nav__menu a {
-		color: var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937));
+html.kbroo-nav-locked {
+	overflow: hidden;
+}
+
+@keyframes kbroo-nav-fade {
+	from {
+		opacity: 0;
 	}
+}
 
-	.kbroo-nav--break-mobile .kbroo-nav__menu .sub-menu {
-		position: static;
-		min-width: 0;
-		box-shadow: none;
-		visibility: visible;
-		opacity: 1;
+@keyframes kbroo-nav-from-right {
+	from {
+		transform: translateX(100%);
 	}
+}
 
-	.kbroo-nav--break-mobile .kbroo-nav__menu .sub-menu a {
-		padding-left: calc(var(--kbroo-nav-pad-x, 15px) * 2);
+@keyframes kbroo-nav-from-left {
+	from {
+		transform: translateX(-100%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.kbroo-nav.is-open > .kbroo-nav__menu,
+	.kbroo-nav.is-open > .kbroo-nav__close,
+	.kbroo-nav.is-open::before {
+		animation: none;
 	}
 }
 
