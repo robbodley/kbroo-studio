@@ -300,6 +300,9 @@ final class Admin {
 						echo '<strong>' . esc_html( sprintf( __( 'Version %s is out. Check for updates to get it.', 'kbroo-studio' ), $release['version'] ) ) . '</strong>';
 					} elseif ( $release ) {
 						esc_html_e( 'This is the latest release.', 'kbroo-studio' );
+					} elseif ( $can_plugins && '' !== Updater::last_error() ) {
+						/* translators: %s: why the check failed, e.g. "GitHub answered with HTTP 403". */
+						echo '<strong>' . esc_html( sprintf( __( 'Couldn\'t check GitHub for updates: %s. Try again in a few minutes.', 'kbroo-studio' ), Updater::last_error() ) ) . '</strong>';
 					}
 					echo '</p>';
 					if ( '' !== self::hello_version() ) {

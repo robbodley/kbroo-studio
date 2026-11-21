@@ -67,6 +67,7 @@ class Updater {
 		}
 
 		$release  = null;
+		$error    = '';
 		$response = wp_remote_get(
 			'https://api.github.com/repos/' . self::repo() . '/releases/latest',
 			array(
@@ -77,15 +78,71 @@ class Updater {
 				),
 			)
 		);
-		if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+		$code = is_wp_error( $response ) ? 0 : (int) wp_remote_retrieve_response_code( $response );
+		if ( 200 === $code ) {
 			$release = self::parse( json_decode( wp_remote_retrieve_body( $response ), true ) );
+		} elseif ( ! is_wp_error( $response ) ) {
+			// GitHub's API allows 60 requests an hour per server address, and
+			// shared hosting often uses that up. The release pages aren't
+			// limited like that, so ask them instead.
+			$release = self::from_release_page();
+		}
+		if ( ! $release ) {
+			$error = is_wp_error( $response )
+				? $response->get_error_message()
+				/* translators: %d: HTTP status code. */
+				: ( 200 === $code ? __( 'the latest release has no kbroo-studio.zip yet', 'kbroo-studio' ) : sprintf( __( 'GitHub answered with HTTP %d', 'kbroo-studio' ), $code ) );
 		}
 
 		// A failed check is kept for an hour, so a GitHub outage doesn't slow
 		// every admin page. A release whose zip isn't attached yet (the
 		// workflow takes a few minutes) is asked about again soon.
-		set_site_transient( self::CACHE_KEY, array( 'release' => $release ), $release ? self::CACHE_TTL : ( is_wp_error( $response ) ? HOUR_IN_SECONDS : 15 * MINUTE_IN_SECONDS ) );
+		set_site_transient( self::CACHE_KEY, array( 'release' => $release, 'error' => $error ), $release ? self::CACHE_TTL : ( is_wp_error( $response ) ? HOUR_IN_SECONDS : 15 * MINUTE_IN_SECONDS ) );
 		return $release;
+	}
+
+	/**
+	 * Why the last check found no release, or '' when it found one.
+	 */
+	public static function last_error(): string {
+		$cached = get_site_transient( self::CACHE_KEY );
+		return is_array( $cached ) ? (string) ( $cached['error'] ?? '' ) : '';
+	}
+
+	/**
+	 * The latest release from github.com's own pages, for when the API
+	 * refuses: /releases/latest redirects to the newest tag, and the zip's
+	 * download link redirects when it's attached.
+	 */
+	public static function from_release_page(): ?array {
+		$args     = array(
+			'timeout'     => 10,
+			'redirection' => 0,
+			'headers'     => array( 'User-Agent' => 'Kbroo-Studio-Updater' ),
+		);
+		$base     = 'https://github.com/' . self::repo() . '/releases';
+		$location = (string) wp_remote_retrieve_header( wp_remote_head( $base . '/latest', $args ), 'location' );
+		if ( ! preg_match( '#/releases/tag/([^/?\#]+)$#', $location, $m ) ) {
+			return null;
+		}
+		$tag     = rawurldecode( $m[1] );
+		$version = ltrim( $tag, 'vV' );
+		if ( ! preg_match( '/^\d+(\.\d+){1,3}([-.][0-9A-Za-z.]+)?$/', $version ) ) {
+			return null;
+		}
+		$package = $base . '/download/' . rawurlencode( $tag ) . '/' . self::ASSET;
+		$code    = (int) wp_remote_retrieve_response_code( wp_remote_head( $package, $args ) );
+		if ( $code < 300 || $code >= 400 ) {
+			return null; // Not built yet.
+		}
+		return array(
+			'version'   => $version,
+			'tag'       => $tag,
+			'package'   => $package,
+			'url'       => $base . '/tag/' . rawurlencode( $tag ),
+			'notes'     => '',
+			'published' => '',
+		);
 	}
 
 	/**
