@@ -873,6 +873,8 @@
 		resetHistory();
 		if ( config.openPanel === 'globals' ) {
 			state.panelView = 'globals'; // Opened from the Kbroo Studio admin menu.
+		} else if ( config.openPanel === 'display' && state.display ) {
+			state.panelView = 'display'; // "Edit conditions" in the Theme builder.
 		}
 		renderAll();
 
@@ -940,9 +942,9 @@
 		ui.topbar.innerHTML = '';
 		ui.topbar.appendChild(
 			el( 'div', { class: 'kb-topbar-start' }, [
-				el( 'a', { class: 'kb-icon-btn', href: config.wpEditUrl, title: config.isTemplate ? 'Back to the templates' : 'Back to the WordPress editor' }, [
+				el( 'a', { class: 'kb-icon-btn', href: config.wpEditUrl, title: config.isTemplate ? ( config.themeTypes.indexOf( config.templateType ) > -1 ? 'Back to the Theme builder' : 'Back to the templates' ) : 'Back to the WordPress editor' }, [
 					icon( 'dashicons-arrow-left-alt2' ),
-					el( 'span', { class: 'kb-hide-sm', text: config.isTemplate ? 'Templates' : 'WordPress editor' } ),
+					el( 'span', { class: 'kb-hide-sm', text: config.isTemplate ? ( config.themeTypes.indexOf( config.templateType ) > -1 ? 'Theme builder' : 'Templates' ) : 'WordPress editor' } ),
 				] ),
 				el( 'span', { class: 'kb-brand', text: 'Kbroo Studio' } ),
 				el( 'div', { class: 'kb-segmented' }, [
