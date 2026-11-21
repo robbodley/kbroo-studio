@@ -22,6 +22,9 @@ final class Plugin {
 	/** @var Renderer */
 	private $renderer;
 
+	/** @var Frontend|null */
+	private $frontend;
+
 	/** @var ThemeBuilder */
 	private $theme_builder;
 
@@ -43,7 +46,8 @@ final class Plugin {
 
 		( new Rest( $this->widgets, $this->renderer ) )->hooks();
 		( new Editor( $this->widgets ) )->hooks();
-		$frontend = new Frontend( $this->renderer );
+		$frontend       = new Frontend( $this->renderer );
+		$this->frontend = $frontend;
 		$frontend->hooks();
 		$this->theme_builder = new ThemeBuilder( $frontend );
 		$this->theme_builder->hooks();
@@ -56,6 +60,16 @@ final class Plugin {
 		( new Templates( $this->widgets, $this->renderer ) )->hooks();
 		( new Elementor\Migration( $this->widgets, $this->renderer ) )->hooks();
 		( new Updater() )->register(); // Also runs for background auto-updates.
+	}
+
+	/**
+	 * Load the stylesheet, global styles and fonts a layout needs (for
+	 * layouts drawn inside another, such as loop item templates).
+	 */
+	public function frontend_enqueue( array $layout ): void {
+		if ( $this->frontend ) {
+			$this->frontend->enqueue_layout( $layout );
+		}
 	}
 
 	public function theme_builder(): ThemeBuilder {

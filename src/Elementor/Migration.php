@@ -160,31 +160,60 @@ final class Migration {
 	}
 
 	/** Elementor template types the library takes. */
-	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer', 'archive' );
+	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer', 'archive', 'search-results', 'single', 'single-post', 'single-page', 'error-404', 'loop-item' );
 
-	/** The library type for an Elementor template type. */
-	private static function template_type( string $elementor_type ): string {
-		if ( in_array( $elementor_type, ThemeBuilder::TYPES, true ) ) {
+	/**
+	 * The library type for an Elementor template type. Elementor Pro's older
+	 * "single" type covers posts, pages and the 404 page; its conditions say
+	 * which.
+	 *
+	 * @param mixed $conditions The _elementor_conditions meta, if known.
+	 */
+	private static function template_type( string $elementor_type, $conditions = null ): string {
+		if ( 'single' === $elementor_type ) {
+			$conditions = array_map( 'strval', is_array( $conditions ) ? $conditions : array() );
+			$includes   = array_values(
+				array_filter(
+					$conditions,
+					function ( $c ) {
+						return 0 === strpos( $c, 'include/' );
+					}
+				)
+			);
+			if ( $includes && ! array_diff( $includes, array( 'include/singular/not_found404' ) ) ) {
+				return 'error-404';
+			}
+			$pages = array_filter(
+				$includes,
+				function ( $c ) {
+					return 0 === strpos( $c, 'include/singular/page' ) || 0 === strpos( $c, 'include/singular/front_page' );
+				}
+			);
+			return $includes && count( $pages ) === count( $includes ) ? 'single-page' : 'single-post';
+		}
+		if ( in_array( $elementor_type, ThemeBuilder::TYPES, true ) || 'loop-item' === $elementor_type ) {
 			return $elementor_type;
 		}
 		return in_array( $elementor_type, array( 'section', 'container' ), true ) ? 'section' : 'page';
 	}
 
 	/**
-	 * Display settings from an Elementor Pro header or footer's conditions
+	 * Display settings from an Elementor Pro theme template's conditions
 	 * ("include/general", "include/singular/page/12", ...). Converted ones
 	 * start switched off, so nothing changes on the site until they are
 	 * checked and switched on.
 	 *
-	 * @param mixed $conditions The _elementor_conditions meta.
+	 * @param mixed  $conditions The _elementor_conditions meta.
+	 * @param string $type       Kbroo Studio template type they are for.
 	 * @return array{display: array, dropped: string[]}
 	 */
-	public static function display_from_conditions( $conditions ): array {
+	public static function display_from_conditions( $conditions, string $type = 'header' ): array {
 		$display = array(
 			'active'  => false,
 			'include' => array(),
 			'exclude' => array(),
 		);
+		$single  = 'single' === ThemeBuilder::area_of( $type );
 		$dropped = array();
 		foreach ( is_array( $conditions ) ? $conditions : array() as $condition ) {
 			$parts = explode( '/', (string) $condition );
@@ -192,7 +221,7 @@ final class Migration {
 			$rest  = implode( '/', array_slice( $parts, 1 ) );
 			$map   = array(
 				'general'                => array( 'entire_site' ),
-				'singular'               => array( 'pages', 'posts' ),
+				'singular'               => $single ? array( 'singular_all' ) : array( 'pages', 'posts' ),
 				'singular/front_page'    => array( 'front_page' ),
 				'singular/page'          => array( 'pages' ),
 				'singular/post'          => array( 'posts' ),
@@ -206,6 +235,12 @@ final class Migration {
 				$targets = $map[ $rest ];
 			} elseif ( preg_match( '#^singular/(?:page|post|by_id)/(\d+)$#', $rest, $m ) ) {
 				$targets = array( 'singular:' . $m[1] );
+			} elseif ( $single && preg_match( '#^singular/in_(category|post_tag)/(\d+)$#', $rest, $m ) ) {
+				$targets = array( ( 'category' === $m[1] ? 'in_category:' : 'in_tag:' ) . $m[2] );
+			} elseif ( $single && preg_match( '#^singular/(?:post|page)?_?by_author/(\d+)$#', $rest, $m ) ) {
+				$targets = array( 'author:' . $m[1] );
+			} elseif ( $single && preg_match( '#^singular/([a-z0-9_-]{1,20})$#', $rest, $m ) && ! in_array( $m[1], array( 'attachment' ), true ) ) {
+				$targets = array( 'post_type:' . $m[1] ); // A custom post type, such as a product.
 			} elseif ( 0 === strpos( $rest, 'archive' ) ) {
 				$targets = array( 'archives' );
 			} else {
@@ -213,6 +248,11 @@ final class Migration {
 				continue;
 			}
 			$display[ $list ] = array_merge( $display[ $list ], $targets );
+		}
+		// Search results and 404 templates show where their type says, even
+		// when Elementor stored no condition.
+		if ( ! $display['include'] && in_array( $type, array( 'search-results', 'error-404' ), true ) ) {
+			$display['include'] = array( ThemeBuilder::DEFAULT_TARGET[ $type ] );
 		}
 		return array(
 			'display' => ThemeBuilder::sanitize_display( $display ),
@@ -276,20 +316,23 @@ final class Migration {
 		if ( null === $data || ! in_array( $type, self::LIBRARY_TYPES, true ) ) {
 			return null;
 		}
-		$result   = ( new Converter( $this->widgets ) )->convert( $data, $elementor_id );
-		$existing = self::converted_template( $elementor_id );
+		$result     = ( new Converter( $this->widgets ) )->convert( $data, $elementor_id );
+		$existing   = self::converted_template( $elementor_id );
+		$conditions = get_post_meta( $elementor_id, '_elementor_conditions', true );
+		$kbroo_type = self::template_type( $type, $conditions );
 		if ( $existing ) {
 			$id = $existing->ID;
 			Document::save_layout( $id, $result['layout'] );
+			update_post_meta( $id, Templates::META_TYPE, $kbroo_type );
 		} else {
-			$id = Templates::create( get_the_title( $source ), self::template_type( $type ), $result['layout'] );
+			$id = Templates::create( get_the_title( $source ), $kbroo_type, $result['layout'] );
 			if ( is_wp_error( $id ) ) {
 				return null;
 			}
 			update_post_meta( $id, Templates::META_SOURCE, (string) $elementor_id );
 		}
-		if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
-			$converted = self::display_from_conditions( get_post_meta( $elementor_id, '_elementor_conditions', true ) );
+		if ( in_array( $kbroo_type, ThemeBuilder::TYPES, true ) ) {
+			$converted = self::display_from_conditions( $conditions, $kbroo_type );
 			ThemeBuilder::save_display( $id, $converted['display'] );
 			foreach ( $converted['dropped'] as $condition ) {
 				/* translators: %s: Elementor display condition. */
@@ -605,10 +648,10 @@ final class Migration {
 
 			<h2><?php esc_html_e( '3. Saved templates', 'kbroo-studio' ); ?></h2>
 			<?php if ( ! $library ) : ?>
-				<p><?php esc_html_e( 'No Elementor saved templates (pages, sections, containers, headers or footers) were found on this site.', 'kbroo-studio' ); ?></p>
+				<p><?php esc_html_e( 'No Elementor saved templates (pages, sections, containers, or theme builder headers, footers, single, archive, search results and 404 templates) were found on this site.', 'kbroo-studio' ); ?></p>
 			<?php else : ?>
 				<p><?php esc_html_e( 'Copy Elementor\'s saved templates into Kbroo Studio > Templates, so they can be inserted into any page from the editor.', 'kbroo-studio' ); ?></p>
-				<p><?php esc_html_e( 'Headers and footers keep their display conditions but start switched off, so the site does not change yet. Check each one, then switch it on under "Where it shows" in its editor (and turn off Elementor\'s).', 'kbroo-studio' ); ?></p>
+				<p><?php esc_html_e( 'Theme builder templates (headers, footers, single posts and pages, archives, search results, 404) keep their display conditions but start switched off, so the site does not change yet. Check each one, then switch it on under "Where it shows" in its editor (and turn off Elementor\'s).', 'kbroo-studio' ); ?></p>
 				<p><a class="button" href="<?php echo esc_url( self::action_url( 'library-all' ) ); ?>"><?php esc_html_e( 'Convert all templates', 'kbroo-studio' ); ?></a></p>
 				<table class="widefat striped">
 					<thead>

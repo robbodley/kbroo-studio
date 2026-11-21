@@ -19,11 +19,17 @@
  * - Block themes: the header and footer template parts are swapped as they
  *   render.
  *
- * A blog archive template replaces the theme's template for the blog page,
- * archives and search results it is set for: classic themes get a template
- * that calls get_header() and get_footer() around it; block themes get a
- * block template with the theme's header and footer parts around the
- * kbroo/archive block.
+ * The other types replace the theme's whole template (between its header
+ * and footer) for the requests they are set for, like Elementor Pro's
+ * theme builder:
+ * - archive: the blog page, archives and search results;
+ * - search-results: search results only (beats an archive template);
+ * - single-post and single-page: single posts, pages and other post types
+ *   (the Post title, Post content... widgets show the post being viewed);
+ * - error-404: the page not found page.
+ * Classic themes get a template that calls get_header() and get_footer()
+ * around it; block themes get a block template with the theme's header and
+ * footer parts around the kbroo/theme-template block.
  *
  * @package KbrooStudio
  */
@@ -39,24 +45,54 @@ final class ThemeBuilder {
 	const META_DISPLAY = '_kbroo_display';
 
 	/** Template types that replace part of the theme. */
-	const TYPES = array( 'header', 'footer', 'archive' );
+	const TYPES = array( 'header', 'footer', 'archive', 'search-results', 'single-post', 'single-page', 'error-404' );
 
 	/** The ones that are template parts around every page. */
 	const AREAS = array( 'header', 'footer' );
 
+	/** The part of the page each type fills. Types of one area compete. */
+	const AREA_OF = array(
+		'header'         => 'header',
+		'footer'         => 'footer',
+		'archive'        => 'archive',
+		'search-results' => 'archive',
+		'single-post'    => 'single',
+		'single-page'    => 'single',
+		'error-404'      => 'not_found',
+	);
+
+	/** Areas that replace the theme's template between header and footer. */
+	const CONTENT_AREAS = array( 'archive', 'single', 'not_found' );
+
+	/** Where a new template of each type shows until changed. */
+	const DEFAULT_TARGET = array(
+		'header'         => 'entire_site',
+		'footer'         => 'entire_site',
+		'archive'        => 'archives',
+		'search-results' => 'search',
+		'single-post'    => 'posts',
+		'single-page'    => 'pages',
+		'error-404'      => 'not_found',
+	);
+
 	/** How specific each target is; higher wins. */
 	const SPECIFICITY = array(
-		'entire_site' => 10,
-		'archives'    => 20,
-		'blog'        => 25,
-		'category'    => 25,
-		'tag'         => 25,
-		'search'      => 25,
-		'pages'       => 20,
-		'posts'       => 20,
-		'front_page'  => 30,
-		'not_found'   => 30,
-		'singular'    => 40,
+		'entire_site'  => 10,
+		'singular_all' => 15,
+		'archives'     => 20,
+		'pages'        => 20,
+		'posts'        => 20,
+		'post_type'    => 20,
+		'blog'         => 25,
+		'category'     => 25,
+		'tag'          => 25,
+		'search'       => 25,
+		'author'       => 28,
+		'front_page'   => 30,
+		'not_found'    => 30,
+		'in_category'  => 30,
+		'in_tag'       => 30,
+		'singular'     => 40,
 	);
 
 	/** Most chosen pages and posts one header or footer keeps. */
@@ -121,17 +157,53 @@ final class ThemeBuilder {
 	}
 
 	/**
+	 * Where a single post or page template can show: kinds of post (more
+	 * are picked one by one, by category, tag or author in the editor).
+	 *
+	 * @return array<string,string>
+	 */
+	public static function single_targets(): array {
+		$targets = array(
+			'singular_all' => __( 'All posts and pages', 'kbroo-studio' ),
+			'posts'        => __( 'All posts', 'kbroo-studio' ),
+			'pages'        => __( 'All pages', 'kbroo-studio' ),
+			'front_page'   => __( 'Front page', 'kbroo-studio' ),
+		);
+		foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $type ) {
+			if ( in_array( $type->name, array( 'post', 'page', 'attachment', Templates::POST_TYPE ), true ) ) {
+				continue;
+			}
+			/* translators: %s: post type name, plural (e.g. "Products"). */
+			$targets[ 'post_type:' . $type->name ] = sprintf( __( 'All %s', 'kbroo-studio' ), $type->labels->name );
+		}
+		return $targets;
+	}
+
+	/**
 	 * The targets offered for a template type.
 	 *
 	 * @return array<string,string>
 	 */
 	public static function targets_for( string $type ): array {
-		return 'archive' === $type ? self::archive_targets() : self::targets();
+		switch ( self::AREA_OF[ $type ] ?? '' ) {
+			case 'archive':
+				return 'search-results' === $type ? array( 'search' => __( 'Search results', 'kbroo-studio' ) ) : self::archive_targets();
+			case 'single':
+				return self::single_targets();
+			case 'not_found':
+				return array( 'not_found' => __( 'Page not found (404)', 'kbroo-studio' ) );
+		}
+		return self::targets();
+	}
+
+	/** The area a template type fills ('' for library templates). */
+	public static function area_of( string $type ): string {
+		return self::AREA_OF[ $type ] ?? '';
 	}
 
 	/** Every target, with labels. */
 	private static function all_targets(): array {
-		return self::targets() + self::archive_targets();
+		return self::targets() + self::archive_targets() + self::single_targets();
 	}
 
 	/**
@@ -156,8 +228,10 @@ final class ThemeBuilder {
 				$target = is_string( $target ) ? $target : '';
 				if ( array_key_exists( $target, self::all_targets() ) ) {
 					$out[] = $target;
-				} elseif ( preg_match( '/^singular:(\d{1,12})$/', $target, $m ) && (int) $m[1] > 0 ) {
-					$out[] = 'singular:' . (int) $m[1];
+				} elseif ( preg_match( '/^(singular|in_category|in_tag|author):(\d{1,12})$/', $target, $m ) && (int) $m[2] > 0 ) {
+					$out[] = $m[1] . ':' . (int) $m[2];
+				} elseif ( preg_match( '/^post_type:([a-z0-9_-]{1,20})$/', $target, $m ) ) {
+					$out[] = $target; // Kept even while its plugin is off.
 				}
 			}
 			return array_slice( array_values( array_unique( $out ) ), 0, self::MAX_ITEMS );
@@ -194,10 +268,26 @@ final class ThemeBuilder {
 		return $text;
 	}
 
-	private static function target_label( string $target ): string {
-		if ( 0 === strpos( $target, 'singular:' ) ) {
-			$title = get_the_title( (int) substr( $target, 9 ) );
-			return '' !== $title ? '"' . $title . '"' : '#' . substr( $target, 9 );
+	public static function target_label( string $target ): string {
+		list( $kind, $id ) = array_pad( explode( ':', $target, 2 ), 2, '' );
+		if ( 'singular' === $kind ) {
+			$title = get_the_title( (int) $id );
+			return '' !== $title ? '"' . $title . '"' : '#' . $id;
+		}
+		if ( 'in_category' === $kind || 'in_tag' === $kind ) {
+			$term = get_term( (int) $id );
+			$name = $term && ! is_wp_error( $term ) ? $term->name : '#' . $id;
+			/* translators: %s: category or tag name. */
+			return sprintf( 'in_category' === $kind ? __( 'Posts in category "%s"', 'kbroo-studio' ) : __( 'Posts tagged "%s"', 'kbroo-studio' ), $name );
+		}
+		if ( 'author' === $kind ) {
+			$user = get_userdata( (int) $id );
+			/* translators: %s: author name. */
+			return sprintf( __( 'Posts by %s', 'kbroo-studio' ), $user ? $user->display_name : '#' . $id );
+		}
+		if ( 'post_type' === $kind && ! post_type_exists( $id ) ) {
+			/* translators: %s: post type key. */
+			return sprintf( __( 'All "%s" (not available now)', 'kbroo-studio' ), $id );
 		}
 		if ( 'archives' === $target ) {
 			return __( 'All archives', 'kbroo-studio' );
@@ -206,7 +296,63 @@ final class ThemeBuilder {
 	}
 
 	/**
-	 * Pages and posts that can be picked one by one, for the editor.
+	 * What can be picked one by one in the editor for a template type: pages
+	 * and posts for headers, footers and single templates, and categories,
+	 * tags and authors for single templates.
+	 *
+	 * @return array<int,array{value: string, label: string, group: string}>
+	 */
+	public static function pickables( string $type ): array {
+		$area = self::area_of( $type );
+		if ( ! in_array( $area, array( 'header', 'footer', 'single' ), true ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( self::pickable_posts() as $post ) {
+			$out[] = array(
+				'value' => 'singular:' . $post['id'],
+				'label' => $post['title'],
+				'group' => 'post' === $post['type'] ? __( 'Posts', 'kbroo-studio' ) : __( 'Pages', 'kbroo-studio' ),
+			);
+		}
+		if ( 'single' !== $area ) {
+			return $out;
+		}
+		foreach ( array( 'category' => 'in_category', 'post_tag' => 'in_tag' ) as $taxonomy => $kind ) {
+			$terms = get_terms(
+				array(
+					'taxonomy'   => $taxonomy,
+					'hide_empty' => false,
+					'number'     => self::MAX_ITEMS,
+				)
+			);
+			foreach ( is_array( $terms ) ? $terms : array() as $term ) {
+				$out[] = array(
+					'value' => $kind . ':' . $term->term_id,
+					'label' => $term->name,
+					'group' => 'category' === $taxonomy ? __( 'Posts in category', 'kbroo-studio' ) : __( 'Posts with tag', 'kbroo-studio' ),
+				);
+			}
+		}
+		$authors = get_users(
+			array(
+				'capability' => array( 'edit_posts' ),
+				'number'     => self::MAX_ITEMS,
+				'fields'     => array( 'ID', 'display_name' ),
+			)
+		);
+		foreach ( $authors as $user ) {
+			$out[] = array(
+				'value' => 'author:' . $user->ID,
+				'label' => $user->display_name,
+				'group' => __( 'Posts by', 'kbroo-studio' ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Pages and posts that can be picked one by one.
 	 */
 	public static function pickable_posts(): array {
 		$out = array();
@@ -261,19 +407,37 @@ final class ThemeBuilder {
 			case 'search':
 				return is_search();
 		}
-		if ( 0 === strpos( $target, 'singular:' ) ) {
-			return is_singular() && (int) substr( $target, 9 ) === (int) get_queried_object_id();
+		list( $kind, $value ) = array_pad( explode( ':', $target, 2 ), 2, '' );
+		if ( 'singular_all' === $kind ) {
+			return is_singular() && ! is_attachment();
+		}
+		if ( ! is_singular() ) {
+			return false;
+		}
+		switch ( $kind ) {
+			case 'singular':
+				return (int) $value === (int) get_queried_object_id();
+			case 'post_type':
+				return is_singular( $value );
+			case 'in_category':
+				return has_term( (int) $value, 'category', get_queried_object_id() );
+			case 'in_tag':
+				return has_term( (int) $value, 'post_tag', get_queried_object_id() );
+			case 'author':
+				$post = get_queried_object();
+				return $post instanceof WP_Post && (int) $value === (int) $post->post_author;
 		}
 		return false;
 	}
 
 	private static function specificity( string $target ): int {
-		$key = 0 === strpos( $target, 'singular:' ) ? 'singular' : $target;
+		$key = explode( ':', $target, 2 )[0];
 		return self::SPECIFICITY[ $key ] ?? 0;
 	}
 
 	/**
-	 * The header or footer for this request, or null.
+	 * The template for an area (header, footer, archive, single or
+	 * not_found) for this request, or null for the theme's own.
 	 */
 	public function find( string $area ): ?WP_Post {
 		if ( array_key_exists( $area, $this->found ) ) {
@@ -283,8 +447,13 @@ final class ThemeBuilder {
 		if ( is_admin() || is_feed() || is_embed() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 			return null;
 		}
-		// A Canvas page has no header or footer at all.
-		if ( in_array( $area, self::AREAS, true ) && PageSettings::is_canvas_request() ) {
+		// A Canvas page has no header or footer, and no single template: it
+		// asked for a blank page.
+		if ( in_array( $area, array( 'header', 'footer', 'single' ), true ) && PageSettings::is_canvas_request() ) {
+			return null;
+		}
+		$types = array_keys( self::AREA_OF, $area, true );
+		if ( ! $types ) {
 			return null;
 		}
 		$posts = get_posts(
@@ -295,7 +464,8 @@ final class ThemeBuilder {
 				'orderby'        => 'modified',
 				'order'          => 'DESC',
 				'meta_key'       => Templates::META_TYPE, // phpcs:ignore WordPress.DB.SlowDBQuery
-				'meta_value'     => $area, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'     => $types, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_compare'   => 'IN',
 			)
 		);
 		$best = 0;
@@ -310,6 +480,10 @@ final class ThemeBuilder {
 					$score = max( $score, self::specificity( $target ) );
 				}
 			}
+			// A search results template beats an archive template set for search.
+			if ( $score && 'search-results' === Templates::type_of( $post ) ) {
+				$score++;
+			}
 			foreach ( $display['exclude'] as $target ) {
 				if ( self::matches( $target ) ) {
 					$score = 0;
@@ -322,10 +496,10 @@ final class ThemeBuilder {
 			}
 		}
 		/**
-		 * Filters the header or footer template used for this request.
+		 * Filters the theme template used for this request.
 		 *
 		 * @param WP_Post|null $post Template, or null for the theme's own.
-		 * @param string       $area "header" or "footer".
+		 * @param string       $area "header", "footer", "archive", "single" or "not_found".
 		 */
 		$this->found[ $area ] = apply_filters( 'kbroo_studio_theme_template', $this->found[ $area ], $area );
 		return $this->found[ $area ];
@@ -344,9 +518,14 @@ final class ThemeBuilder {
 			return '';
 		}
 		$display = self::get_display( $post );
-		if ( 'archive' === $area ) {
+		if ( in_array( $area, self::CONTENT_AREAS, true ) ) {
 			$this->printed[ $area ] = true;
-			return sprintf( '<div class="kbroo-archive-template" data-kbroo-template="%d">%s</div>', $post->ID, $this->frontend->render_post( $post ) );
+			$class = array(
+				'archive'   => 'kbroo-archive-template',
+				'single'    => 'kbroo-single-template',
+				'not_found' => 'kbroo-404-template',
+			)[ $area ];
+			return sprintf( '<div class="%s" data-kbroo-template="%d">%s</div>', $class, $post->ID, $this->frontend->render_post( $post ) );
 		}
 		$tag     = 'header' === $area ? 'header' : 'footer';
 		$classes = array( 'kbroo-site-' . $area );
@@ -367,7 +546,7 @@ final class ThemeBuilder {
 	 * Styles for the header and footer, in the head.
 	 */
 	public function enqueue(): void {
-		foreach ( self::TYPES as $area ) {
+		foreach ( array_unique( self::AREA_OF ) as $area ) {
 			$post = $this->find( $area );
 			if ( $post ) {
 				$this->frontend->enqueue_layout( Document::get_layout( $post ) );
@@ -377,9 +556,9 @@ final class ThemeBuilder {
 
 	public function body_class( $classes ): array {
 		$classes = (array) $classes;
-		foreach ( self::TYPES as $area ) {
+		foreach ( array_unique( self::AREA_OF ) as $area ) {
 			if ( $this->find( $area ) ) {
-				$classes[] = 'kbroo-has-' . $area;
+				$classes[] = 'kbroo-has-' . ( 'not_found' === $area ? '404' : $area );
 			}
 		}
 		return $classes;
@@ -435,42 +614,74 @@ final class ThemeBuilder {
 		ob_end_clean();
 	}
 
-	/** Whether this request is the blog page, an archive or search results. */
-	private static function is_archive_request(): bool {
-		return is_home() || is_archive() || is_search();
+	/**
+	 * The content area this request shows: archive (the blog page, archives
+	 * and search results), single or not_found, or ''.
+	 */
+	public static function content_area(): string {
+		if ( is_404() ) {
+			return 'not_found';
+		}
+		if ( is_home() || is_archive() || is_search() ) {
+			return 'archive';
+		}
+		if ( is_singular() && ! is_attachment() ) {
+			return 'single';
+		}
+		return '';
 	}
 
+	/** @var string Content area the current template file is for. */
+	private $current = '';
+
 	/**
-	 * Blog archive template: use ours instead of the theme's template.
+	 * Archive, single and 404 templates: use ours instead of the theme's.
 	 *
 	 * @param string $template Template file chosen so far.
 	 */
 	public function archive_template( $template ) {
-		if ( ! self::is_archive_request() || ! $this->find( 'archive' ) ) {
+		$area = self::content_area();
+		if ( '' === $area || ! $this->find( $area ) ) {
 			return $template;
 		}
+		$this->current = $area;
 		if ( ! wp_is_block_theme() ) {
-			return KBROO_STUDIO_DIR . 'templates/site-archive.php';
+			return KBROO_STUDIO_DIR . 'templates/site-template.php';
 		}
 		// A block template: the theme's header and footer parts (which a
 		// Kbroo Studio header or footer then replaces) around ours.
 		global $_wp_current_template_content;
 		$theme = wp_json_encode( get_stylesheet() );
 		$_wp_current_template_content = '<!-- wp:template-part {"slug":"header","theme":' . $theme . ',"tagName":"header","area":"header"} /-->'
-			. '<!-- wp:kbroo/archive /-->'
+			. '<!-- wp:kbroo/theme-template /-->'
 			. '<!-- wp:template-part {"slug":"footer","theme":' . $theme . ',"tagName":"footer","area":"footer"} /-->';
 		return ABSPATH . WPINC . '/template-canvas.php';
 	}
 
+	/**
+	 * The main content for templates/site-template.php and the
+	 * kbroo/theme-template block: the template for this request, inside
+	 * the loop for single posts so its widgets show that post.
+	 */
+	public function render_content(): string {
+		$area = '' !== $this->current ? $this->current : self::content_area();
+		if ( 'single' === $area && ! in_the_loop() && have_posts() ) {
+			the_post();
+			$html = $this->render_area( $area );
+			rewind_posts();
+			return $html;
+		}
+		return $this->render_area( $area );
+	}
+
 	public function register_archive_block(): void {
-		register_block_type(
-			'kbroo/archive',
-			array(
-				'render_callback' => function () {
-					return '<main class="kbroo-archive">' . $this->render_area( 'archive' ) . '</main>';
-				},
-			)
-		);
+		$callback = function () {
+			$area = '' !== $this->current ? $this->current : self::content_area();
+			return '<main class="kbroo-' . ( 'not_found' === $area ? '404' : $area ) . '">' . $this->render_content() . '</main>';
+		};
+		register_block_type( 'kbroo/theme-template', array( 'render_callback' => $callback ) );
+		// The name 0.2 used, for block templates saved with it.
+		register_block_type( 'kbroo/archive', array( 'render_callback' => $callback ) );
 	}
 
 	/**

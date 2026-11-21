@@ -41,6 +41,7 @@ final class Converter {
 		'image-gallery'          => 'Image gallery',
 		'image-carousel'         => 'Image carousel',
 		'video'                  => 'Video',
+		'loop-carousel'          => 'Loop carousel',
 		'wp-widget-categories'   => 'Categories (WordPress widget)',
 		'wp-widget-recent-posts' => 'Recent posts (WordPress widget)',
 	);
@@ -51,6 +52,37 @@ final class Converter {
 		'theme-site-title'    => 'site-title',
 		'theme-archive-title' => 'archive-title',
 		'archive-posts'       => 'posts',
+		'theme-post-title'    => 'post-title',
+		'theme-page-title'    => 'post-title',
+		'theme-post-content'  => 'post-content',
+		'theme-post-excerpt'  => 'post-excerpt',
+		'theme-post-featured-image' => 'post-featured-image',
+	);
+
+	/**
+	 * Elementor widgets whose main setting is filled by a dynamic tag that a
+	 * Kbroo Studio widget shows by itself: widget => setting => tag => widget.
+	 */
+	const DYNAMIC_WIDGETS = array(
+		'heading'     => array(
+			'title' => array(
+				'post-title'    => 'theme-post-title',
+				'archive-title' => 'theme-archive-title',
+				'site-title'    => 'theme-site-title',
+			),
+		),
+		'image'       => array(
+			'image' => array(
+				'post-featured-image' => 'theme-post-featured-image',
+				'site-logo'           => 'theme-site-logo',
+			),
+		),
+		'text-editor' => array(
+			'editor' => array(
+				'post-excerpt' => 'theme-post-excerpt',
+				'post-content' => 'theme-post-content',
+			),
+		),
 	);
 
 	/** Elementor settings with no visible effect, left out of the report. */
@@ -330,7 +362,20 @@ final class Converter {
 			}
 			return $clean;
 		}
-		unset( $settings['__dynamic__'], $settings['title'], $settings['link'] );
+		// A link to the post (the post-url tag) on a title or featured image.
+		if ( 'post-url' === ( self::tags_in( $settings )['link'] ?? '' ) ) {
+			if ( 'post-title' === $type ) {
+				$settings['link_to_post'] = 'yes';
+			} elseif ( 'post-featured-image' === $type ) {
+				$settings['link_to'] = 'post';
+			}
+		}
+		unset( $settings['__dynamic__'], $settings['title'] );
+		if ( 'post-featured-image' !== $type ) {
+			unset( $settings['link'] ); // The featured image keeps a custom link.
+		} else {
+			unset( $settings['image'] ); // The post's own.
+		}
 		if ( 'site-logo' === $type ) {
 			$settings['link_to'] = 'none' === ( $settings['link_to'] ?? '' ) ? 'none' : 'home';
 			if ( isset( $settings['space'] ) ) {
@@ -355,6 +400,11 @@ final class Converter {
 		}
 		$this->report['elements']++;
 		$this->report['widgets'][ $type ] = ( $this->report['widgets'][ $type ] ?? 0 ) + 1;
+		$type = $this->dynamic_widget( $type, $settings );
+		if ( 'loop-grid' === $type ) {
+			$type     = 'posts';
+			$settings = $this->loop_grid( $settings );
+		}
 		if ( isset( self::WIDGET_ALIASES[ $type ] ) ) {
 			$type     = self::WIDGET_ALIASES[ $type ];
 			$settings = $this->site_widget( $type, $settings );
@@ -365,9 +415,10 @@ final class Converter {
 			$widget = null; // Dailymotion and VideoPress stay as Elementor showed them.
 		}
 		if ( $widget && 'elementor-fallback' !== $type ) {
+			$settings = $this->dynamic_tags( $settings );
 			$settings = $this->common( $settings );
 			$settings = $this->legacy_icons( $type, $settings );
-			if ( 'posts' === $type ) {
+			if ( 'posts' === $type && 'loop' !== ( $settings['_skin'] ?? '' ) ) {
 				$settings = $this->posts( $settings );
 			}
 			if ( 0 === strpos( $type, 'wp-widget-' ) && isset( $settings['wp'] ) && is_array( $settings['wp'] ) ) {
@@ -395,6 +446,10 @@ final class Converter {
 					$this->drop( 'video lightbox (plays in the page)' );
 				}
 				unset( $settings['lightbox'] );
+			}
+			if ( 'post-navigation' === $type ) {
+				// Elementor picks taxonomies; Kbroo Studio keeps to categories.
+				$settings['in_same_term'] = ! empty( $settings['in_same_term'] ) ? 'yes' : '';
 			}
 			if ( 'divider' === $type && 'line_icon' === ( $settings['look'] ?? '' ) ) {
 				$settings['look'] = 'line';
@@ -438,6 +493,84 @@ final class Converter {
 				'snapshot'       => ElementorFallback::render_with_elementor( $json, $this->source_post ),
 			),
 		);
+	}
+
+	/**
+	 * The dynamic tags in an element's settings, as setting => tag name.
+	 * Elementor stores them as shortcodes: [elementor-tag id=".." name="post-title" settings=".."].
+	 */
+	private static function tags_in( array $settings ): array {
+		$tags = array();
+		foreach ( (array) ( $settings['__dynamic__'] ?? array() ) as $key => $shortcode ) {
+			if ( is_string( $shortcode ) && preg_match( '/name="([a-z0-9_-]+)"/i', $shortcode, $m ) ) {
+				$tags[ (string) $key ] = $m[1];
+			}
+		}
+		return $tags;
+	}
+
+	/**
+	 * A heading showing the post title becomes a Post title widget, an image
+	 * showing the featured image a Featured image widget, and so on.
+	 */
+	private function dynamic_widget( string $type, array &$settings ): string {
+		$tags = self::tags_in( $settings );
+		foreach ( self::DYNAMIC_WIDGETS[ $type ] ?? array() as $key => $map ) {
+			if ( isset( $tags[ $key ], $map[ $tags[ $key ] ] ) ) {
+				unset( $settings['__dynamic__'][ $key ] );
+				if ( 'heading' === $type && empty( $settings['header_size'] ) ) {
+					$settings['header_size'] = 'h2'; // Elementor's heading default.
+				}
+				return $map[ $tags[ $key ] ];
+			}
+		}
+		return $type;
+	}
+
+	/**
+	 * Dynamic tags Kbroo Studio cannot fill yet: the setting keeps the value
+	 * saved with it, and the report says so.
+	 */
+	private function dynamic_tags( array $settings ): array {
+		foreach ( self::tags_in( $settings ) as $key => $tag ) {
+			$this->drop( 'dynamic tag ' . $tag . ' (shows the saved ' . $key . ' instead)' );
+		}
+		unset( $settings['__dynamic__'] );
+		return $settings;
+	}
+
+	/**
+	 * Elementor Pro's Loop grid: a Posts widget with the Loop item skin. Its
+	 * query settings are named post_query_* where the Posts widget's are
+	 * posts_*. The loop item is found by the Elementor template it was
+	 * converted from, now or once it is converted.
+	 */
+	private function loop_grid( array $settings ): array {
+		$clean = array( '_skin' => 'loop' );
+		foreach ( $settings as $key => $value ) {
+			$key = (string) $key;
+			if ( 0 === strpos( $key, 'post_query_' ) ) {
+				$key = 'posts_' . substr( $key, 11 );
+			}
+			$clean[ $key ] = $value;
+		}
+		$elementor = (int) ( $settings['template_id'] ?? 0 );
+		$converted = $elementor ? Migration::converted_template( $elementor ) : null;
+		$clean['template_id']           = $converted ? (string) $converted->ID : '';
+		$clean['elementor_template_id'] = $elementor;
+		if ( $elementor && ! $converted ) {
+			$this->drop( 'loop item template (convert it under Saved templates and the grid uses it)' );
+		}
+		if ( in_array( $clean['pagination_type'] ?? '', array( 'load_more_on_click', 'load_more_infinite_scroll' ), true ) ) {
+			$this->drop( 'load more pagination (shown as numbers)' );
+			$clean['pagination_type'] = 'numbers';
+		}
+		// Elementor's defaults where they differ from the Posts widget's.
+		$clean += array(
+			'posts_exclude_current' => '',
+			'posts_post_type'       => 'post',
+		);
+		return $clean;
 	}
 
 	/**

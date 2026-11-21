@@ -32,7 +32,11 @@ final class Renderer {
 		$this->widgets = $widgets;
 	}
 
-	public function render( array $layout, int $post_id = 0 ): string {
+	public function render( array $layout, int $post_id = 0, bool $with_css = true ): string {
+		// A widget can render another layout while this one renders (Post
+		// content, a loop item grid): keep this one's state to come back to.
+		$outer = array( $this->rules, $this->animated, $this->post_id );
+
 		$this->rules    = array_fill_keys( Controls::DEVICES, array() );
 		$this->animated = false;
 		$this->post_id  = $post_id;
@@ -52,7 +56,8 @@ final class Renderer {
 			Frontend::enqueue_script();
 		}
 
-		$css = Css::stylesheet( $this->rules );
+		$css = $with_css ? Css::stylesheet( $this->rules ) : '';
+		list( $this->rules, $this->animated, $this->post_id ) = $outer;
 		if ( '' !== $css ) {
 			// Values are validated before they reach the CSS; this only
 			// guarantees the style element cannot be closed early.

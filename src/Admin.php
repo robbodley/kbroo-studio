@@ -171,7 +171,7 @@ final class Admin {
 	}
 
 	/**
-	 * The newest switched-on header or footer, for the overview.
+	 * The newest switched-on theme template of a type, for the overview.
 	 */
 	private function area_templates( string $area ): ?\WP_Post {
 		$posts = get_posts(
@@ -238,7 +238,7 @@ final class Admin {
 					</p>
 				</div>
 				<div class="card">
-					<h2 class="title"><?php esc_html_e( 'Header, footer and blog archive', 'kbroo-studio' ); ?></h2>
+					<h2 class="title"><?php esc_html_e( 'Theme templates', 'kbroo-studio' ); ?></h2>
 					<?php foreach ( ThemeBuilder::TYPES as $area ) : ?>
 						<?php $current = $this->area_templates( $area ); ?>
 						<p>
@@ -253,9 +253,10 @@ final class Admin {
 					<?php endforeach; ?>
 					<?php if ( current_user_can( 'publish_pages' ) ) : ?>
 						<p>
-							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=header' ) ); ?>"><?php esc_html_e( 'New header', 'kbroo-studio' ); ?></a>
-							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=footer' ) ); ?>"><?php esc_html_e( 'New footer', 'kbroo-studio' ); ?></a>
-							<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=archive' ) ); ?>"><?php esc_html_e( 'New blog archive', 'kbroo-studio' ); ?></a>
+							<?php esc_html_e( 'New:', 'kbroo-studio' ); ?>
+							<?php foreach ( Templates::new_labels() as $kbroo_type => $kbroo_label ) : ?>
+								<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=' . $kbroo_type ) ); ?>"><?php echo esc_html( $kbroo_label ); ?></a>
+							<?php endforeach; ?>
 						</p>
 					<?php endif; ?>
 				</div>

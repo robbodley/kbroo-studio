@@ -849,7 +849,8 @@
 		ui.canvas.addEventListener( 'submit', function ( e ) {
 			e.preventDefault();
 		} );
-		ui.canvasWrap = el( 'main', { class: 'kb-canvas-wrap' }, [ ui.canvas ] );
+		// A loop item is designed at about the width of one grid cell.
+		ui.canvasWrap = el( 'main', { class: 'kb-canvas-wrap' + ( config.templateType === 'loop-item' ? ' is-loop-item' : '' ) }, [ ui.canvas ] );
 		ui.toast = el( 'div', { class: 'kb-toast', role: 'status', 'aria-live': 'polite' } );
 
 		document.head.appendChild( ui.styles );
@@ -2029,6 +2030,10 @@
 
 	function itemTitle( control, item, index ) {
 		var value = control.title_field ? item[ control.title_field ] : '';
+		var titleField = control.fields && control.fields[ control.title_field ];
+		if ( titleField && titleField.options && typeof value === 'string' && titleField.options[ value ] ) {
+			value = titleField.options[ value ]; // A select: its label.
+		}
 		if ( value && typeof value === 'object' ) {
 			value = typeof value.value === 'string' ? value.value.replace( /^fa[a-z]? fa-/, '' ).replace( /-/g, ' ' ) : '';
 		}
@@ -2680,12 +2685,17 @@
 	}
 
 	function displayLabel( target ) {
-		if ( target.indexOf( 'singular:' ) === 0 ) {
-			var id = parseInt( target.slice( 9 ), 10 );
-			var found = config.displayPosts.filter( function ( p ) {
-				return p.id === id;
-			} )[ 0 ];
-			return found ? found.title + ( found.type === 'post' ? ' (post)' : '' ) : '#' + id;
+		var found = config.displayPicks.filter( function ( p ) {
+			return p.value === target;
+		} )[ 0 ];
+		if ( found ) {
+			if ( target.indexOf( 'singular:' ) === 0 ) {
+				return found.label + ( found.group === 'Posts' ? ' (post)' : '' );
+			}
+			return found.group + ' ' + found.label;
+		}
+		if ( /^(singular|in_category|in_tag|author):/.test( target ) ) {
+			return '#' + target.split( ':' )[ 1 ];
 		}
 		return config.displayTargets[ target ] || target;
 	}
@@ -2698,7 +2708,7 @@
 		wrap.appendChild( el( 'label', { for: selectId, text: title } ) );
 		var chips = el( 'ul', { class: 'kb-chips' } );
 		list.forEach( function ( target, index ) {
-			if ( generalTargets === null && target.indexOf( 'singular:' ) !== 0 ) {
+			if ( generalTargets === null && config.displayTargets[ target ] ) {
 				return; // Shown as checkboxes instead.
 			}
 			chips.appendChild(
@@ -2733,18 +2743,20 @@
 					general.appendChild( el( 'option', { value: t, text: config.displayTargets[ t ] } ) );
 				}
 			} );
-			select.appendChild( general );
-		}
-		( config.displayPosts.length ? [ [ 'page', 'Pages' ], [ 'post', 'Posts' ] ] : [] ).forEach( function ( pair ) {
-			var group = el( 'optgroup', { label: pair[ 1 ] } );
-			config.displayPosts.forEach( function ( p ) {
-				if ( p.type === pair[ 0 ] && list.indexOf( 'singular:' + p.id ) === -1 ) {
-					group.appendChild( el( 'option', { value: 'singular:' + p.id, text: p.title } ) );
-				}
-			} );
-			if ( group.children.length ) {
-				select.appendChild( group );
+			if ( general.children.length ) {
+				select.appendChild( general );
 			}
+		}
+		var groups = {};
+		config.displayPicks.forEach( function ( p ) {
+			if ( list.indexOf( p.value ) > -1 ) {
+				return;
+			}
+			if ( ! groups[ p.group ] ) {
+				groups[ p.group ] = el( 'optgroup', { label: p.group } );
+				select.appendChild( groups[ p.group ] );
+			}
+			groups[ p.group ].appendChild( el( 'option', { value: p.value, text: p.label } ) );
 		} );
 		select.addEventListener( 'change', function () {
 			if ( select.value ) {
@@ -2766,23 +2778,32 @@
 		return el( 'div', { class: 'kb-control kb-control-switcher' }, [ el( 'label', { for: id, text: label } ), box ] );
 	}
 
+	/** How the display panel talks about each kind of theme template. */
+	var DISPLAY_WORDS = {
+		header: { thing: 'header', off: 'the theme\'s own header shows everywhere', everywhere: 'entire_site' },
+		footer: { thing: 'footer', off: 'the theme\'s own footer shows everywhere', everywhere: 'entire_site' },
+		archive: { thing: 'archive template', off: 'the theme\'s own archive pages show', everywhere: 'archives' },
+		'search-results': { thing: 'search results template', off: 'the theme\'s own search results page shows', everywhere: 'search' },
+		'single-post': { thing: 'single post template', off: 'the theme\'s own post pages show', everywhere: 'singular_all' },
+		'single-page': { thing: 'single page template', off: 'the theme\'s own pages show', everywhere: 'singular_all' },
+		'error-404': { thing: '404 template', off: 'the theme\'s own page not found page shows', everywhere: 'not_found' },
+	};
+
 	function renderDisplayPanel() {
 		var d = state.display;
-		var area = { header: 'header', footer: 'footer', archive: 'archive page' }[ config.templateType ] || 'header';
-		var everywhere = config.templateType === 'archive' ? 'archives' : 'entire_site';
-		var pickPosts = config.displayPosts.length > 0;
+		var words = DISPLAY_WORDS[ config.templateType ] || DISPLAY_WORDS.header;
+		var area = words.thing;
+		var pickPosts = config.displayPicks.length > 0;
+		var isSingle = config.templateType === 'single-post' || config.templateType === 'single-page';
 		var body = el( 'div', { class: 'kb-panel-body kb-display' } );
 
 		var summary;
 		if ( ! d.active ) {
-			summary = 'Switched off: the theme\'s own ' + area + ' shows everywhere.';
-			if ( config.templateType === 'archive' ) {
-				summary = 'Switched off: the theme\'s own archive pages show.';
-			}
+			summary = 'Switched off: ' + words.off + '.';
 		} else if ( ! d.include.length ) {
 			summary = 'Not shown anywhere yet. Choose where below.';
 		} else {
-			summary = 'Replaces the theme\'s ' + ( config.templateType === 'archive' ? 'template' : area ) + ' on: ' + d.include.map( displayLabel ).join( ', ' ) + ( d.exclude.length ? '; not on: ' + d.exclude.map( displayLabel ).join( ', ' ) : '' ) + '.';
+			summary = 'Replaces the theme\'s ' + ( area === 'header' || area === 'footer' ? area : 'template' ) + ' on: ' + d.include.map( displayLabel ).join( ', ' ) + ( d.exclude.length ? '; not on: ' + d.exclude.map( displayLabel ).join( ', ' ) : '' ) + '.';
 		}
 		body.appendChild( el( 'p', { class: 'kb-hint kb-display-summary', text: summary } ) );
 
@@ -2791,7 +2812,7 @@
 				d.active = on;
 			} )
 		);
-		if ( area === 'header' ) {
+		if ( config.templateType === 'header' ) {
 			body.appendChild(
 				displaySwitch( 'kb-display-sticky', 'Stick to the top when scrolling', d.sticky, function ( on ) {
 					d.sticky = on;
@@ -2801,7 +2822,7 @@
 
 		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Show on' } ) );
 		Object.keys( config.displayTargets ).forEach( function ( target ) {
-			var id = 'kb-display-include-' + target;
+			var id = 'kb-display-include-' + target.replace( /[^a-z0-9_-]/gi, '-' );
 			var box = el( 'input', { type: 'checkbox', id: id, 'data-target': target } );
 			box.checked = d.include.indexOf( target ) > -1;
 			box.addEventListener( 'change', function () {
@@ -2816,30 +2837,29 @@
 			body.appendChild( el( 'div', { class: 'kb-check' }, [ box, el( 'label', { for: id, text: config.displayTargets[ target ] } ) ] ) );
 		} );
 		if ( pickPosts ) {
-			body.appendChild( displayList( 'include', 'And on these pages and posts', null, 'Add a page or post…' ) );
+			body.appendChild( displayList( 'include', isSingle ? 'And these posts and pages' : 'And on these pages and posts', null, isSingle ? 'Add a post, page, category, tag or author…' : 'Add a page or post…' ) );
 		}
 
-		body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Except on' } ) );
-		body.appendChild(
-			displayList(
-				'exclude',
-				'Exceptions',
-				Object.keys( config.displayTargets ).filter( function ( t ) {
-					return t !== everywhere;
-				} ),
-				'Add an exception…'
-			)
-		);
-		body.appendChild(
-			el( 'p', {
-				class: 'kb-control-note',
-				text: config.templateType === 'archive'
-					? 'If more than one archive template fits a page, the most specific wins: "Category archives" beats "All archives". Changes apply when you save.'
-					: 'If more than one ' + area + ' fits a page, the most specific wins: a chosen page beats a kind of page, which beats the entire site. Changes apply when you save.',
-			} )
-		);
+		var exceptions = Object.keys( config.displayTargets ).filter( function ( t ) {
+			return t !== words.everywhere;
+		} );
+		if ( exceptions.length || pickPosts ) {
+			body.appendChild( el( 'h3', { class: 'kb-control-section', text: 'Except on' } ) );
+			body.appendChild( displayList( 'exclude', 'Exceptions', exceptions, 'Add an exception…' ) );
+		}
+		var note;
+		if ( config.templateType === 'archive' ) {
+			note = 'If more than one archive template fits a page, the most specific wins: "Category archives" beats "All archives", and a Search results template beats both on search results. Changes apply when you save.';
+		} else if ( isSingle ) {
+			note = 'If more than one single template fits a post or page, the most specific wins: a chosen post beats a category, tag or author, which beats "All posts", which beats "All posts and pages". Canvas pages never use one. Changes apply when you save.';
+		} else if ( config.templateType === 'search-results' || config.templateType === 'error-404' ) {
+			note = 'If there is more than one, the most recently changed one shows. Changes apply when you save.';
+		} else {
+			note = 'If more than one ' + area + ' fits a page, the most specific wins: a chosen page beats a kind of page, which beats the entire site. Changes apply when you save.';
+		}
+		body.appendChild( el( 'p', { class: 'kb-control-note', text: note } ) );
 
-		ui.panel.appendChild( panelHeader( config.templateType === 'archive' ? 'Where this template shows' : 'Where this ' + area + ' shows' ) );
+		ui.panel.appendChild( panelHeader( area === 'header' || area === 'footer' ? 'Where this ' + area + ' shows' : 'Where this template shows' ) );
 		ui.panel.appendChild( body );
 	}
 
@@ -3182,9 +3202,7 @@
 			var search = el( 'input', { type: 'search', class: 'kb-template-search', placeholder: 'Search templates', 'aria-label': 'Search templates' } );
 			search.value = templates.search;
 			var filters = el( 'div', { class: 'kb-segmented kb-template-filter', role: 'group', 'aria-label': 'Template type' } );
-			[ [ '', 'All' ] ].concat( Object.keys( config.templateTypes ).map( function ( k ) {
-				return [ k, config.templateTypes[ k ] + 's' ];
-			} ) ).forEach( function ( pair ) {
+			[ [ '', 'All' ], [ 'section', 'Sections' ], [ 'page', 'Pages' ], [ 'theme', 'Theme' ] ].forEach( function ( pair ) {
 				filters.appendChild(
 					el( 'button', {
 						type: 'button',
@@ -3205,7 +3223,8 @@
 				var words = templates.search.toLowerCase().split( /\s+/ ).filter( Boolean );
 				var shown = templates.items.filter( function ( item ) {
 					var title = ( item.title || '' ).toLowerCase();
-					return ( ! templates.filter || item.type === templates.filter ) && words.every( function ( w ) {
+					var typeMatches = ! templates.filter || item.type === templates.filter || ( templates.filter === 'theme' && config.themeTypes.indexOf( item.type ) > -1 );
+					return typeMatches && words.every( function ( w ) {
 						return title.indexOf( w ) > -1;
 					} );
 				} );

@@ -5,7 +5,9 @@
  *
  * A template is a `kbroo_template` post holding a layout like any page,
  * edited in the same editor. Its type (section or page) is a label used to
- * sort the library. Templates are listed under Kbroo Studio > Templates
+ * sort the library; theme templates (header, footer, archive, single post
+ * or page, search results, 404) replace part of the theme (see
+ * ThemeBuilder). Templates are listed under Kbroo Studio > Templates
  * and are never shown on the site by themselves.
  *
  * @package KbrooStudio
@@ -47,11 +49,34 @@ final class Templates {
 	 */
 	public static function types(): array {
 		return array(
-			'section' => __( 'Section', 'kbroo-studio' ),
-			'page'    => __( 'Page', 'kbroo-studio' ),
-			'header'  => __( 'Header', 'kbroo-studio' ),
-			'footer'  => __( 'Footer', 'kbroo-studio' ),
-			'archive' => __( 'Blog archive', 'kbroo-studio' ),
+			'section'        => __( 'Section', 'kbroo-studio' ),
+			'page'           => __( 'Page', 'kbroo-studio' ),
+			'header'         => __( 'Header', 'kbroo-studio' ),
+			'footer'         => __( 'Footer', 'kbroo-studio' ),
+			'archive'        => __( 'Blog archive', 'kbroo-studio' ),
+			'search-results' => __( 'Search results', 'kbroo-studio' ),
+			'single-post'    => __( 'Single post', 'kbroo-studio' ),
+			'single-page'    => __( 'Single page', 'kbroo-studio' ),
+			'error-404'      => __( 'Page not found (404)', 'kbroo-studio' ),
+			'loop-item'      => __( 'Loop item', 'kbroo-studio' ),
+		);
+	}
+
+	/**
+	 * Short names for the "New ..." buttons of theme templates.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function new_labels(): array {
+		return array(
+			'header'         => __( 'Header', 'kbroo-studio' ),
+			'footer'         => __( 'Footer', 'kbroo-studio' ),
+			'archive'        => __( 'Archive', 'kbroo-studio' ),
+			'search-results' => __( 'Search results', 'kbroo-studio' ),
+			'single-post'    => __( 'Single post', 'kbroo-studio' ),
+			'single-page'    => __( 'Single page', 'kbroo-studio' ),
+			'error-404'      => __( '404 page', 'kbroo-studio' ),
+			'loop-item'      => __( 'Loop item', 'kbroo-studio' ),
 		);
 	}
 
@@ -78,21 +103,20 @@ final class Templates {
 	}
 
 	/**
-	 * "New header" and "New footer" next to "New template" in the list.
+	 * "New: Header, Footer, Archive..." next to "New template" in the list.
 	 */
 	public function new_buttons(): void {
 		$screen = get_current_screen();
 		if ( ! $screen || 'edit-' . self::POST_TYPE !== $screen->id || ! current_user_can( 'publish_pages' ) ) {
 			return;
 		}
-		$links = '';
-		foreach ( ThemeBuilder::TYPES as $area ) {
+		$links = ' <span class="kbroo-new-theme-label">' . esc_html__( 'New theme template:', 'kbroo-studio' ) . '</span>';
+		foreach ( self::new_labels() as $area => $label ) {
 			$links .= sprintf(
 				' <a href="%s" class="page-title-action" data-kbroo-new="%s">%s</a>',
 				esc_url( admin_url( 'post-new.php?post_type=' . self::POST_TYPE . '&template_type=' . $area ) ),
 				esc_attr( $area ),
-				/* translators: %s: Header or Footer. */
-				esc_html( sprintf( __( 'New %s', 'kbroo-studio' ), strtolower( self::types()[ $area ] ) ) )
+				esc_html( $label )
 			);
 		}
 		?>
@@ -159,15 +183,24 @@ final class Templates {
 		if ( is_wp_error( $id ) ) {
 			wp_die( esc_html( $id->get_error_message() ) );
 		}
-		if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
-			// A new header or footer is for the whole site unless changed, and
-			// an archive template for every archive.
-			ThemeBuilder::save_display( $id, array( 'include' => array( 'archive' === $type ? 'archives' : 'entire_site' ) ) );
+		if ( 'loop-item' === $type ) {
 			wp_update_post(
 				array(
 					'ID'         => $id,
-					/* translators: %s: Header or Footer. */
-					'post_title' => sprintf( __( 'New %s', 'kbroo-studio' ), strtolower( self::types()[ $type ] ) ),
+					'post_title' => __( 'New loop item', 'kbroo-studio' ),
+				)
+			);
+		}
+		if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
+			// A new header or footer is for the whole site unless changed, an
+			// archive template for every archive, a single post template for
+			// all posts, and so on.
+			ThemeBuilder::save_display( $id, array( 'include' => array( ThemeBuilder::DEFAULT_TARGET[ $type ] ) ) );
+			wp_update_post(
+				array(
+					'ID'         => $id,
+					/* translators: %s: Header, Footer, Single post... */
+					'post_title' => sprintf( __( 'New %s', 'kbroo-studio' ), strtolower( self::new_labels()[ $type ] ) ),
 				)
 			);
 		}
