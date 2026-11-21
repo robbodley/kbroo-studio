@@ -160,7 +160,7 @@ final class Migration {
 	}
 
 	/** Elementor template types the library takes. */
-	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer', 'archive', 'search-results', 'single', 'single-post', 'single-page', 'error-404' );
+	const LIBRARY_TYPES = array( 'page', 'section', 'container', 'header', 'footer', 'archive', 'search-results', 'single', 'single-post', 'single-page', 'error-404', 'loop-item' );
 
 	/**
 	 * The library type for an Elementor template type. Elementor Pro's older
@@ -191,7 +191,7 @@ final class Migration {
 			);
 			return $includes && count( $pages ) === count( $includes ) ? 'single-page' : 'single-post';
 		}
-		if ( in_array( $elementor_type, ThemeBuilder::TYPES, true ) ) {
+		if ( in_array( $elementor_type, ThemeBuilder::TYPES, true ) || 'loop-item' === $elementor_type ) {
 			return $elementor_type;
 		}
 		return in_array( $elementor_type, array( 'section', 'container' ), true ) ? 'section' : 'page';

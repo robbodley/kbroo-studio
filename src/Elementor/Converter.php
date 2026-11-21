@@ -41,7 +41,6 @@ final class Converter {
 		'image-gallery'          => 'Image gallery',
 		'image-carousel'         => 'Image carousel',
 		'video'                  => 'Video',
-		'loop-grid'              => 'Loop grid',
 		'loop-carousel'          => 'Loop carousel',
 		'wp-widget-categories'   => 'Categories (WordPress widget)',
 		'wp-widget-recent-posts' => 'Recent posts (WordPress widget)',
@@ -402,6 +401,10 @@ final class Converter {
 		$this->report['elements']++;
 		$this->report['widgets'][ $type ] = ( $this->report['widgets'][ $type ] ?? 0 ) + 1;
 		$type = $this->dynamic_widget( $type, $settings );
+		if ( 'loop-grid' === $type ) {
+			$type     = 'posts';
+			$settings = $this->loop_grid( $settings );
+		}
 		if ( isset( self::WIDGET_ALIASES[ $type ] ) ) {
 			$type     = self::WIDGET_ALIASES[ $type ];
 			$settings = $this->site_widget( $type, $settings );
@@ -415,7 +418,7 @@ final class Converter {
 			$settings = $this->dynamic_tags( $settings );
 			$settings = $this->common( $settings );
 			$settings = $this->legacy_icons( $type, $settings );
-			if ( 'posts' === $type ) {
+			if ( 'posts' === $type && 'loop' !== ( $settings['_skin'] ?? '' ) ) {
 				$settings = $this->posts( $settings );
 			}
 			if ( 0 === strpos( $type, 'wp-widget-' ) && isset( $settings['wp'] ) && is_array( $settings['wp'] ) ) {
@@ -534,6 +537,40 @@ final class Converter {
 		}
 		unset( $settings['__dynamic__'] );
 		return $settings;
+	}
+
+	/**
+	 * Elementor Pro's Loop grid: a Posts widget with the Loop item skin. Its
+	 * query settings are named post_query_* where the Posts widget's are
+	 * posts_*. The loop item is found by the Elementor template it was
+	 * converted from, now or once it is converted.
+	 */
+	private function loop_grid( array $settings ): array {
+		$clean = array( '_skin' => 'loop' );
+		foreach ( $settings as $key => $value ) {
+			$key = (string) $key;
+			if ( 0 === strpos( $key, 'post_query_' ) ) {
+				$key = 'posts_' . substr( $key, 11 );
+			}
+			$clean[ $key ] = $value;
+		}
+		$elementor = (int) ( $settings['template_id'] ?? 0 );
+		$converted = $elementor ? Migration::converted_template( $elementor ) : null;
+		$clean['template_id']           = $converted ? (string) $converted->ID : '';
+		$clean['elementor_template_id'] = $elementor;
+		if ( $elementor && ! $converted ) {
+			$this->drop( 'loop item template (convert it under Saved templates and the grid uses it)' );
+		}
+		if ( in_array( $clean['pagination_type'] ?? '', array( 'load_more_on_click', 'load_more_infinite_scroll' ), true ) ) {
+			$this->drop( 'load more pagination (shown as numbers)' );
+			$clean['pagination_type'] = 'numbers';
+		}
+		// Elementor's defaults where they differ from the Posts widget's.
+		$clean += array(
+			'posts_exclude_current' => '',
+			'posts_post_type'       => 'post',
+		);
+		return $clean;
 	}
 
 	/**

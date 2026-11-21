@@ -11,6 +11,9 @@
 namespace KbrooStudio\Widgets;
 
 use KbrooStudio\ControlGroups;
+use KbrooStudio\Document;
+use KbrooStudio\Plugin;
+use KbrooStudio\Templates;
 use WP_Query;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,7 +84,70 @@ class Posts extends Widget {
 		return $options;
 	}
 
+	/** Settings the Loop item skin keeps: the rest style the built-in skins. */
+	const LOOP_KEEPS = array( '_skin', 'template_id', 'elementor_template_id', 'columns', 'posts_per_page', 'column_gap', 'row_gap' );
+
+	/**
+	 * Loop item templates to pick from, for the Loop item skin.
+	 *
+	 * @return array<string,string>
+	 */
+	private static function loop_templates(): array {
+		$options = array( '' => __( 'Choose a loop item template', 'kbroo-studio' ) );
+		$posts   = get_posts(
+			array(
+				'post_type'      => Templates::POST_TYPE,
+				'post_status'    => array( 'publish', 'draft', 'private' ),
+				'posts_per_page' => 200,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+				'meta_key'       => Templates::META_TYPE, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'     => 'loop-item', // phpcs:ignore WordPress.DB.SlowDBQuery
+			)
+		);
+		foreach ( $posts as $post ) {
+			$options[ (string) $post->ID ] = '' !== $post->post_title ? $post->post_title : '#' . $post->ID;
+		}
+		return $options;
+	}
+
 	protected function widget_controls(): array {
+		$controls = $this->base_controls();
+		// The Loop item skin draws each post with a template: the built-in
+		// skins' settings are hidden for it.
+		foreach ( $controls as $key => $control ) {
+			$tab       = $control['tab'] ?? 'content';
+			$selectors = implode( ' ', array_keys( (array) ( $control['selectors'] ?? array() ) ) );
+			$classic   = ( 'content' === $tab && ( $control['section'] ?? '' ) === __( 'Layout', 'kbroo-studio' ) ) || preg_match( '/\.kbroo-post(?!s)/', $selectors );
+			if ( $classic && ! in_array( $key, self::LOOP_KEEPS, true ) ) {
+				$controls[ $key ]['condition'] = (array) ( $control['condition'] ?? array() ) + array( '_skin!' => 'loop' );
+			}
+		}
+		$controls['_skin']['options']['loop'] = __( 'Loop item template', 'kbroo-studio' );
+		$position = array_search( '_skin', array_keys( $controls ), true ) + 1;
+		return array_slice( $controls, 0, $position, true ) + array(
+			'template_id'           => array(
+				'type'        => 'select',
+				'label'       => __( 'Loop item template', 'kbroo-studio' ),
+				'section'     => __( 'Layout', 'kbroo-studio' ),
+				'default'     => '',
+				'options'     => self::loop_templates(),
+				'condition'   => array( '_skin' => 'loop' ),
+				'description' => __( 'Make one under Kbroo Studio > Templates > New theme template: Loop item. Its Post title, Featured image, Post info... widgets show each post in turn.', 'kbroo-studio' ),
+			),
+			// The Elementor loop item a converted grid used, until its
+			// template is converted too.
+			'elementor_template_id' => array(
+				'type'    => 'number',
+				'label'   => 'Elementor template',
+				'default' => 0,
+				'min'     => 0,
+				'hidden'  => true,
+			),
+		) + array_slice( $controls, $position, null, true );
+	}
+
+	private function base_controls(): array {
 		$layout = array( 'section' => __( 'Layout', 'kbroo-studio' ) );
 		$query  = array( 'section' => __( 'Query', 'kbroo-studio' ) );
 		// Hidden when the posts come from the archive being viewed.
@@ -558,6 +624,9 @@ class Posts extends Widget {
 			return '' !== $message ? '<div class="kbroo-posts-nothing">' . esc_html( $message ) . '</div>' : '';
 		}
 
+		if ( 'loop' === $settings['_skin'] ) {
+			return $this->render_loop( $settings, $query, $page, $main );
+		}
 		$skin  = 'cards' === $settings['_skin'] ? 'cards' : 'classic';
 		$thumb = in_array( $settings['thumbnail'], array( 'top', 'left', 'right', 'none' ), true ) ? $settings['thumbnail'] : 'top';
 		$html  = '';
@@ -568,6 +637,55 @@ class Posts extends Widget {
 		wp_reset_postdata();
 
 		$html = sprintf( '<div class="kbroo-posts kbroo-posts--%1$s kbroo-posts--thumb-%2$s">%3$s</div>', $skin, $thumb, $html );
+		return $html . $this->pagination( $settings, $query, $page, $main );
+	}
+
+	/**
+	 * The loop item template a grid uses: the one chosen, or the converted
+	 * copy of the Elementor loop item it was converted with.
+	 */
+	public static function loop_template( array $settings ): ?\WP_Post {
+		$id   = (int) $settings['template_id'];
+		$post = $id > 0 ? get_post( $id ) : null; // get_post( 0 ) is the current post.
+		if ( ! $post && (int) $settings['elementor_template_id'] > 0 && class_exists( '\\KbrooStudio\\Elementor\\Migration' ) ) {
+			$post = \KbrooStudio\Elementor\Migration::converted_template( (int) $settings['elementor_template_id'] );
+		}
+		if ( ! $post || ! Templates::is_template( $post ) || 'trash' === $post->post_status ) {
+			return null;
+		}
+		return $post;
+	}
+
+	/** @var int[] Loop item templates being drawn, so one cannot hold itself. */
+	private static $drawing = array();
+
+	/**
+	 * Each post drawn with the loop item template, in the grid.
+	 */
+	private function render_loop( array $settings, WP_Query $query, int $page, bool $main ): string {
+		$template = self::loop_template( $settings );
+		if ( ! $template || in_array( $template->ID, self::$drawing, true ) ) {
+			wp_reset_postdata();
+			return current_user_can( 'edit_posts' ) && '' === $this->element_id
+				? '<div class="kbroo-posts-nothing">' . esc_html__( 'Choose a loop item template for this grid.', 'kbroo-studio' ) . '</div>'
+				: '';
+		}
+		self::$drawing[] = $template->ID;
+		$layout   = Document::get_layout( $template );
+		$renderer = Plugin::instance()->renderer();
+		Plugin::instance()->frontend_enqueue( $layout );
+		$html     = '';
+		$first    = true;
+		while ( $query->have_posts() ) {
+			$query->the_post();
+			// The template's CSS is the same for every post: print it once.
+			$item  = $renderer->render( $layout, $template->ID, $first );
+			$html .= '<article class="' . esc_attr( implode( ' ', get_post_class( 'kbroo-loop-item' ) ) ) . '">' . $item . '</article>';
+			$first = false;
+		}
+		wp_reset_postdata();
+		array_pop( self::$drawing );
+		$html = '<div class="kbroo-posts kbroo-posts--loop" data-kbroo-loop-template="' . (int) $template->ID . '">' . $html . '</div>';
 		return $html . $this->pagination( $settings, $query, $page, $main );
 	}
 

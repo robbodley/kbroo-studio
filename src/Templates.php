@@ -58,6 +58,7 @@ final class Templates {
 			'single-post'    => __( 'Single post', 'kbroo-studio' ),
 			'single-page'    => __( 'Single page', 'kbroo-studio' ),
 			'error-404'      => __( 'Page not found (404)', 'kbroo-studio' ),
+			'loop-item'      => __( 'Loop item', 'kbroo-studio' ),
 		);
 	}
 
@@ -75,6 +76,7 @@ final class Templates {
 			'single-post'    => __( 'Single post', 'kbroo-studio' ),
 			'single-page'    => __( 'Single page', 'kbroo-studio' ),
 			'error-404'      => __( '404 page', 'kbroo-studio' ),
+			'loop-item'      => __( 'Loop item', 'kbroo-studio' ),
 		);
 	}
 
@@ -180,6 +182,14 @@ final class Templates {
 		$id = self::create( __( 'New template', 'kbroo-studio' ), $type, Layout::empty_layout(), 'auto-draft' );
 		if ( is_wp_error( $id ) ) {
 			wp_die( esc_html( $id->get_error_message() ) );
+		}
+		if ( 'loop-item' === $type ) {
+			wp_update_post(
+				array(
+					'ID'         => $id,
+					'post_title' => __( 'New loop item', 'kbroo-studio' ),
+				)
+			);
 		}
 		if ( in_array( $type, ThemeBuilder::TYPES, true ) ) {
 			// A new header or footer is for the whole site unless changed, an

@@ -1858,3 +1858,8 @@ span.kb-unit {
 .kb-page-settings .kb-page-more {
 	margin-top: 20px;
 }
+
+/* Loop item templates: one grid cell wide, so the card looks as it will. */
+.kb-canvas-wrap.is-loop-item:not([data-device="mobile"]) .kb-canvas {
+	max-width: 420px;
+}

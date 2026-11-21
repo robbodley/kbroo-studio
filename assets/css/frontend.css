@@ -1902,3 +1902,18 @@ body.kbroo-template-canvas {
 .kbroo-404 {
 	display: block;
 }
+
+/* Loop item templates in a posts grid: each post's copy sits in its cell. */
+.kbroo-loop-item {
+	min-width: 0;
+}
+
+.kbroo-loop-item > .kbroo {
+	width: auto;
+	max-width: none;
+	margin: 0;
+}
+
+.kbroo-post-title a {
+	color: inherit;
+}

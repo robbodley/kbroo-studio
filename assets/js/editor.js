@@ -849,7 +849,8 @@
 		ui.canvas.addEventListener( 'submit', function ( e ) {
 			e.preventDefault();
 		} );
-		ui.canvasWrap = el( 'main', { class: 'kb-canvas-wrap' }, [ ui.canvas ] );
+		// A loop item is designed at about the width of one grid cell.
+		ui.canvasWrap = el( 'main', { class: 'kb-canvas-wrap' + ( config.templateType === 'loop-item' ? ' is-loop-item' : '' ) }, [ ui.canvas ] );
 		ui.toast = el( 'div', { class: 'kb-toast', role: 'status', 'aria-live': 'polite' } );
 
 		document.head.appendChild( ui.styles );

@@ -109,7 +109,7 @@ final class Editor {
 			'isTemplate'     => $is_template,
 			'templateType'   => $is_template ? Templates::type_of( $post ) : '',
 			'templateTypes'  => Templates::types(),
-			'themeTypes'     => ThemeBuilder::TYPES,
+			'themeTypes'     => array_merge( ThemeBuilder::TYPES, array( 'loop-item' ) ),
 			'templatesUrl'   => esc_url_raw( rest_url( Rest::NAMESPACE . '/templates' ) ),
 			'display'        => $is_template && in_array( Templates::type_of( $post ), ThemeBuilder::TYPES, true ) ? ThemeBuilder::get_display( $post ) : null,
 			'displayTargets' => ThemeBuilder::targets_for( $is_template ? Templates::type_of( $post ) : '' ),
