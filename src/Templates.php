@@ -103,22 +103,18 @@ final class Templates {
 	}
 
 	/**
-	 * "New: Header, Footer, Archive..." next to "New template" in the list.
+	 * A link to the Theme builder next to "New template" in the list.
 	 */
 	public function new_buttons(): void {
 		$screen = get_current_screen();
 		if ( ! $screen || 'edit-' . self::POST_TYPE !== $screen->id || ! current_user_can( 'publish_pages' ) ) {
 			return;
 		}
-		$links = ' <span class="kbroo-new-theme-label">' . esc_html__( 'New theme template:', 'kbroo-studio' ) . '</span>';
-		foreach ( self::new_labels() as $area => $label ) {
-			$links .= sprintf(
-				' <a href="%s" class="page-title-action" data-kbroo-new="%s">%s</a>',
-				esc_url( admin_url( 'post-new.php?post_type=' . self::POST_TYPE . '&template_type=' . $area ) ),
-				esc_attr( $area ),
-				esc_html( $label )
-			);
-		}
+		$links = sprintf(
+			' <a href="%s" class="page-title-action">%s</a>',
+			esc_url( ThemeBuilderAdmin::url() ),
+			esc_html__( 'Theme builder (headers, footers, site parts)', 'kbroo-studio' )
+		);
 		?>
 		<script>
 			( function () {
@@ -251,6 +247,9 @@ final class Templates {
 		$current = sanitize_key( wp_unslash( $_GET['kbroo_template_type'] ?? '' ) );
 		echo '<select name="kbroo_template_type"><option value="">' . esc_html__( 'All types', 'kbroo-studio' ) . '</option>';
 		foreach ( self::types() as $key => $label ) {
+			if ( ThemeBuilderAdmin::is_theme_type( $key ) ) {
+				continue; // Listed in the Theme builder.
+			}
 			printf( '<option value="%s"%s>%s</option>', esc_attr( $key ), selected( $current, $key, false ), esc_html( $label ) );
 		}
 		echo '</select>';
@@ -265,7 +264,25 @@ final class Templates {
 		if ( array_key_exists( $type, self::types() ) ) {
 			$query->set( 'meta_key', self::META_TYPE );
 			$query->set( 'meta_value', $type );
+			return;
 		}
+		// The library of sections and pages: theme templates live in the
+		// Theme builder.
+		$query->set(
+			'meta_query', // phpcs:ignore WordPress.DB.SlowDBQuery
+			array(
+				'relation' => 'OR',
+				array(
+					'key'     => self::META_TYPE,
+					'value'   => ThemeBuilderAdmin::TYPES,
+					'compare' => 'NOT IN',
+				),
+				array(
+					'key'     => self::META_TYPE,
+					'compare' => 'NOT EXISTS',
+				),
+			)
+		);
 	}
 
 	/* ------------------------------------------------------------------ *

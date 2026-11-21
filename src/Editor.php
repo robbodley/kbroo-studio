@@ -126,7 +126,7 @@ final class Editor {
 			'canPublish'     => $type ? current_user_can( $type->cap->publish_posts ) : false,
 			'permalink'      => get_permalink( $post ),
 			'previewUrl'     => get_preview_post_link( $post ),
-			'wpEditUrl'      => $is_template ? admin_url( 'edit.php?post_type=' . Templates::POST_TYPE ) : get_edit_post_link( $post, 'raw' ),
+			'wpEditUrl'      => $is_template ? ( ThemeBuilderAdmin::is_theme_type( Templates::type_of( $post ) ) ? ThemeBuilderAdmin::url( Templates::type_of( $post ) ) : admin_url( 'edit.php?post_type=' . Templates::POST_TYPE ) ) : get_edit_post_link( $post, 'raw' ),
 			'restUrl'        => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID ) ),
 			'nonce'          => wp_create_nonce( 'wp_rest' ),
 			'layout'         => $layout,
@@ -144,7 +144,7 @@ final class Editor {
 			'fonts'          => Fonts::all(),
 			'shapes'           => ShapeDividers::for_editor(),
 			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only picks which panel opens first.
-			'openPanel'        => 'globals' === ( $_GET['kb-panel'] ?? '' ) ? 'globals' : '',
+			'openPanel'        => in_array( $_GET['kb-panel'] ?? '', array( 'globals', 'display' ), true ) ? sanitize_key( wp_unslash( $_GET['kb-panel'] ) ) : '',
 			'iconsUrl'         => esc_url_raw( add_query_arg( 'v', KBROO_STUDIO_VERSION, rest_url( Rest::NAMESPACE . '/icons' ) ) ),
 			'widgetPreviewUrl' => esc_url_raw( rest_url( Rest::NAMESPACE . '/documents/' . $post->ID . '/widget-preview' ) ),
 			'canUnfilteredHtml' => current_user_can( 'unfiltered_html' ),

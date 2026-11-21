@@ -51,6 +51,7 @@ final class Plugin {
 		$frontend->hooks();
 		$this->theme_builder = new ThemeBuilder( $frontend );
 		$this->theme_builder->hooks();
+		( new ThemeBuilderAdmin() )->hooks();
 		( new Revisions() )->hooks();
 		( new PageSettings() )->hooks();
 		if ( is_admin() ) {
@@ -70,6 +71,13 @@ final class Plugin {
 		if ( $this->frontend ) {
 			$this->frontend->enqueue_layout( $layout );
 		}
+	}
+
+	/**
+	 * A template's layout as HTML, with its styles enqueued.
+	 */
+	public function render_template( \WP_Post $post ): string {
+		return $this->frontend ? $this->frontend->render_post( $post ) : '';
 	}
 
 	public function theme_builder(): ThemeBuilder {

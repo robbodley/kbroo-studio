@@ -238,7 +238,7 @@ final class Admin {
 					</p>
 				</div>
 				<div class="card">
-					<h2 class="title"><?php esc_html_e( 'Theme templates', 'kbroo-studio' ); ?></h2>
+					<h2 class="title"><?php esc_html_e( 'Theme builder', 'kbroo-studio' ); ?></h2>
 					<?php foreach ( ThemeBuilder::TYPES as $area ) : ?>
 						<?php $current = $this->area_templates( $area ); ?>
 						<p>
@@ -251,14 +251,7 @@ final class Admin {
 							<?php endif; ?>
 						</p>
 					<?php endforeach; ?>
-					<?php if ( current_user_can( 'publish_pages' ) ) : ?>
-						<p>
-							<?php esc_html_e( 'New:', 'kbroo-studio' ); ?>
-							<?php foreach ( Templates::new_labels() as $kbroo_type => $kbroo_label ) : ?>
-								<a class="button" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=' . Templates::POST_TYPE . '&template_type=' . $kbroo_type ) ); ?>"><?php echo esc_html( $kbroo_label ); ?></a>
-							<?php endforeach; ?>
-						</p>
-					<?php endif; ?>
+					<p><a class="button" href="<?php echo esc_url( ThemeBuilderAdmin::url() ); ?>"><?php esc_html_e( 'Open the Theme builder', 'kbroo-studio' ); ?></a></p>
 				</div>
 				<div class="card">
 					<h2 class="title"><?php esc_html_e( 'Move from Elementor', 'kbroo-studio' ); ?></h2>
