@@ -1495,28 +1495,49 @@ textarea.kbroo-form__input {
 	padding-left: calc(var(--kbroo-nav-pad-x, 15px) * 2);
 }
 
-/* The burger button. */
-.kbroo-nav__toggle {
-	--kbroo-nav-s: var(--kbroo-nav-toggle-size, 22px);
+/*
+ * The burger button.
+ *
+ * Themes and Elementor's site settings style every <button> on the page
+ * (".elementor-kit-5 button", "[type=button]:hover"...), which the editor
+ * canvas never loads. Two classes, repeated for hover and focus, keep the
+ * burger's own settings ahead of those rules on the live site.
+ */
+.kbroo-nav .kbroo-nav__toggle {
 	display: none;
+}
+
+.kbroo-nav .kbroo-nav__toggle,
+.kbroo-nav .kbroo-nav__toggle:hover,
+.kbroo-nav .kbroo-nav__toggle:focus,
+.kbroo-nav .kbroo-nav__toggle:active {
+	--kbroo-nav-s: var(--kbroo-nav-toggle-size, 22px);
 	align-items: center;
 	justify-content: center;
 	box-sizing: content-box;
 	width: var(--kbroo-nav-s);
+	min-width: 0;
 	height: var(--kbroo-nav-s);
+	min-height: 0;
+	margin: 0;
 	padding: var(--kbroo-nav-toggle-pad, 9px);
 	border: var(--kbroo-nav-toggle-border-width, 0) solid var(--kbroo-nav-toggle-border-color, currentColor);
 	border-radius: var(--kbroo-nav-toggle-radius, 4px);
 	background: var(--kbroo-nav-toggle-bg, transparent);
+	box-shadow: none;
 	color: var(--kbroo-nav-toggle-color, currentColor);
 	font-size: var(--kbroo-nav-s);
 	line-height: 1;
+	letter-spacing: normal;
+	text-decoration: none;
+	text-shadow: none;
+	text-transform: none;
 	cursor: pointer;
 	transition: color 0.2s, background-color 0.2s, border-color 0.2s;
 }
 
-.kbroo-nav__toggle:hover,
-.kbroo-nav__toggle:focus-visible {
+.kbroo-nav .kbroo-nav__toggle:hover,
+.kbroo-nav .kbroo-nav__toggle:focus-visible {
 	background: var(--kbroo-nav-toggle-hover-bg, var(--kbroo-nav-toggle-bg, transparent));
 	color: var(--kbroo-nav-toggle-hover, var(--kbroo-nav-toggle-color, currentColor));
 }
@@ -1791,18 +1812,32 @@ textarea.kbroo-form__input {
 	animation: kbroo-nav-fade 0.25s ease-out;
 }
 
-.kbroo-nav__close {
+/* Two classes for the same reason as the burger button. */
+.kbroo-nav .kbroo-nav__close {
 	display: none;
+}
+
+.kbroo-nav .kbroo-nav__close,
+.kbroo-nav .kbroo-nav__close:hover,
+.kbroo-nav .kbroo-nav__close:focus,
+.kbroo-nav .kbroo-nav__close:active {
 	align-items: center;
 	justify-content: center;
 	box-sizing: content-box;
 	width: var(--kbroo-nav-close-size, 22px);
+	min-width: 0;
 	height: var(--kbroo-nav-close-size, 22px);
+	min-height: 0;
+	margin: 0;
 	padding: 10px;
 	border: 0;
+	border-radius: 0;
 	background: transparent;
+	box-shadow: none;
 	color: var(--kbroo-nav-close-color, var(--kbroo-nav-sub-color, var(--kbroo-nav-color, #1f2937)));
 	font-size: var(--kbroo-nav-close-size, 22px);
+	line-height: 1;
+	text-shadow: none;
 	cursor: pointer;
 }
 
