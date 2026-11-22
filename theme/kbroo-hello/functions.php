@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'KBROO_HELLO_VERSION', '0.2.2' );
+define( 'KBROO_HELLO_VERSION', '0.2.3' );
 
 /*
  * Oldest Kbroo Studio plugin this theme works with. Raise it when the theme
