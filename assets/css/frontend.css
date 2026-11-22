@@ -152,6 +152,19 @@
 	position: relative;
 }
 
+/* A fixed background only stays fixed on computers. Phones and tablets
+   either ignore it or, like iPhone Safari, stretch the image to the height
+   of the whole page, so it shows hugely zoomed in and blurred. There the
+   background scrolls with the element instead (Elementor does the same). */
+@media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+	.kbroo-el,
+	.kbroo-el::before,
+	.kbroo-column-inner,
+	.kbroo-column-inner::before {
+		background-attachment: scroll !important;
+	}
+}
+
 .kbroo-section > .kbroo-container,
 .kbroo-con > .kbroo-con-inner,
 .kbroo-column-inner > * {

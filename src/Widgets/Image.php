@@ -46,11 +46,11 @@ class Image extends Widget {
 
 		return array_merge(
 			array(
-				'image'          => $content + array(
+				'image'           => $content + array(
 					'type'  => 'media',
 					'label' => __( 'Choose image', 'kbroo-studio' ),
 				),
-				'image_size'     => $content + array(
+				'image_size'      => $content + array(
 					'type'    => 'select',
 					'label'   => __( 'Image size', 'kbroo-studio' ),
 					'default' => 'large',
@@ -62,8 +62,8 @@ class Image extends Widget {
 						'full'         => __( 'Full', 'kbroo-studio' ),
 					),
 				),
-				'align'          => ControlGroups::align( '{{WRAPPER}} .kbroo-image', $content ),
-				'caption_source' => $content + array(
+				'align'           => ControlGroups::align( '{{WRAPPER}} .kbroo-image', $content ),
+				'caption_source'  => $content + array(
 					'type'    => 'select',
 					'label'   => __( 'Caption', 'kbroo-studio' ),
 					'default' => 'none',
@@ -73,13 +73,13 @@ class Image extends Widget {
 						'custom'     => __( 'Custom', 'kbroo-studio' ),
 					),
 				),
-				'caption'        => $content + array(
+				'caption'         => $content + array(
 					'type'      => 'text',
 					'label'     => __( 'Custom caption', 'kbroo-studio' ),
 					'default'   => '',
 					'condition' => array( 'caption_source' => 'custom' ),
 				),
-				'link_to'        => $content + array(
+				'link_to'         => $content + array(
 					'type'    => 'select',
 					'label'   => __( 'Link', 'kbroo-studio' ),
 					'default' => 'none',
@@ -89,45 +89,68 @@ class Image extends Widget {
 						'custom' => __( 'Custom URL', 'kbroo-studio' ),
 					),
 				),
-				'link'           => $content + array(
+				'link'            => $content + array(
 					'type'      => 'url',
 					'label'     => __( 'Link URL', 'kbroo-studio' ),
 					'condition' => array( 'link_to' => 'custom' ),
 				),
-				'width'          => $style + array(
+				'width'           => $style + array(
 					'type'       => 'slider',
 					'label'      => __( 'Width', 'kbroo-studio' ),
 					'units'      => array( '%', 'px', 'vw' ),
 					'responsive' => true,
 					'selectors'  => array( $img => 'width: {{SIZE}}{{UNIT}};' ),
 				),
-				'space'          => $style + array(
+				'space'           => $style + array(
 					'type'       => 'slider',
 					'label'      => __( 'Max width', 'kbroo-studio' ),
 					'units'      => array( '%', 'px', 'vw' ),
 					'responsive' => true,
 					'selectors'  => array( $img => 'max-width: {{SIZE}}{{UNIT}};' ),
 				),
-				'height'         => $style + array(
+				'height'          => $style + array(
 					'type'       => 'slider',
 					'label'      => __( 'Height', 'kbroo-studio' ),
 					'units'      => array( 'px', 'vh' ),
 					'responsive' => true,
 					'selectors'  => array( $img => 'height: {{SIZE}}{{UNIT}};' ),
 				),
-				'object-fit'     => $style + array(
-					'type'      => 'select',
-					'label'     => __( 'Object fit', 'kbroo-studio' ),
-					'default'   => '',
-					'options'   => array(
-						''        => __( 'Default', 'kbroo-studio' ),
-						'fill'    => __( 'Fill', 'kbroo-studio' ),
-						'cover'   => __( 'Cover', 'kbroo-studio' ),
-						'contain' => __( 'Contain', 'kbroo-studio' ),
+				'object-fit'      => $style + array(
+					'type'       => 'select',
+					'label'      => __( 'Object fit', 'kbroo-studio' ),
+					'default'    => '',
+					'responsive' => true,
+					'options'    => array(
+						''           => __( 'Default', 'kbroo-studio' ),
+						'fill'       => __( 'Fill', 'kbroo-studio' ),
+						'cover'      => __( 'Cover', 'kbroo-studio' ),
+						'contain'    => __( 'Contain', 'kbroo-studio' ),
+						'scale-down' => __( 'Scale down', 'kbroo-studio' ),
 					),
-					'selectors' => array( $img => 'object-fit: {{VALUE}};' ),
+					'selectors'  => array( $img => 'object-fit: {{VALUE}};' ),
 				),
-				'opacity'        => $style + array(
+				'object-position' => $style + array(
+					'type'        => 'select',
+					'label'       => __( 'Object position', 'kbroo-studio' ),
+					'description' => __( 'Which part of the image stays in view when Cover crops it.', 'kbroo-studio' ),
+					'default'     => '',
+					'responsive'  => true,
+					'condition'   => array( 'object-fit' => 'cover' ),
+					'options'     => array(
+						''              => __( 'Default', 'kbroo-studio' ),
+						'center center' => __( 'Center center', 'kbroo-studio' ),
+						'center left'   => __( 'Center left', 'kbroo-studio' ),
+						'center right'  => __( 'Center right', 'kbroo-studio' ),
+						'top center'    => __( 'Top center', 'kbroo-studio' ),
+						'top left'      => __( 'Top left', 'kbroo-studio' ),
+						'top right'     => __( 'Top right', 'kbroo-studio' ),
+						'bottom center' => __( 'Bottom center', 'kbroo-studio' ),
+						'bottom left'   => __( 'Bottom left', 'kbroo-studio' ),
+						'bottom right'  => __( 'Bottom right', 'kbroo-studio' ),
+					),
+					'selectors'   => array( $img => 'object-position: {{VALUE}};' ),
+				),
+				'opacity'         => $style + array(
 					'type'      => 'slider',
 					'label'     => __( 'Opacity (0 to 1)', 'kbroo-studio' ),
 					'units'     => array( 'px' ),
