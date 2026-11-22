@@ -39,6 +39,52 @@ class Updater {
 		// 10, so the cached release has to be gone before then.
 		add_action( 'load-update-core.php', array( $this, 'forget_on_force_check' ), 1 );
 		add_action( 'upgrader_process_complete', array( $this, 'forget' ), 10, 0 );
+		add_filter( 'site_transient_update_plugins', array( $this, 'add_known_update' ) );
+	}
+
+	/**
+	 * Make sure WordPress's list of plugin updates has the newer release
+	 * this updater already knows about.
+	 *
+	 * WordPress only asks update_data() at the end of its WordPress.org
+	 * check, and leaves the list as it was when that check fails (a host
+	 * that blocks or times out on api.wordpress.org, for example). The
+	 * overview then knew a newer version was out but WordPress had nothing
+	 * to install, so there was no Update button. This uses only the cached
+	 * release, so reading the list never waits on GitHub.
+	 *
+	 * @param mixed $updates The update_plugins site transient.
+	 * @return mixed
+	 */
+	public function add_known_update( $updates ) {
+		if ( ! is_object( $updates ) ) {
+			return $updates; // No check yet; WordPress runs one soon.
+		}
+		$cached  = get_site_transient( self::CACHE_KEY );
+		$release = is_array( $cached ) ? ( $cached['release'] ?? null ) : null;
+		if ( ! is_array( $release ) || ! version_compare( $release['version'], KBROO_STUDIO_VERSION, '>' ) ) {
+			return $updates;
+		}
+		$file  = self::basename();
+		$known = isset( $updates->response[ $file ] ) ? (object) $updates->response[ $file ] : null;
+		if ( $known && ! empty( $known->package ) && version_compare( (string) ( $known->new_version ?? '' ), $release['version'], '>=' ) ) {
+			return $updates;
+		}
+		if ( ! isset( $updates->response ) || ! is_array( $updates->response ) ) {
+			$updates->response = array();
+		}
+		$updates->response[ $file ] = (object) array(
+			'id'          => 'https://github.com/' . self::repo(),
+			'slug'        => self::SLUG,
+			'plugin'      => $file,
+			'new_version' => $release['version'],
+			'url'         => $release['url'],
+			'package'     => $release['package'],
+		);
+		if ( isset( $updates->no_update ) && is_array( $updates->no_update ) ) {
+			unset( $updates->no_update[ $file ] );
+		}
+		return $updates;
 	}
 
 	public static function repo(): string {
