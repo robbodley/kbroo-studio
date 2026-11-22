@@ -32,6 +32,45 @@ final class Kbroo_Hello_Updater {
 		// 10, so the cached release has to be gone before then.
 		add_action( 'load-update-core.php', array( __CLASS__, 'forget_on_force_check' ), 1 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'forget' ), 10, 0 );
+		add_filter( 'site_transient_update_themes', array( __CLASS__, 'add_known_update' ) );
+	}
+
+	/**
+	 * Make sure WordPress's list of theme updates has the newer release
+	 * this updater already knows about, even when WordPress's own check
+	 * stopped early (it asks update_data() only after WordPress.org
+	 * answers). Uses only the cached release, so it never waits on GitHub.
+	 *
+	 * @param mixed $updates The update_themes site transient.
+	 * @return mixed
+	 */
+	public static function add_known_update( $updates ) {
+		if ( ! is_object( $updates ) ) {
+			return $updates;
+		}
+		$cached  = get_site_transient( self::CACHE_KEY );
+		$release = is_array( $cached ) && isset( $cached['release'] ) ? $cached['release'] : null;
+		$theme   = wp_get_theme( self::SLUG );
+		if ( ! is_array( $release ) || ! $theme->exists() || ! version_compare( $release['version'], (string) $theme->get( 'Version' ), '>' ) ) {
+			return $updates;
+		}
+		$known = isset( $updates->response[ self::SLUG ] ) ? (array) $updates->response[ self::SLUG ] : array();
+		if ( ! empty( $known['package'] ) && isset( $known['new_version'] ) && version_compare( (string) $known['new_version'], $release['version'], '>=' ) ) {
+			return $updates;
+		}
+		if ( ! isset( $updates->response ) || ! is_array( $updates->response ) ) {
+			$updates->response = array();
+		}
+		$updates->response[ self::SLUG ] = array(
+			'theme'       => self::SLUG,
+			'new_version' => $release['version'],
+			'url'         => $release['url'],
+			'package'     => $release['package'],
+		);
+		if ( isset( $updates->no_update ) && is_array( $updates->no_update ) ) {
+			unset( $updates->no_update[ self::SLUG ] );
+		}
+		return $updates;
 	}
 
 	/**
