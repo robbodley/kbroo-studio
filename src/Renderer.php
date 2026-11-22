@@ -84,10 +84,40 @@ final class Renderer {
 	 * Settings with defaults, after collecting the element's CSS.
 	 */
 	private function prepare( array $element, array $controls ): array {
-		$settings = Controls::with_defaults( $controls, $element['settings'] ?? array() );
+		$settings = self::featured_backgrounds( $controls, Controls::with_defaults( $controls, $element['settings'] ?? array() ) );
 		$rules    = Css::element_rules( $controls, $settings, Css::wrapper( $this->element_id( $element ) ) );
 		foreach ( $rules as $device => $list ) {
 			$this->rules[ $device ] = array_merge( $this->rules[ $device ], $list );
+		}
+		return $settings;
+	}
+
+	/**
+	 * Backgrounds whose image source is the featured image: the post being
+	 * shown (the viewed post, or the one a loop item is for) lends its
+	 * featured image on every device. With none, the chosen image stays.
+	 */
+	private static function featured_backgrounds( array $controls, array $settings ): array {
+		foreach ( $controls as $key => $control ) {
+			if ( '_image_source' !== substr( (string) $key, -13 ) || 'featured' !== ( $settings[ $key ] ?? '' ) ) {
+				continue;
+			}
+			$image = substr( (string) $key, 0, -7 ); // e.g. background_image.
+			$post  = Widgets\DynamicPost::get();
+			$id    = $post ? (int) get_post_thumbnail_id( $post ) : 0;
+			$url   = $id ? (string) wp_get_attachment_image_url( $id, 'full' ) : '';
+			if ( '' === $url ) {
+				continue;
+			}
+			$settings[ $image ] = array(
+				'id'  => $id,
+				'url' => $url,
+			);
+			foreach ( Controls::keys( $image, $controls[ $image ] ?? array() ) as $device => $device_key ) {
+				if ( 'desktop' !== $device ) {
+					$settings[ $device_key ] = array();
+				}
+			}
 		}
 		return $settings;
 	}

@@ -354,6 +354,16 @@ final class ControlGroups {
 		$controls = array_merge(
 			$controls,
 			array(
+				$p . '_image_source' => $classic + array(
+					'type'        => 'select',
+					'label'       => __( 'Image source', 'kbroo-studio' ),
+					'default'     => '',
+					'options'     => array(
+						''         => __( 'The image chosen below', 'kbroo-studio' ),
+						'featured' => __( 'The post\'s featured image', 'kbroo-studio' ),
+					),
+					'description' => __( 'In a single post template or loop item, each post shows its own featured image (the editor previews the image chosen below, which also shows when a post has none).', 'kbroo-studio' ),
+				),
 				$p . '_image'      => $classic + array(
 					'type'       => 'media',
 					'label'      => __( 'Image', 'kbroo-studio' ),
