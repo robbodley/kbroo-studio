@@ -187,6 +187,7 @@ final class Converter {
 			return null;
 		}
 
+		$settings = $this->dynamic_tags( $this->featured_backgrounds( $settings ) );
 		$settings = $this->common( $settings );
 		if ( 'section' === $type ) {
 			$settings = $this->section( $settings );
@@ -415,7 +416,7 @@ final class Converter {
 			$widget = null; // Dailymotion and VideoPress stay as Elementor showed them.
 		}
 		if ( $widget && 'elementor-fallback' !== $type ) {
-			$settings = $this->dynamic_tags( $settings );
+			$settings = $this->dynamic_tags( $this->featured_backgrounds( $settings ) );
 			$settings = $this->common( $settings );
 			$settings = $this->legacy_icons( $type, $settings );
 			if ( 'posts' === $type && 'loop' !== ( $settings['_skin'] ?? '' ) ) {
@@ -525,6 +526,20 @@ final class Converter {
 			}
 		}
 		return $type;
+	}
+
+	/**
+	 * A background image filled by the featured image tag becomes a
+	 * background whose image source is the featured image.
+	 */
+	private function featured_backgrounds( array $settings ): array {
+		foreach ( self::tags_in( $settings ) as $key => $tag ) {
+			if ( 'post-featured-image' === $tag && preg_match( '/^(_?background(?:_hover|_overlay(?:_hover)?)?)_image(?:_tablet|_mobile)?$/', $key, $m ) ) {
+				$settings[ $m[1] . '_image_source' ] = 'featured';
+				unset( $settings['__dynamic__'][ $key ] );
+			}
+		}
+		return $settings;
 	}
 
 	/**
