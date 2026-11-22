@@ -1488,6 +1488,14 @@ input[type="checkbox"].kb-switch:focus-visible {
  * The canvas is narrower than the window, so frontend.css media queries do
  * not fire; these mirror them. :where() keeps them as weak as the originals. */
 
+/* Fixed backgrounds scroll on tablets and phones (see frontend.css). */
+.kb-canvas-wrap:is([data-device="tablet"], [data-device="mobile"]) .kbroo-el,
+.kb-canvas-wrap:is([data-device="tablet"], [data-device="mobile"]) .kbroo-el::before,
+.kb-canvas-wrap:is([data-device="tablet"], [data-device="mobile"]) .kbroo-column-inner,
+.kb-canvas-wrap:is([data-device="tablet"], [data-device="mobile"]) .kbroo-column-inner::before {
+	background-attachment: scroll !important;
+}
+
 :where(.kb-canvas-wrap[data-device="tablet"]) .kbroo-con {
 	width: var(--kbroo-con-width-tablet, var(--kbroo-con-width-desktop, 100%));
 }
