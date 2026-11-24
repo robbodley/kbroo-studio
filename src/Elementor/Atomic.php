@@ -301,10 +301,107 @@ final class Atomic {
 		if ( isset( $value['row'] ) || isset( $value['column'] ) ) {
 			return ( self::to_css( $prop, $value['row'] ?? '0' ) ?? '0' ) . ' ' . ( self::to_css( $prop, $value['column'] ?? '0' ) ?? '0' );
 		}
-		// A background: its colour (images and overlays are not read yet).
 		if ( 'background' === $prop ) {
-			return isset( $value['color'] ) && is_string( $value['color'] ) && ! isset( $value['background-overlay'] ) ? $value['color'] : null;
+			return self::background( $value );
+		}
+		if ( 'transition' === $prop ) {
+			return self::transition( $value );
 		}
 		return null;
+	}
+
+	/**
+	 * A background: its layers (images, gradients, colour overlays), top
+	 * first, over its colour.
+	 */
+	private static function background( array $value ): ?string {
+		$layers = array();
+		foreach ( (array) ( $value['background-overlay'] ?? array() ) as $layer ) {
+			if ( ! is_array( $layer ) ) {
+				continue;
+			}
+			$css = self::background_layer( $layer );
+			if ( null === $css ) {
+				return null; // A layer that cannot be written: leave it to the report.
+			}
+			$layers[] = $css;
+		}
+		$color = isset( $value['color'] ) && is_string( $value['color'] ) ? $value['color'] : '';
+		if ( '' !== $color ) {
+			$layers[] = $color;
+		}
+		return $layers ? implode( ', ', $layers ) : null;
+	}
+
+	private static function background_layer( array $layer ): ?string {
+		if ( isset( $layer['image'] ) ) {
+			$image = (array) $layer['image'];
+			$src   = (array) ( $image['src'] ?? $image );
+			$id    = (int) ( $src['id'] ?? 0 );
+			$url   = $id ? (string) wp_get_attachment_image_url( $id, 'full' ) : '';
+			if ( '' === $url ) {
+				$url = is_string( $src['url'] ?? null ) ? $src['url'] : '';
+			}
+			$url = esc_url_raw( $url );
+			if ( '' === $url ) {
+				return null;
+			}
+			$words = function ( $part, string $default ) {
+				return is_string( $part ) && preg_match( '/^[a-z0-9 %.-]+$/i', $part ) ? $part : $default;
+			};
+			$size = $layer['size'] ?? 'auto';
+			$size = is_array( $size ) ? ( self::to_css( 'size', $size ) ?? 'auto' ) : $words( $size, 'auto' );
+			$position = $layer['position'] ?? '0% 0%';
+			$position = is_array( $position ) ? ( self::to_css( 'position', array_values( $position ) ) ?? '0% 0%' ) : $words( $position, '0% 0%' );
+			return sprintf(
+				'url("%1$s") %2$s / %3$s %4$s %5$s',
+				str_replace( array( '"', '\\', ';', '{', '}' ), '', $url ),
+				$position,
+				$size,
+				$words( $layer['repeat'] ?? 'repeat', 'repeat' ),
+				$words( $layer['attachment'] ?? 'scroll', 'scroll' )
+			);
+		}
+		if ( isset( $layer['stops'] ) && is_array( $layer['stops'] ) ) {
+			$stops = array();
+			foreach ( $layer['stops'] as $stop ) {
+				if ( is_array( $stop ) && is_string( $stop['color'] ?? null ) ) {
+					$stops[] = $stop['color'] . ( is_numeric( $stop['offset'] ?? null ) ? ' ' . ( 0 + $stop['offset'] ) . '%' : '' );
+				}
+			}
+			if ( count( $stops ) < 2 ) {
+				return null;
+			}
+			if ( 'radial' === ( $layer['type'] ?? '' ) ) {
+				$at = is_string( $layer['positions'] ?? null ) ? $layer['positions'] : 'center center';
+				return 'radial-gradient(circle at ' . $at . ', ' . implode( ', ', $stops ) . ')';
+			}
+			$angle = is_numeric( $layer['angle'] ?? null ) ? 0 + $layer['angle'] : 180;
+			return 'linear-gradient(' . $angle . 'deg, ' . implode( ', ', $stops ) . ')';
+		}
+		if ( isset( $layer['color'] ) && is_string( $layer['color'] ) ) {
+			return 'linear-gradient(' . $layer['color'] . ', ' . $layer['color'] . ')';
+		}
+		return null;
+	}
+
+	/**
+	 * A transition: a list of { selection: { value: property }, size }.
+	 */
+	private static function transition( array $value ): ?string {
+		$parts = array();
+		foreach ( $value as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$selection = $item['selection'] ?? 'all';
+			$property  = is_array( $selection ) ? ( $selection['value'] ?? 'all' ) : $selection;
+			$duration  = is_array( $item['size'] ?? null ) ? self::to_css( 'transition', $item['size'] ) : null;
+			if ( ! is_string( $property ) || ! preg_match( '/^[a-z-]+$/', $property ) || null === $duration ) {
+				continue;
+			}
+			$parts[] = $property . ' ' . $duration;
+		}
+		return $parts ? implode( ', ', $parts ) : null;
 	}
 }

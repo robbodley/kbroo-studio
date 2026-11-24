@@ -70,7 +70,7 @@ In the editor:
 ![Show and hide rules, with hidden elements faded in the editor](docs/screenshots/show-hide.png)
 - **Icons** come from Font Awesome Free (solid, regular and brands), bundled with the plugin as SVG: pages load only the icons they use, with no icon font or outside request. The icon picker searches by name and keyword.
 - Lists such as slides and social icons are edited item by item in the panel: add, open, reorder, duplicate or remove each one.
-- **Posts** shows a grid of posts (classic or cards), picked by post type, categories or tags to include or leave out, order and offset, with numbered and/or previous/next pages. The editor previews the real posts.
+- **Posts** shows a grid of posts (classic or cards), picked by post type, categories or tags to include or leave out, order and offset, with numbered and/or previous/next pages, or a load more button (on a click, or as the visitor scrolls) that adds the next posts in place. The editor previews the real posts.
 - **Form** builds a contact form from fields (text, email, textarea, phone, number, URL, date, time, select, radio, checkboxes, acceptance, hidden). Each message is emailed (to the site admin address unless the form names another, with Reply-To set to the sender) and saved under Kbroo Studio > **Form messages**. Spam protection is built in with no outside service: a hidden trap field, a minimum time before sending, and a limit of 5 messages per visitor in 10 minutes. Forms send without reloading the page and still work with JavaScript off. Developers can hook `kbroo_studio_form_submitted`.
 
 ![A converted Elementor form showing a field error](docs/screenshots/form-errors.png)

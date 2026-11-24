@@ -519,6 +519,9 @@ final class Converter {
 			if ( 'image' === $type ) {
 				$settings = $this->image_size( $settings );
 			}
+			if ( 'post-info' === $type ) {
+				$settings = self::post_info( $settings );
+			}
 			if ( 'nav-menu' === $type && ! isset( $settings['pointer'] ) ) {
 				$settings['pointer'] = 'underline'; // Elementor's default.
 			}
@@ -673,16 +676,59 @@ final class Converter {
 		if ( $elementor && ! $converted ) {
 			$this->drop( 'loop item template (convert it under Saved templates and the grid uses it)' );
 		}
-		if ( in_array( $clean['pagination_type'] ?? '', array( 'load_more_on_click', 'load_more_infinite_scroll' ), true ) ) {
-			$this->drop( 'load more pagination (shown as numbers)' );
-			$clean['pagination_type'] = 'numbers';
-		}
+		$clean = self::load_more( $clean );
 		// Elementor's defaults where they differ from the Posts widget's.
 		$clean += array(
 			'posts_exclude_current' => '',
 			'posts_post_type'       => 'post',
 		);
 		return $clean;
+	}
+
+	/**
+	 * Load more pagination: Elementor names the button's text "text".
+	 * Its spinner and end-of-posts message have no equivalent (the button
+	 * goes once the last posts are in).
+	 */
+	private static function load_more( array $settings ): array {
+		if ( 0 === strpos( (string) ( $settings['pagination_type'] ?? '' ), 'load_more' ) && isset( $settings['text'] ) && is_string( $settings['text'] ) ) {
+			$settings['load_more_text'] = html_entity_decode( $settings['text'], ENT_QUOTES, 'UTF-8' );
+		}
+		unset( $settings['text'], $settings['load_more_spinner'], $settings['load_more_no_posts_custom_message'], $settings['load_more_no_posts_message_switcher'] );
+		return $settings;
+	}
+
+	/**
+	 * Post info: some versions list what to show in meta_data (["author",
+	 * "date"]) rather than as icon_list items.
+	 */
+	private static function post_info( array $settings ): array {
+		$meta = $settings['meta_data'] ?? null;
+		unset( $settings['meta_data'] );
+		if ( ! is_array( $meta ) || ! $meta || ! empty( $settings['icon_list'] ) ) {
+			return $settings;
+		}
+		$items = array();
+		foreach ( $meta as $i => $item ) {
+			if ( is_array( $item ) ) {
+				$items[] = $item + array( '_id' => substr( md5( 'meta' . $i ), 0, 7 ) ); // Already items.
+			} elseif ( is_string( $item ) && in_array( $item, array( 'author', 'date', 'time', 'comments', 'terms' ), true ) ) {
+				$items[] = array(
+					'_id'  => substr( md5( 'meta' . $item ), 0, 7 ),
+					'type' => $item,
+				);
+			} elseif ( in_array( $item, array( 'categories', 'tags' ), true ) ) {
+				$items[] = array(
+					'_id'      => substr( md5( 'meta' . $item ), 0, 7 ),
+					'type'     => 'terms',
+					'taxonomy' => 'categories' === $item ? 'category' : 'post_tag',
+				);
+			}
+		}
+		if ( $items ) {
+			$settings['icon_list'] = $items;
+		}
+		return $settings;
 	}
 
 	/**
@@ -735,12 +781,8 @@ final class Converter {
 		if ( ! in_array( 'terms', (array) ( $clean['posts_exclude'] ?? array() ), true ) ) {
 			unset( $clean['posts_exclude_term_ids'] );
 		}
-		unset( $clean['posts_include'], $clean['posts_exclude'], $clean['text'], $clean['load_more_no_posts_custom_message'] );
-		$type = (string) ( $clean['pagination_type'] ?? '' );
-		if ( 0 === strpos( $type, 'load_more' ) ) {
-			$clean['pagination_type'] = 'numbers';
-			$this->drop( 'posts "load more" button (shown as page numbers)' );
-		}
+		$clean = self::load_more( $clean );
+		unset( $clean['posts_include'], $clean['posts_exclude'] );
 		foreach ( array( 'pagination_prev_label', 'pagination_next_label', 'read_more_text' ) as $key ) {
 			if ( isset( $clean[ $key ] ) && is_string( $clean[ $key ] ) ) {
 				$clean[ $key ] = html_entity_decode( $clean[ $key ], ENT_QUOTES, 'UTF-8' );

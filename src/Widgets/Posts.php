@@ -373,7 +373,16 @@ class Posts extends Widget {
 						'numbers'               => __( 'Numbers', 'kbroo-studio' ),
 						'prev_next'             => __( 'Previous and next', 'kbroo-studio' ),
 						'numbers_and_prev_next' => __( 'Numbers, previous and next', 'kbroo-studio' ),
+						'load_more_on_click'        => __( 'Load more button', 'kbroo-studio' ),
+						'load_more_infinite_scroll' => __( 'Load more on scroll', 'kbroo-studio' ),
 					),
+				),
+				'load_more_text'        => $paging + array(
+					'type'      => 'text',
+					'label'     => __( 'Button text', 'kbroo-studio' ),
+					'default'   => __( 'Load more', 'kbroo-studio' ),
+					'condition' => array( 'pagination_type' => array( 'load_more_on_click', 'load_more_infinite_scroll' ) ),
+					'description' => __( 'The next posts are added below without leaving the page. On scroll, they load as the visitor reaches the end; the button stays for anyone without JavaScript.', 'kbroo-studio' ),
 				),
 				'pagination_page_limit' => $paging + array(
 					'type'      => 'number',
@@ -541,7 +550,81 @@ class Posts extends Widget {
 					'label'     => __( 'Current page colour', 'kbroo-studio' ),
 					'selectors' => array( '{{WRAPPER}} .kbroo-pagination .current' => 'color: {{VALUE}};' ),
 				),
-			)
+				// Cards skin extras.
+				'card_vertical_padding'   => $box + $cards + array(
+					'type'      => 'slider',
+					'label'     => __( 'Vertical padding', 'kbroo-studio' ),
+					'units'     => array( 'px' ),
+					'selectors' => array( $post => 'padding-top: {{SIZE}}{{UNIT}}; padding-bottom: {{SIZE}}{{UNIT}};' ),
+				),
+				'meta_border_color'       => $style( __( 'Details', 'kbroo-studio' ) ) + $cards + array(
+					'type'      => 'color',
+					'label'     => __( 'Line above the details', 'kbroo-studio' ),
+					'selectors' => array( '{{WRAPPER}} .kbroo-post__footer' => 'border-top-color: {{VALUE}};' ),
+				),
+				'read_more_alignment'     => $style( __( 'Read more', 'kbroo-studio' ) ) + array(
+					'type'                 => 'select',
+					'label'                => __( 'Alignment', 'kbroo-studio' ),
+					'default'              => '',
+					'options'              => array(
+						''       => __( 'Default', 'kbroo-studio' ),
+						'left'   => __( 'Left', 'kbroo-studio' ),
+						'center' => __( 'Center', 'kbroo-studio' ),
+						'right'  => __( 'Right', 'kbroo-studio' ),
+					),
+					'selectors_dictionary' => array(
+						'left'   => 'flex-start',
+						'center' => 'center',
+						'right'  => 'flex-end',
+					),
+					'selectors'            => array( '{{WRAPPER}} .kbroo-post__read-more' => 'align-self: {{VALUE}};' ),
+				),
+			),
+			ControlGroups::css_filters( '{{WRAPPER}} .kbroo-post__thumbnail img', $image, 'thumbnail_filters' ),
+			ControlGroups::css_filters( '{{WRAPPER}} .kbroo-post:hover .kbroo-post__thumbnail img', $image + array( 'section' => __( 'Image on hover', 'kbroo-studio' ) ), 'thumbnail_hover_filters' ),
+			self::load_more_controls( $style( __( 'Load more button', 'kbroo-studio' ) ) )
+		);
+	}
+
+	/**
+	 * The load more button's look (Elementor's button settings).
+	 */
+	private static function load_more_controls( array $base ): array {
+		$base    = array( 'condition' => array( 'pagination_type' => array( 'load_more_on_click', 'load_more_infinite_scroll' ) ) ) + $base;
+		$button  = '{{WRAPPER}} .kbroo-load-more__button';
+		$hovered = '{{WRAPPER}} .kbroo-load-more__button:hover, {{WRAPPER}} .kbroo-load-more__button:focus-visible';
+		return array_merge(
+			array(
+				'button_text_color'             => $base + array(
+					'type'      => 'color',
+					'label'     => __( 'Text colour', 'kbroo-studio' ),
+					'selectors' => array( $button => 'color: {{VALUE}};' ),
+				),
+				'background_color'              => $base + array(
+					'type'      => 'color',
+					'label'     => __( 'Background colour', 'kbroo-studio' ),
+					'selectors' => array( $button => 'background-color: {{VALUE}};' ),
+				),
+				'hover_color'                   => $base + array(
+					'type'      => 'color',
+					'label'     => __( 'Text colour on hover', 'kbroo-studio' ),
+					'selectors' => array( $hovered => 'color: {{VALUE}};' ),
+				),
+				'button_background_hover_color' => $base + array(
+					'type'      => 'color',
+					'label'     => __( 'Background colour on hover', 'kbroo-studio' ),
+					'selectors' => array( $hovered => 'background-color: {{VALUE}};' ),
+				),
+				'text_padding'                  => $base + array(
+					'type'       => 'dimensions',
+					'label'      => __( 'Padding', 'kbroo-studio' ),
+					'units'      => array( 'px', 'em', '%' ),
+					'responsive' => true,
+					'selectors'  => array( $button => 'padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};' ),
+				),
+			),
+			ControlGroups::typography( 'typography', $button, $base ),
+			ControlGroups::border( $button, $base )
 		);
 	}
 
@@ -781,6 +864,18 @@ class Posts extends Widget {
 			}
 			return esc_url( 1 === $n ? remove_query_arg( self::PAGE_VAR ) : add_query_arg( self::PAGE_VAR, $n ) );
 		};
+		if ( 0 === strpos( $type, 'load_more' ) ) {
+			if ( $page >= $total ) {
+				return '';
+			}
+			\KbrooStudio\Frontend::enqueue_script(); // Adds the next posts in place.
+			return sprintf(
+				'<div class="kbroo-load-more"%1$s><a class="kbroo-button kbroo-button--sm kbroo-load-more__button" href="%2$s">%3$s</a></div>',
+				'load_more_infinite_scroll' === $type ? ' data-kbroo-load-more="scroll"' : ' data-kbroo-load-more="click"',
+				$url( $page + 1 ),
+				esc_html( '' !== trim( (string) $settings['load_more_text'] ) ? $settings['load_more_text'] : __( 'Load more', 'kbroo-studio' ) )
+			);
+		}
 		$links = array();
 		$prev  = in_array( $type, array( 'prev_next', 'numbers_and_prev_next' ), true );
 		if ( $prev ) {
