@@ -64,8 +64,12 @@ final class PreviewStyles {
 		$styles = wp_styles();
 		$before = $styles->queue;
 
-		self::run_plugin_enqueues();
-		$html = (string) call_user_func( $render );
+		try {
+			self::run_plugin_enqueues();
+			$html = (string) call_user_func( $render );
+		} finally {
+			self::restore( $previous );
+		}
 
 		$handles = array_values( array_diff( $styles->queue, $before ) );
 		$handles = array_values(
@@ -93,17 +97,23 @@ final class PreviewStyles {
 			$markup = (string) ob_get_clean();
 		}
 
+		return array(
+			'html'   => $html,
+			'styles' => $markup,
+		);
+	}
+
+	/**
+	 * Put back the query and post a preview replaced.
+	 */
+	private static function restore( array $previous ): void {
+		global $wp_query, $wp_the_query;
 		$wp_query        = $previous['wp_query']; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		$wp_the_query    = $previous['wp_the_query']; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		$GLOBALS['post'] = $previous['post']; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		if ( $previous['post'] ) {
 			setup_postdata( $previous['post'] );
 		}
-
-		return array(
-			'html'   => $html,
-			'styles' => $markup,
-		);
 	}
 
 	/**
@@ -118,8 +128,15 @@ final class PreviewStyles {
 		}
 		foreach ( $wp_filter['wp_enqueue_scripts']->callbacks as $callbacks ) {
 			foreach ( $callbacks as $callback ) {
-				if ( self::is_plugin_callback( $callback['function'] ) ) {
+				if ( ! self::is_plugin_callback( $callback['function'] ) ) {
+					continue;
+				}
+				// Another plugin's front-end code can fail outside a page
+				// request. Its styles are then missing, not the preview.
+				try {
 					call_user_func( $callback['function'] );
+				} catch ( \Throwable $e ) {
+					continue;
 				}
 			}
 		}

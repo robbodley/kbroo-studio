@@ -227,12 +227,19 @@ final class Rest {
 		if ( Templates::is_template( $post ) && ( 'single' === ThemeBuilder::area_of( Templates::type_of( $post ) ) || 'loop-item' === Templates::type_of( $post ) ) ) {
 			$post = Widgets\DynamicPost::sample( $post ) ?? $post;
 		}
-		$preview = PreviewStyles::render(
-			function () use ( $widget, $settings ) {
-				return $widget->render( $settings );
-			},
-			$post
-		);
+		try {
+			$preview = PreviewStyles::render(
+				function () use ( $widget, $settings ) {
+					return $widget->render( $settings );
+				},
+				$post
+			);
+		} catch ( \Throwable $e ) {
+			// Say what failed, rather than WordPress's "critical error" page.
+			$file = str_replace( wp_normalize_path( KBROO_STUDIO_DIR ), '', wp_normalize_path( $e->getFile() ) );
+			error_log( 'Kbroo Studio preview: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			return new WP_Error( 'kbroo_preview_error', $e->getMessage() . ' (' . $file . ':' . $e->getLine() . ')', array( 'status' => 500 ) );
+		}
 
 		return rest_ensure_response( $preview );
 	}
