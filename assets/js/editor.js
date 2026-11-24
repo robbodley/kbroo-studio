@@ -3838,6 +3838,19 @@
 		return layer;
 	}
 
+	/** Background slideshow in the canvas: its first image, standing still. */
+	function backgroundSlideshow( s ) {
+		var images = ( s.background_slideshow_gallery || [] ).filter( function ( image ) {
+			return image && image.url;
+		} );
+		if ( s.background_background !== 'slideshow' || ! images.length ) {
+			return null;
+		}
+		var image = el( 'div', { class: 'kbroo-bg-slideshow__image' } );
+		image.style.backgroundImage = 'url("' + String( images[ 0 ].url ).replace( /["\\]/g, '' ) + '")';
+		return el( 'div', { class: 'kbroo-bg-slideshow', 'aria-hidden': 'true' }, [ el( 'div', { class: 'kbroo-bg-slideshow__slide is-active' }, [ image ] ) ] );
+	}
+
 	/** Shape dividers: the server's SVG for each shape (see ShapeDividers). */
 	function shapeDividers( s ) {
 		var layers = [];
@@ -3906,6 +3919,7 @@
 					} ),
 				] ),
 				backgroundVideo( s ),
+				backgroundSlideshow( s ),
 			].concat( shapeDividers( s ), [
 				el( 'div', { class: 'kbroo-container' }, [ row ] ),
 			] )
@@ -3974,6 +3988,7 @@
 					} ),
 				] ),
 				backgroundVideo( s ),
+				backgroundSlideshow( s ),
 			].concat( shapeDividers( s ), [
 				zone,
 			] )
@@ -4056,6 +4071,17 @@
 		} );
 	}
 
+	/** Twin of Renderer::widget_classes(). */
+	function widgetClasses( name, s ) {
+		var classes = [ 'kbroo-widget', 'kbroo-widget--' + name ];
+		if ( [ '', '_tablet', '_mobile' ].some( function ( suffix ) {
+			return s[ '_element_width' + suffix ] === 'auto' || s[ '_element_width' + suffix ] === 'initial';
+		} ) ) {
+			classes.push( 'kbroo-widget--inline' );
+		}
+		return classes;
+	}
+
 	function renderWidget( widget ) {
 		var render = renderers[ widget.widgetType ];
 		var definition = config.widgets[ widget.widgetType ];
@@ -4073,7 +4099,7 @@
 		var node = el(
 			'div',
 			{
-				class: elementClasses( widget, s, [ 'kbroo-widget', 'kbroo-widget--' + widget.widgetType ], '_' ),
+				class: elementClasses( widget, s, widgetClasses( widget.widgetType, s ), '_' ),
 				'data-id': widget.id,
 				draggable: 'true',
 				ondragstart: function ( e ) {

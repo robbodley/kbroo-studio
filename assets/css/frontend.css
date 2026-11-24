@@ -54,8 +54,27 @@
 	display: flex;
 	flex: 1 1 auto;
 	flex-direction: column;
-	gap: 20px;
+	justify-content: var(--kbroo-column-valign, normal);
+	row-gap: 20px;
+	column-gap: 0;
 	min-width: 0;
+}
+
+/* A column holding inline widgets (Advanced > Width: Inline or Custom)
+   lays its widgets out in rows, as Elementor's does: inline ones sit side
+   by side, the rest take a whole row. Vertical align then moves the rows,
+   and Horizontal align lines up the inline widgets. */
+.kbroo-column-inner:has(> .kbroo-widget--inline) {
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-content: var(--kbroo-column-valign, flex-start);
+	align-items: var(--kbroo-column-valign, normal);
+	justify-content: var(--kbroo-column-halign, flex-start);
+}
+
+/* No specificity, so a widget's own width settings win. */
+:where(.kbroo-column-inner:has(> .kbroo-widget--inline)) > * {
+	flex: 0 1 100%;
 }
 
 .kbroo-section--inner {
@@ -119,6 +138,12 @@
 .kbroo-widget {
 	position: relative;
 	max-width: 100%;
+}
+
+/* Mouse effects (frontend.js moves the element with translate and
+   transform). */
+.kbroo-el[data-kbroo-mouse] {
+	transition: background 0.3s, border 0.3s, border-radius 0.3s, box-shadow 0.3s, translate 0.2s ease-out, transform 0.2s ease-out;
 }
 
 .kbroo-heading {
@@ -207,13 +232,63 @@
 	min-height: 56.25%;
 }
 
-:is(.kbroo-section, .kbroo-con):has(> .kbroo-bg-video)::before {
+:is(.kbroo-section, .kbroo-con):has(> .kbroo-bg-video, > .kbroo-bg-slideshow)::before {
 	z-index: 1;
 }
 
-.kbroo-section:has(> .kbroo-bg-video) > .kbroo-container,
-.kbroo-con:has(> .kbroo-bg-video) > .kbroo-con-inner {
+.kbroo-section:has(> .kbroo-bg-video, > .kbroo-bg-slideshow) > .kbroo-container,
+.kbroo-con:has(> .kbroo-bg-video, > .kbroo-bg-slideshow) > .kbroo-con-inner {
 	z-index: 2;
+}
+
+/* Background slideshow: images stacked under the content; frontend.js
+   moves .is-active along, and each fades in over the one before. */
+.kbroo-bg-slideshow {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	border-radius: inherit;
+	pointer-events: none;
+}
+
+.kbroo-bg-slideshow__slide {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	opacity: 0;
+	transition-property: opacity;
+	transition-duration: var(--kbroo-slide-fade, 0.5s);
+}
+
+.kbroo-bg-slideshow__slide.is-active {
+	z-index: 1;
+	opacity: 1;
+}
+
+.kbroo-bg-slideshow__slide.was-active {
+	opacity: 1;
+}
+
+.kbroo-bg-slideshow__image {
+	width: 100%;
+	height: 100%;
+	background-position: center center;
+	background-repeat: no-repeat;
+	background-size: cover;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.kbroo-bg-slideshow--ken-burns-in .kbroo-bg-slideshow__image { transform: scale(1); }
+	.kbroo-bg-slideshow--ken-burns-out .kbroo-bg-slideshow__image { transform: scale(1.3); }
+
+	.kbroo-bg-slideshow--ken-burns-in .is-active .kbroo-bg-slideshow__image,
+	.kbroo-bg-slideshow--ken-burns-out .is-active .kbroo-bg-slideshow__image {
+		transition: transform var(--kbroo-slide-zoom, 20s) linear;
+	}
+
+	/* The slide fading out keeps its zoom until it is hidden. */
+	.kbroo-bg-slideshow--ken-burns-in :is(.is-active, .was-active) .kbroo-bg-slideshow__image { transform: scale(1.3); }
+	.kbroo-bg-slideshow--ken-burns-out :is(.is-active, .was-active) .kbroo-bg-slideshow__image { transform: scale(1); }
 }
 
 /* Shape dividers: an SVG along the top or bottom edge, under the content
@@ -267,7 +342,94 @@
 	}
 }
 
-/* Hover animations (hover_animation) set --kbroo-hover-transform. */
+/* Hover animations (hover_animation) set --kbroo-hover-transform, or
+   --kbroo-hover-animation for ones that play keyframes. */
+@media (prefers-reduced-motion: no-preference) {
+	.kbroo-button:hover,
+	.kbroo-button:focus-visible,
+	.kbroo-image:hover img,
+	.kbroo-icon-el:hover,
+	.kbroo-social-icon:hover,
+	.kbroo-widget--image-box .kbroo-box:hover .kbroo-box__media {
+		animation: var(--kbroo-hover-animation, none);
+	}
+}
+
+@keyframes kbroo-hover-pulse {
+	25% { transform: scale(1.1); }
+	75% { transform: scale(0.9); }
+}
+
+@keyframes kbroo-hover-pulse-grow {
+	to { transform: scale(1.1); }
+}
+
+@keyframes kbroo-hover-pulse-shrink {
+	to { transform: scale(0.9); }
+}
+
+@keyframes kbroo-hover-push {
+	50% { transform: scale(0.8); }
+	100% { transform: scale(1); }
+}
+
+@keyframes kbroo-hover-pop {
+	50% { transform: scale(1.2); }
+}
+
+@keyframes kbroo-hover-bob {
+	0% { transform: translateY(-8px); }
+	50% { transform: translateY(-4px); }
+	100% { transform: translateY(-8px); }
+}
+
+@keyframes kbroo-hover-bob-float {
+	100% { transform: translateY(-8px); }
+}
+
+@keyframes kbroo-hover-hang {
+	0% { transform: translateY(8px); }
+	50% { transform: translateY(4px); }
+	100% { transform: translateY(8px); }
+}
+
+@keyframes kbroo-hover-hang-sink {
+	100% { transform: translateY(8px); }
+}
+
+@keyframes kbroo-hover-buzz {
+	50% { transform: translateX(3px) rotate(2deg); }
+	100% { transform: translateX(-3px) rotate(-2deg); }
+}
+
+@keyframes kbroo-hover-buzz-out {
+	10%, 30% { transform: translateX(3px) rotate(2deg); }
+	20%, 40% { transform: translateX(-3px) rotate(-2deg); }
+	50%, 70% { transform: translateX(2px) rotate(1deg); }
+	60%, 80% { transform: translateX(-2px) rotate(-1deg); }
+	90% { transform: translateX(1px) rotate(0); }
+	100% { transform: translateX(-1px) rotate(0); }
+}
+
+@keyframes kbroo-hover-wobble-vertical {
+	16.65% { transform: translateY(8px); }
+	33.3% { transform: translateY(-6px); }
+	49.95% { transform: translateY(4px); }
+	66.6% { transform: translateY(-2px); }
+	83.25% { transform: translateY(1px); }
+	100% { transform: translateY(0); }
+}
+
+@keyframes kbroo-hover-wobble-horizontal {
+	16.65% { transform: translateX(8px); }
+	33.3% { transform: translateX(-6px); }
+	49.95% { transform: translateX(4px); }
+	66.6% { transform: translateX(-2px); }
+	83.25% { transform: translateX(1px); }
+	100% { transform: translateX(0); }
+}
+
+/* Single-transform hover animations. */
 .kbroo-button,
 .kbroo-image img {
 	transition-property: color, background-color, border-color, transform, filter, opacity;
@@ -1440,6 +1602,38 @@ textarea.kbroo-form__input {
 	color: var(--kbroo-nav-hover, var(--kbroo-nav-color, inherit));
 }
 
+/* Pointers (Elementor's): a line, frame or background on the item under
+   the mouse and the current page, in the menu across the page only. */
+.kbroo-nav[class*="kbroo-nav--pointer-"]:not(.is-open) > .kbroo-nav__menu > li > a {
+	--kbroo-nav-pointer-on: 0;
+	background-repeat: no-repeat;
+	transition: color 0.2s, background-color 0.2s, background-size 0.2s, box-shadow 0.2s;
+}
+
+.kbroo-nav[class*="kbroo-nav--pointer-"]:not(.is-open) > .kbroo-nav__menu > li > a:is(:hover, :focus-visible),
+.kbroo-nav[class*="kbroo-nav--pointer-"]:not(.is-open) > .kbroo-nav__menu > li:is(.current-menu-item, .current-menu-ancestor) > a {
+	--kbroo-nav-pointer-on: 1;
+}
+
+.kbroo-nav:is(.kbroo-nav--pointer-underline, .kbroo-nav--pointer-overline, .kbroo-nav--pointer-double-line):not(.is-open) > .kbroo-nav__menu > li > a {
+	background-image: linear-gradient(var(--kbroo-nav-pointer, var(--kbroo-global-color-accent, #61ce70)), var(--kbroo-nav-pointer, var(--kbroo-global-color-accent, #61ce70))), linear-gradient(var(--kbroo-nav-pointer, var(--kbroo-global-color-accent, #61ce70)), var(--kbroo-nav-pointer, var(--kbroo-global-color-accent, #61ce70)));
+	background-size: calc(var(--kbroo-nav-pointer-on) * 100%) var(--kbroo-nav-pointer-width, 3px), calc(var(--kbroo-nav-pointer-on) * 100%) var(--kbroo-nav-pointer-width, 3px);
+}
+
+.kbroo-nav--pointer-underline:not(.is-open) > .kbroo-nav__menu > li > a { background-position: center bottom, center bottom; }
+.kbroo-nav--pointer-overline:not(.is-open) > .kbroo-nav__menu > li > a { background-position: center top, center top; }
+.kbroo-nav--pointer-double-line:not(.is-open) > .kbroo-nav__menu > li > a { background-position: center top, center bottom; }
+
+.kbroo-nav--pointer-framed:not(.is-open) > .kbroo-nav__menu > li > a {
+	box-shadow: inset 0 0 0 calc(var(--kbroo-nav-pointer-on) * var(--kbroo-nav-pointer-width, 3px)) var(--kbroo-nav-pointer, var(--kbroo-global-color-accent, #61ce70));
+}
+
+.kbroo-nav--pointer-background:not(.is-open) > .kbroo-nav__menu > li > a:is(:hover, :focus-visible),
+.kbroo-nav--pointer-background:not(.is-open) > .kbroo-nav__menu > li:is(.current-menu-item, .current-menu-ancestor) > a {
+	background-color: var(--kbroo-nav-pointer, var(--kbroo-global-color-accent, #61ce70));
+	color: var(--kbroo-nav-hover, #fff);
+}
+
 .kbroo-nav__menu .current-menu-item > a,
 .kbroo-nav__menu .current-menu-ancestor > a {
 	color: var(--kbroo-nav-active, var(--kbroo-nav-hover, var(--kbroo-nav-color, inherit)));
@@ -2135,4 +2329,38 @@ body.kbroo-template-canvas {
 
 .kbroo-post-title a {
 	color: inherit;
+}
+
+/* Counter: a number that counts up (frontend.js), with a title above,
+   below or beside it. */
+.kbroo-counter {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+}
+
+.kbroo-counter--title-before { flex-direction: column-reverse; }
+.kbroo-counter--title-start { flex-direction: row-reverse; justify-content: center; gap: 0.5em; }
+.kbroo-counter--title-end { flex-direction: row; justify-content: center; gap: 0.5em; }
+
+.kbroo-counter__number-wrapper {
+	display: flex;
+	justify-content: center;
+	font-size: 69px;
+	font-weight: 600;
+	line-height: 1;
+	color: var(--kbroo-global-color-primary, inherit);
+}
+
+.kbroo-counter__number {
+	font-variant-numeric: tabular-nums;
+}
+
+.kbroo-counter__title {
+	margin: 0;
+	font-size: 19px;
+	font-weight: 400;
+	line-height: 2.5;
+	color: var(--kbroo-global-color-secondary, inherit);
 }

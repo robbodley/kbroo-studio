@@ -187,7 +187,7 @@ final class Forms {
 		do_action( 'kbroo_studio_form_submitted', $values, $settings, $post, $sent );
 
 		if ( ! $sent && 'yes' !== $settings['save_submissions'] ) {
-			$this->respond( $ajax, $post, $form_id, false, $settings['error_message'] );
+			$this->respond( $ajax, $post, $form_id, false, '' !== trim( (string) $settings['server_message'] ) ? $settings['server_message'] : $settings['error_message'] );
 		}
 		$redirect = Controls::sanitize_url( $settings['redirect_to']['url'] ?? '', array( 'http', 'https' ) );
 		$this->respond( $ajax, $post, $form_id, true, $settings['success_message'], array(), $redirect );
@@ -285,31 +285,55 @@ final class Forms {
 	}
 
 	private function send_email( array $settings, array $values, WP_Post $post ): bool {
-		$to = self::addresses( (string) $settings['email_to'] );
-		if ( ! $to ) {
-			$to = array( get_option( 'admin_email' ) );
+		$sent = $this->send_one( $settings, $values, $post, '' );
+		if ( 'yes' === ( $settings['email_2'] ?? '' ) ) {
+			$this->send_one( $settings, $values, $post, '_2' );
 		}
+		return $sent;
+	}
+
+	/**
+	 * One of the form's emails: the main one ($suffix '') or the second
+	 * ('_2'). Addresses may use [field id="..."]. The main email goes to
+	 * the site address when it names none; the second is then not sent.
+	 */
+	private function send_one( array $settings, array $values, WP_Post $post, string $suffix ): bool {
 		// Header values: no line breaks, so nothing can be added to the mail headers.
-		$clean   = function ( $value ) {
+		$clean = function ( $value ) {
 			return trim( str_replace( array( "\r", "\n" ), ' ', (string) $value ) );
 		};
-		$subject = $clean( self::fill( (string) $settings['email_subject'], $values ) );
-		$body    = self::fill( (string) $settings['email_content'], $values )
+		$setting = function ( string $key ) use ( $settings, $suffix, $values, $clean ) {
+			return $clean( self::fill( (string) ( $settings[ $key . $suffix ] ?? '' ), $values ) );
+		};
+
+		$to = self::addresses( $setting( 'email_to' ) );
+		if ( ! $to ) {
+			if ( '' !== $suffix ) {
+				return false;
+			}
+			$to = array( get_option( 'admin_email' ) );
+		}
+		$subject = $setting( 'email_subject' );
+		$body    = self::fill( (string) ( $settings[ 'email_content' . $suffix ] ?? '' ), $values );
+		if ( '' === $suffix ) {
 			/* translators: 1: page title, 2: page address. */
-			. "\n\n---\n" . sprintf( __( 'Sent from "%1$s" (%2$s)', 'kbroo-studio' ), $clean( get_the_title( $post ) ), get_permalink( $post ) );
+			$body .= "\n\n---\n" . sprintf( __( 'Sent from "%1$s" (%2$s)', 'kbroo-studio' ), $clean( get_the_title( $post ) ), get_permalink( $post ) );
+		}
 
 		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
-		$from    = is_email( $clean( $settings['email_from'] ) );
+		$from    = is_email( $setting( 'email_from' ) );
 		if ( $from ) {
-			$name      = $clean( $settings['email_from_name'] );
+			$name      = $setting( 'email_from_name' );
 			$headers[] = 'From: ' . ( '' !== $name ? '"' . str_replace( '"', '', $name ) . '" ' : '' ) . '<' . $from . '>';
 		}
-		$reply = $values[ preg_replace( '/[^A-Za-z0-9_]/', '', (string) $settings['email_reply_to'] ) ][1] ?? '';
+		// A field ID (the address typed there), or an address.
+		$reply_key = (string) ( $settings[ 'email_reply_to' . $suffix ] ?? '' );
+		$reply     = $values[ preg_replace( '/[^A-Za-z0-9_]/', '', $reply_key ) ][1] ?? $setting( 'email_reply_to' );
 		if ( is_email( $reply ) ) {
 			$headers[] = 'Reply-To: ' . $reply;
 		}
 		foreach ( array( 'Cc' => 'email_to_cc', 'Bcc' => 'email_to_bcc' ) as $header => $key ) {
-			foreach ( self::addresses( (string) $settings[ $key ] ) as $address ) {
+			foreach ( self::addresses( $setting( $key ) ) as $address ) {
 				$headers[] = $header . ': ' . $address;
 			}
 		}

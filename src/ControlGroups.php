@@ -191,6 +191,70 @@ final class ControlGroups {
 	}
 
 	/**
+	 * Box shadow (Elementor's box_shadow group). Elementor keeps the shadow
+	 * in one value, { horizontal, vertical, blur, spread, color }; here
+	 * each part is its own control (the converter splits it):
+	 * <prefix>_box_shadow_type, _horizontal, _vertical, _blur, _spread,
+	 * _color and _position.
+	 *
+	 * @param string $prefix "box_shadow" for sections, columns and
+	 *                       containers, "_box_shadow" for widgets.
+	 */
+	public static function box_shadow( string $selector, array $base = array(), string $prefix = 'box_shadow' ): array {
+		$p    = $prefix . '_box_shadow';
+		$base = array_merge(
+			array(
+				'tab'     => 'style',
+				'section' => __( 'Box shadow', 'kbroo-studio' ),
+			),
+			$base
+		);
+		$on     = array( 'condition' => array_merge( $base['condition'] ?? array(), array( $p . '_type' => 'yes' ) ) ) + $base;
+		$slider = function ( string $label, $default, int $min, int $max ) use ( $on ) {
+			return $on + array(
+				'type'    => 'slider',
+				'label'   => $label,
+				'units'   => array( 'px' ),
+				'min'     => $min,
+				'max'     => $max,
+				'default' => array(
+					'unit' => 'px',
+					'size' => $default,
+				),
+			);
+		};
+		$parts = "{{{$p}_horizontal.SIZE}}px {{{$p}_vertical.SIZE}}px {{{$p}_blur.SIZE}}px {{{$p}_spread.SIZE}}px";
+		return array(
+			$p . '_type'       => $base + array(
+				'type'    => 'switcher',
+				'label'   => __( 'Box shadow', 'kbroo-studio' ),
+				'default' => '',
+			),
+			$p . '_horizontal' => $slider( __( 'Horizontal', 'kbroo-studio' ), 0, -100, 100 ),
+			$p . '_vertical'   => $slider( __( 'Vertical', 'kbroo-studio' ), 0, -100, 100 ),
+			$p . '_blur'       => $slider( __( 'Blur', 'kbroo-studio' ), 10, 0, 100 ),
+			$p . '_spread'     => $slider( __( 'Spread', 'kbroo-studio' ), 0, -100, 100 ),
+			$p . '_color'      => $on + array(
+				'type'      => 'color',
+				'label'     => __( 'Shadow colour', 'kbroo-studio' ),
+				'default'   => '#00000080',
+				'selectors' => array( $selector => "box-shadow: {$parts} {{VALUE}};" ),
+			),
+			$p . '_position'   => $on + array(
+				'type'                 => 'select',
+				'label'                => __( 'Position', 'kbroo-studio' ),
+				'default'              => '',
+				'options'              => array(
+					''      => __( 'Outside', 'kbroo-studio' ),
+					'inset' => __( 'Inside', 'kbroo-studio' ),
+				),
+				'selectors_dictionary' => array( 'inset' => 'inset' ),
+				'selectors'            => array( $selector => "box-shadow: {{VALUE}} {$parts} {{{$p}_color.VALUE}};" ),
+			),
+		);
+	}
+
+	/**
 	 * Background controls in Elementor's shape: a type (classic colour and
 	 * image, gradient or video) and its settings, e.g. background_background,
 	 * background_color, background_image, background_gradient_angle.
@@ -224,7 +288,7 @@ final class ControlGroups {
 			$hover    = array( 'section' => $base['section'] . ' ' . __( 'on hover', 'kbroo-studio' ) ) + $base;
 			$controls = array_merge(
 				$controls,
-				self::background_set( $args['hover'], $hover, $prefix . '_hover', array_diff( $args['types'], array( 'video' ) ) ),
+				self::background_set( $args['hover'], $hover, $prefix . '_hover', array_diff( $args['types'], array( 'video', 'slideshow' ) ) ),
 				array(
 					$prefix . '_hover_transition' => $hover + array(
 						'type'      => 'slider',
@@ -248,7 +312,8 @@ final class ControlGroups {
 		$type_labels = array(
 			'classic'  => __( 'Colour or image', 'kbroo-studio' ),
 			'gradient' => __( 'Gradient', 'kbroo-studio' ),
-			'video'    => __( 'Video', 'kbroo-studio' ),
+			'video'     => __( 'Video', 'kbroo-studio' ),
+			'slideshow' => __( 'Slideshow', 'kbroo-studio' ),
 		);
 		$options     = array( '' => __( 'None', 'kbroo-studio' ) );
 		foreach ( $types as $type ) {
@@ -492,6 +557,72 @@ final class ControlGroups {
 			);
 		}
 
+		if ( in_array( 'slideshow', $types, true ) ) {
+			$show     = array( 'condition' => array_merge( $base['condition'] ?? array(), array( $type => 'slideshow' ) ) ) + $base;
+			$image    = $selector . ' > .kbroo-bg-slideshow .kbroo-bg-slideshow__image';
+			$controls = array_merge(
+				$controls,
+				array(
+					$p . '_slideshow_gallery'                  => $show + array(
+						'type'  => 'gallery',
+						'label' => __( 'Images', 'kbroo-studio' ),
+					),
+					$p . '_slideshow_loop'                     => $show + array(
+						'type'    => 'switcher',
+						'label'   => __( 'Loop', 'kbroo-studio' ),
+						'default' => 'yes',
+					),
+					$p . '_slideshow_slide_duration'           => $show + array(
+						'type'    => 'number',
+						'label'   => __( 'Time on each image (ms)', 'kbroo-studio' ),
+						'default' => 5000,
+						'min'     => 500,
+						'max'     => 60000,
+					),
+					$p . '_slideshow_transition_duration'      => $show + array(
+						'type'    => 'number',
+						'label'   => __( 'Fade (ms)', 'kbroo-studio' ),
+						'default' => 500,
+						'min'     => 0,
+						'max'     => 10000,
+					),
+					$p . '_slideshow_background_size'          => $show + array(
+						'type'      => 'select',
+						'label'     => __( 'Display size', 'kbroo-studio' ),
+						'default'   => '',
+						'options'   => array(
+							''        => __( 'Default (cover)', 'kbroo-studio' ),
+							'auto'    => __( 'Auto', 'kbroo-studio' ),
+							'cover'   => __( 'Cover', 'kbroo-studio' ),
+							'contain' => __( 'Contain', 'kbroo-studio' ),
+						),
+						'selectors' => array( $image => 'background-size: {{VALUE}};' ),
+					),
+					$p . '_slideshow_background_position'      => $show + array(
+						'type'      => 'select',
+						'label'     => __( 'Position', 'kbroo-studio' ),
+						'default'   => '',
+						'options'   => $positions,
+						'selectors' => array( $image => 'background-position: {{VALUE}};' ),
+					),
+					$p . '_slideshow_ken_burns'                => $show + array(
+						'type'    => 'switcher',
+						'label'   => __( 'Ken Burns effect (slow zoom)', 'kbroo-studio' ),
+						'default' => '',
+					),
+					$p . '_slideshow_ken_burns_zoom_direction' => array( 'condition' => $show['condition'] + array( $p . '_slideshow_ken_burns' => 'yes' ) ) + $show + array(
+						'type'    => 'select',
+						'label'   => __( 'Zoom', 'kbroo-studio' ),
+						'default' => 'in',
+						'options' => array(
+							'in'  => __( 'In', 'kbroo-studio' ),
+							'out' => __( 'Out', 'kbroo-studio' ),
+						),
+					),
+				)
+			);
+		}
+
 		return $controls;
 	}
 
@@ -618,16 +749,48 @@ final class ControlGroups {
 		'skew'          => 'skew(-10deg)',
 		'skew-forward'  => 'skew(-10deg)',
 		'skew-backward' => 'skew(10deg)',
+		'bounce-in'     => 'scale(1.2)',
+		'bounce-out'    => 'scale(0.8)',
 	);
 
 	/**
+	 * Elementor's hover animations that play keyframes (see
+	 * frontend.css, @keyframes kbroo-hover-*): name => animation.
+	 */
+	const HOVER_KEYFRAMES = array(
+		'pulse'             => 'kbroo-hover-pulse 1s linear infinite',
+		'pulse-grow'        => 'kbroo-hover-pulse-grow 0.3s linear infinite alternate',
+		'pulse-shrink'      => 'kbroo-hover-pulse-shrink 0.3s linear infinite alternate',
+		'push'              => 'kbroo-hover-push 0.3s linear 1',
+		'pop'               => 'kbroo-hover-pop 0.3s linear 1',
+		'bob'               => 'kbroo-hover-bob-float 0.3s ease-out forwards, kbroo-hover-bob 1.5s 0.3s ease-in-out infinite alternate',
+		'hang'              => 'kbroo-hover-hang-sink 0.3s ease-out forwards, kbroo-hover-hang 1.5s 0.3s ease-in-out infinite alternate',
+		'buzz'              => 'kbroo-hover-buzz 0.15s linear infinite',
+		'buzz-out'          => 'kbroo-hover-buzz-out 0.75s linear 1',
+		'wobble-vertical'   => 'kbroo-hover-wobble-vertical 1s ease-in-out 1',
+		'wobble-horizontal' => 'kbroo-hover-wobble-horizontal 1s ease-in-out 1',
+	);
+
+	/** Whether Kbroo Studio has an Elementor hover animation. */
+	public static function has_hover_animation( string $name ): bool {
+		return isset( self::HOVER_ANIMATIONS[ $name ] ) || isset( self::HOVER_KEYFRAMES[ $name ] );
+	}
+
+	/**
 	 * Hover animation (Elementor's hover_animation): a transform on hover,
-	 * set through --kbroo-hover-transform on $selector.
+	 * set through --kbroo-hover-transform on $selector, or keyframes, set
+	 * through --kbroo-hover-animation.
 	 */
 	public static function hover_animation( string $selector, array $base ): array {
-		$options = array( '' => __( 'None', 'kbroo-studio' ) );
-		foreach ( array_keys( self::HOVER_ANIMATIONS ) as $name ) {
-			$options[ $name ] = ucfirst( str_replace( '-', ' ', $name ) );
+		$options    = array( '' => __( 'None', 'kbroo-studio' ) );
+		$dictionary = array();
+		foreach ( self::HOVER_ANIMATIONS as $name => $transform ) {
+			$options[ $name ]    = ucfirst( str_replace( '-', ' ', $name ) );
+			$dictionary[ $name ] = '--kbroo-hover-transform: ' . $transform . ';';
+		}
+		foreach ( self::HOVER_KEYFRAMES as $name => $animation ) {
+			$options[ $name ]    = ucfirst( str_replace( '-', ' ', $name ) );
+			$dictionary[ $name ] = '--kbroo-hover-animation: ' . $animation . ';';
 		}
 		return array(
 			'hover_animation' => $base + array(
@@ -635,10 +798,232 @@ final class ControlGroups {
 				'label'                => __( 'Hover animation', 'kbroo-studio' ),
 				'default'              => '',
 				'options'              => $options,
-				'selectors_dictionary' => self::HOVER_ANIMATIONS,
-				'selectors'            => array( $selector => '--kbroo-hover-transform: {{VALUE}};' ),
+				'selectors_dictionary' => $dictionary,
+				'selectors'            => array( $selector => '{{VALUE}}' ),
 			),
 		);
+	}
+
+	/**
+	 * How a widget sizes itself (Elementor's _element_width): full width,
+	 * inline (as wide as its content, so inline widgets sit side by side)
+	 * or a custom width.
+	 */
+	public static function element_width(): array {
+		$layout = array(
+			'tab'     => 'advanced',
+			'section' => __( 'Layout', 'kbroo-studio' ),
+		);
+		return array(
+			'_element_width'        => $layout + array(
+				'type'                 => 'select',
+				'label'                => __( 'Width', 'kbroo-studio' ),
+				'default'              => '',
+				'responsive'           => true,
+				'options'              => array(
+					''        => __( 'Default', 'kbroo-studio' ),
+					'inherit' => __( 'Full width', 'kbroo-studio' ),
+					'auto'    => __( 'Inline (as wide as its content)', 'kbroo-studio' ),
+					'initial' => __( 'Custom', 'kbroo-studio' ),
+				),
+				'selectors_dictionary' => array(
+					'inherit' => 'width: 100%;',
+					'auto'    => 'width: fit-content; flex-basis: auto;',
+					'initial' => 'flex-basis: auto;',
+				),
+				'selectors'            => array( '{{WRAPPER}}' => '{{VALUE}}' ),
+			),
+			'_element_custom_width' => $layout + array(
+				'type'       => 'slider',
+				'label'      => __( 'Custom width', 'kbroo-studio' ),
+				'units'      => array( '%', 'px', 'vw' ),
+				'responsive' => true,
+				'default'    => array(
+					'unit' => '%',
+					'size' => 50,
+				),
+				'condition'  => array( '_element_width' => 'initial' ),
+				'selectors'  => array( '{{WRAPPER}}' => 'width: {{SIZE}}{{UNIT}};' ),
+			),
+		);
+	}
+
+	/** Whether a widget's settings make it inline on any screen size. */
+	public static function is_inline( array $settings ): bool {
+		foreach ( array( '', '_tablet', '_mobile' ) as $suffix ) {
+			if ( in_array( $settings[ '_element_width' . $suffix ] ?? '', array( 'auto', 'initial' ), true ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * How a widget or container sits in a flexbox container (Elementor's
+	 * flex item group, _flex_*): align self, order, and grow or shrink.
+	 */
+	public static function flex_item(): array {
+		$base = array(
+			'tab'        => 'advanced',
+			'section'    => __( 'Position in its container', 'kbroo-studio' ),
+			'responsive' => true,
+		);
+		return array(
+			'_flex_align_self'   => $base + array(
+				'type'      => 'select',
+				'label'     => __( 'Align self', 'kbroo-studio' ),
+				'default'   => '',
+				'options'   => array(
+					''           => __( 'Default', 'kbroo-studio' ),
+					'flex-start' => __( 'Start', 'kbroo-studio' ),
+					'center'     => __( 'Center', 'kbroo-studio' ),
+					'flex-end'   => __( 'End', 'kbroo-studio' ),
+					'stretch'    => __( 'Stretch', 'kbroo-studio' ),
+				),
+				'selectors' => array( '{{WRAPPER}}' => 'align-self: {{VALUE}};' ),
+			),
+			'_flex_order'        => $base + array(
+				'type'                 => 'select',
+				'label'                => __( 'Order', 'kbroo-studio' ),
+				'default'              => '',
+				'options'              => array(
+					''       => __( 'Default', 'kbroo-studio' ),
+					'start'  => __( 'First', 'kbroo-studio' ),
+					'end'    => __( 'Last', 'kbroo-studio' ),
+					'custom' => __( 'Custom', 'kbroo-studio' ),
+				),
+				'selectors_dictionary' => array(
+					'start'  => 'order: -99999;',
+					'end'    => 'order: 99999;',
+					'custom' => '',
+				),
+				'selectors'            => array( '{{WRAPPER}}' => '{{VALUE}}' ),
+			),
+			'_flex_order_custom' => $base + array(
+				'type'      => 'number',
+				'label'     => __( 'Custom order', 'kbroo-studio' ),
+				'condition' => array( '_flex_order' => 'custom' ),
+				'selectors' => array( '{{WRAPPER}}' => 'order: {{VALUE}};' ),
+			),
+			'_flex_size'         => $base + array(
+				'type'                 => 'select',
+				'label'                => __( 'Size', 'kbroo-studio' ),
+				'default'              => '',
+				'options'              => array(
+					''       => __( 'Default', 'kbroo-studio' ),
+					'none'   => __( 'Fixed (no grow or shrink)', 'kbroo-studio' ),
+					'grow'   => __( 'Grow to fill space', 'kbroo-studio' ),
+					'shrink' => __( 'Shrink to fit', 'kbroo-studio' ),
+					'custom' => __( 'Custom', 'kbroo-studio' ),
+				),
+				'selectors_dictionary' => array(
+					'none'   => 'flex-grow: 0; flex-shrink: 0;',
+					'grow'   => 'flex-grow: 1; flex-shrink: 0;',
+					'shrink' => 'flex-grow: 0; flex-shrink: 1;',
+					'custom' => '',
+				),
+				'selectors'            => array( '{{WRAPPER}}' => '{{VALUE}}' ),
+			),
+			'_flex_grow'         => $base + array(
+				'type'      => 'number',
+				'label'     => __( 'Flex grow', 'kbroo-studio' ),
+				'min'       => 0,
+				'condition' => array( '_flex_size' => 'custom' ),
+				'selectors' => array( '{{WRAPPER}}' => 'flex-grow: {{VALUE}};' ),
+			),
+			'_flex_shrink'       => $base + array(
+				'type'      => 'number',
+				'label'     => __( 'Flex shrink', 'kbroo-studio' ),
+				'min'       => 0,
+				'condition' => array( '_flex_size' => 'custom' ),
+				'selectors' => array( '{{WRAPPER}}' => 'flex-shrink: {{VALUE}};' ),
+			),
+		);
+	}
+
+	/**
+	 * Mouse effects (Elementor Pro's motion_fx mouse settings): the element
+	 * follows the pointer (mouse track) or tilts towards it (3D tilt), on
+	 * computers. frontend.js reads them from data-kbroo-mouse.
+	 */
+	public static function mouse_effects( array $motion ): array {
+		$on    = array( 'condition' => array( 'motion_fx_motion_fx_mouse' => 'yes' ) ) + $motion;
+		$track = array( 'condition' => array( 'motion_fx_motion_fx_mouse' => 'yes', 'motion_fx_mouseTrack_effect' => 'yes' ) ) + $motion;
+		$tilt  = array( 'condition' => array( 'motion_fx_motion_fx_mouse' => 'yes', 'motion_fx_tilt_effect' => 'yes' ) ) + $motion;
+		$speed = function ( $default ) {
+			return array(
+				'type'    => 'slider',
+				'label'   => __( 'Speed', 'kbroo-studio' ),
+				'units'   => array( 'px' ),
+				'min'     => 0,
+				'max'     => 10,
+				'step'    => 0.1,
+				'default' => array(
+					'unit' => 'px',
+					'size' => $default,
+				),
+			);
+		};
+		return array(
+			'motion_fx_motion_fx_mouse'      => $motion + array(
+				'type'        => 'switcher',
+				'label'       => __( 'Mouse effects', 'kbroo-studio' ),
+				'default'     => '',
+				'description' => __( 'Move with the pointer on computers. Skipped for visitors who ask for reduced motion.', 'kbroo-studio' ),
+			),
+			'motion_fx_mouseTrack_effect'    => $on + array(
+				'type'    => 'switcher',
+				'label'   => __( 'Mouse track', 'kbroo-studio' ),
+				'default' => '',
+			),
+			'motion_fx_mouseTrack_direction' => $track + array(
+				'type'    => 'select',
+				'label'   => __( 'Direction', 'kbroo-studio' ),
+				'default' => '',
+				'options' => array(
+					''         => __( 'Opposite', 'kbroo-studio' ),
+					'negative' => __( 'Direct', 'kbroo-studio' ),
+				),
+			),
+			'motion_fx_mouseTrack_speed'     => $track + $speed( 1 ),
+			'motion_fx_tilt_effect'          => $on + array(
+				'type'    => 'switcher',
+				'label'   => __( '3D tilt', 'kbroo-studio' ),
+				'default' => '',
+			),
+			'motion_fx_tilt_direction'       => $tilt + array(
+				'type'    => 'select',
+				'label'   => __( 'Direction', 'kbroo-studio' ),
+				'default' => '',
+				'options' => array(
+					''         => __( 'Direct', 'kbroo-studio' ),
+					'negative' => __( 'Opposite', 'kbroo-studio' ),
+				),
+			),
+			'motion_fx_tilt_speed'           => $tilt + $speed( 4 ),
+		);
+	}
+
+	/**
+	 * The data-kbroo-mouse value for an element's mouse effects, or '' when
+	 * it has none. The editor leaves them out, so the canvas stays still.
+	 */
+	public static function mouse_data( array $settings ): string {
+		if ( 'yes' !== ( $settings['motion_fx_motion_fx_mouse'] ?? '' ) ) {
+			return '';
+		}
+		$data = array();
+		foreach ( array( 'track' => 'motion_fx_mouseTrack', 'tilt' => 'motion_fx_tilt' ) as $name => $prefix ) {
+			if ( 'yes' !== ( $settings[ $prefix . '_effect' ] ?? '' ) ) {
+				continue;
+			}
+			$speed         = $settings[ $prefix . '_speed' ]['size'] ?? '';
+			$data[ $name ] = array(
+				'speed'   => is_numeric( $speed ) ? max( 0, min( 10, 0 + $speed ) ) : ( 'tilt' === $name ? 4 : 1 ),
+				'reverse' => 'negative' === ( $settings[ $prefix . '_direction' ] ?? '' ),
+			);
+		}
+		return $data ? (string) wp_json_encode( $data ) : '';
 	}
 
 	/** Entrance animations, by Elementor name. */
@@ -736,6 +1121,7 @@ final class ControlGroups {
 
 		return array_merge(
 			$before,
+			self::mouse_effects( $motion ),
 			Visibility::controls(),
 			array(
 			'custom_css'            => array(

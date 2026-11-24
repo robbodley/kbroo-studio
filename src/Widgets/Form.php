@@ -54,6 +54,8 @@ class Form extends Widget {
 		$fields  = array( 'section' => __( 'Form fields', 'kbroo-studio' ) );
 		$button  = array( 'section' => __( 'Button', 'kbroo-studio' ) );
 		$email   = array( 'section' => __( 'Email', 'kbroo-studio' ) );
+		$email_2 = array( 'section' => __( 'Second email', 'kbroo-studio' ) );
+		$second  = array( 'condition' => array( 'email_2' => 'yes' ) ) + $email_2;
 		$after   = array( 'section' => __( 'After sending', 'kbroo-studio' ) );
 		$texts   = array( 'section' => __( 'Messages', 'kbroo-studio' ) );
 		$style   = function ( string $section ) {
@@ -293,6 +295,57 @@ class Form extends Widget {
 					'default' => '',
 				),
 
+				'email_2'           => $email_2 + array(
+					'type'        => 'switcher',
+					'label'       => __( 'Send a second email', 'kbroo-studio' ),
+					'default'     => '',
+					'description' => __( 'For example a confirmation to the sender: send it to [field id="email"].', 'kbroo-studio' ),
+				),
+				'email_to_2'        => $second + array(
+					'type'        => 'text',
+					'label'       => __( 'Send to', 'kbroo-studio' ),
+					'default'     => '',
+					'description' => __( 'Addresses separated by commas; [field id="email"] uses the address typed in that field.', 'kbroo-studio' ),
+				),
+				'email_subject_2'   => $second + array(
+					'type'    => 'text',
+					'label'   => __( 'Subject', 'kbroo-studio' ),
+					/* translators: %s: site name. */
+					'default' => sprintf( __( 'New message from "%s"', 'kbroo-studio' ), get_bloginfo( 'name' ) ),
+				),
+				'email_content_2'   => $second + array(
+					'type'    => 'textarea',
+					'label'   => __( 'Message', 'kbroo-studio' ),
+					'default' => '[all-fields]',
+					'rows'    => 4,
+				),
+				'email_from_name_2' => $second + array(
+					'type'    => 'text',
+					'label'   => __( 'From name', 'kbroo-studio' ),
+					'default' => get_bloginfo( 'name' ),
+				),
+				'email_from_2'      => $second + array(
+					'type'    => 'text',
+					'label'   => __( 'From address', 'kbroo-studio' ),
+					'default' => '',
+				),
+				'email_reply_to_2'  => $second + array(
+					'type'        => 'text',
+					'label'       => __( 'Reply to', 'kbroo-studio' ),
+					'default'     => '',
+					'description' => __( 'An address, or a field ID whose typed address replies go to.', 'kbroo-studio' ),
+				),
+				'email_to_cc_2'     => $second + array(
+					'type'    => 'text',
+					'label'   => __( 'Cc', 'kbroo-studio' ),
+					'default' => '',
+				),
+				'email_to_bcc_2'    => $second + array(
+					'type'    => 'text',
+					'label'   => __( 'Bcc', 'kbroo-studio' ),
+					'default' => '',
+				),
+
 				'save_submissions' => $after + array(
 					'type'        => 'switcher',
 					'label'       => __( 'Keep a copy of each message', 'kbroo-studio' ),
@@ -313,6 +366,12 @@ class Form extends Widget {
 					'type'    => 'text',
 					'label'   => __( 'Could not send', 'kbroo-studio' ),
 					'default' => __( 'Sorry, your message could not be sent. Please try again.', 'kbroo-studio' ),
+				),
+				'server_message'         => $texts + array(
+					'type'        => 'text',
+					'label'       => __( 'Email failed', 'kbroo-studio' ),
+					'default'     => '',
+					'description' => __( 'Shown when the message is not saved and the email could not go. Empty uses "Could not send".', 'kbroo-studio' ),
 				),
 				'required_field_message' => $texts + array(
 					'type'    => 'text',

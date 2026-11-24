@@ -13,6 +13,10 @@
  * - Videos: an image overlay (.kbroo-video__overlay) is swapped for the
  *   player on click, so nothing loads from YouTube or Vimeo before then.
  *
+ * - Background slideshows (data-kbroo-slideshow): fade through the images.
+ * - Mouse effects (data-kbroo-mouse): follow or tilt towards the pointer.
+ * - Counters (data-kbroo-counter): count up when they scroll into view.
+ *
  * The editor calls KbrooStudio.initCarousels( canvas, { autoplay: false } )
  * after drawing the canvas.
  */
@@ -54,6 +58,137 @@
 		);
 		Array.prototype.forEach.call( elements, function ( element ) {
 			observer.observe( element );
+		} );
+	}
+
+	/* Background slideshows ---------------------------------------------- */
+
+	function initSlideshow( root ) {
+		var slides = Array.prototype.slice.call( root.children );
+		var options = {};
+		try {
+			options = JSON.parse( root.getAttribute( 'data-kbroo-slideshow' ) || '{}' );
+		} catch ( e ) {}
+		var duration = Math.max( 500, options.duration || 5000 );
+		var fade = Math.max( 0, options.transition == null ? 500 : options.transition );
+		root.style.setProperty( '--kbroo-slide-fade', fade / 1000 + 's' );
+		root.style.setProperty( '--kbroo-slide-zoom', ( duration + fade ) / 1000 + 's' );
+		if ( slides.length < 2 ) {
+			return;
+		}
+		var at = 0;
+		var timer = setInterval( function () {
+			if ( at === slides.length - 1 && options.loop === false ) {
+				clearInterval( timer );
+				return;
+			}
+			var previous = slides[ at ];
+			at = ( at + 1 ) % slides.length;
+			slides.forEach( function ( slide ) {
+				slide.classList.remove( 'was-active' );
+			} );
+			previous.classList.remove( 'is-active' );
+			previous.classList.add( 'was-active' ); // Stays under the new one while it fades in.
+			slides[ at ].classList.add( 'is-active' );
+		}, duration );
+	}
+
+	/* Mouse effects ------------------------------------------------------ */
+
+	function initMouseEffects() {
+		var elements = Array.prototype.slice.call( document.querySelectorAll( '[data-kbroo-mouse]' ) );
+		if ( ! elements.length || reduceMotion || ! window.matchMedia( '(hover: hover) and (pointer: fine)' ).matches ) {
+			return;
+		}
+		var items = elements.map( function ( element ) {
+			var options = {};
+			try {
+				options = JSON.parse( element.getAttribute( 'data-kbroo-mouse' ) || '{}' );
+			} catch ( e ) {}
+			// An entrance animation keeps its last frame's transform; let it go once played.
+			element.addEventListener( 'animationend', function () {
+				element.style.animationName = 'none';
+			} );
+			return { element: element, options: options };
+		} );
+		var frame = 0;
+		var x = 0;
+		var y = 0;
+		document.addEventListener( 'mousemove', function ( e ) {
+			// -1 to 1 across the window, from its centre.
+			x = ( e.clientX / window.innerWidth ) * 2 - 1;
+			y = ( e.clientY / window.innerHeight ) * 2 - 1;
+			if ( frame ) {
+				return;
+			}
+			frame = requestAnimationFrame( function () {
+				frame = 0;
+				items.forEach( function ( item ) {
+					var track = item.options.track;
+					var tilt = item.options.tilt;
+					if ( track ) {
+						var move = track.speed * 10 * ( track.reverse ? 1 : -1 );
+						item.element.style.translate = ( x * move ).toFixed( 1 ) + 'px ' + ( y * move ).toFixed( 1 ) + 'px';
+					}
+					if ( tilt ) {
+						var turn = tilt.speed * 2.5 * ( tilt.reverse ? -1 : 1 );
+						item.element.style.transform = 'perspective(1000px) rotateX(' + ( -y * turn ).toFixed( 2 ) + 'deg) rotateY(' + ( x * turn ).toFixed( 2 ) + 'deg)';
+					}
+				} );
+			} );
+		} );
+	}
+
+	/* Counters ----------------------------------------------------------- */
+
+	function formatNumber( value, options ) {
+		var parts = value.toFixed( options.decimals || 0 ).split( '.' );
+		if ( options.separator ) {
+			parts[ 0 ] = parts[ 0 ].replace( /\B(?=(\d{3})+(?!\d))/g, options.separator );
+		}
+		return parts.join( options.separator === '.' ? ',' : '.' );
+	}
+
+	function initCounters() {
+		var counters = document.querySelectorAll( '[data-kbroo-counter]' );
+		function count( element ) {
+			var options = {};
+			try {
+				options = JSON.parse( element.getAttribute( 'data-kbroo-counter' ) || '{}' );
+			} catch ( e ) {}
+			var from = Number( options.from ) || 0;
+			var to = Number( options.to ) || 0;
+			var duration = Math.max( 0, Number( options.duration ) || 0 );
+			if ( reduceMotion || ! duration ) {
+				element.textContent = formatNumber( to, options );
+				return;
+			}
+			var start = null;
+			element.textContent = formatNumber( from, options );
+			function step( now ) {
+				start = start || now;
+				var progress = Math.min( 1, ( now - start ) / duration );
+				var eased = 1 - Math.pow( 1 - progress, 3 );
+				element.textContent = formatNumber( from + ( to - from ) * eased, options );
+				if ( progress < 1 ) {
+					requestAnimationFrame( step );
+				}
+			}
+			requestAnimationFrame( step );
+		}
+		if ( ! ( 'IntersectionObserver' in window ) ) {
+			return; // The final numbers are already showing.
+		}
+		var observer = new IntersectionObserver( function ( entries ) {
+			entries.forEach( function ( entry ) {
+				if ( entry.isIntersecting ) {
+					observer.unobserve( entry.target );
+					count( entry.target );
+				}
+			} );
+		} );
+		Array.prototype.forEach.call( counters, function ( counter ) {
+			observer.observe( counter );
 		} );
 	}
 
@@ -531,6 +666,9 @@
 		if ( ! window.KbrooStudio.editor ) {
 			initCarousels( document );
 			initClicks();
+			Array.prototype.forEach.call( document.querySelectorAll( '[data-kbroo-slideshow]' ), initSlideshow );
+			initMouseEffects();
+			initCounters();
 			stopMobileAutoplay();
 		}
 		Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-form' ), initForm );

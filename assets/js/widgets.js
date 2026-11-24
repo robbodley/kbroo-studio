@@ -191,6 +191,35 @@
 			: hint( 'dashicons-admin-links', 'Name this anchor, then link to it with #name.' );
 	};
 
+	/** Twin of Counter::render(); the canvas shows the end number. */
+	var COUNTER_SEPARATORS = { '': ',', '.': '.', ' ': ' ', _: '_', "'": "'" };
+
+	function counterDecimals( value ) {
+		var text = String( value );
+		var dot = text.indexOf( '.' );
+		return dot < 0 ? 0 : Math.min( 6, text.slice( dot + 1 ).replace( /0+$/, '' ).length );
+	}
+
+	renderers.counter = function ( s ) {
+		var to = isFinite( parseFloat( s.ending_number ) ) ? parseFloat( s.ending_number ) : 100;
+		var from = isFinite( parseFloat( s.starting_number ) ) ? parseFloat( s.starting_number ) : 0;
+		var decimals = Math.max( counterDecimals( from ), counterDecimals( to ) );
+		var separator = s.thousand_separator === 'yes' ? COUNTER_SEPARATORS[ s.thousand_separator_char || '' ] || ',' : '';
+		var parts = to.toFixed( decimals ).split( '.' );
+		if ( separator ) {
+			parts[ 0 ] = parts[ 0 ].replace( /\B(?=(\d{3})+(?!\d))/g, separator );
+		}
+		var tag = HEADING_TAGS.indexOf( s.title_tag ) > -1 ? s.title_tag : 'div';
+		var position = [ 'before', 'after', 'start', 'end' ].indexOf( s.title_position ) > -1 ? s.title_position : 'after';
+		var title = String( s.title || '' ).trim() ? '<' + tag + ' class="kbroo-counter__title">' + esc( s.title ) + '</' + tag + '>' : '';
+		return (
+			'<div class="kbroo-counter kbroo-counter--title-' + position + '"><div class="kbroo-counter__number-wrapper">' +
+			'<span class="kbroo-counter__prefix">' + esc( s.prefix ) + '</span>' +
+			'<span class="kbroo-counter__number">' + esc( parts.join( separator === '.' ? ',' : '.' ) ) + '</span>' +
+			'<span class="kbroo-counter__suffix">' + esc( s.suffix ) + '</span></div>' + title + '</div>'
+		);
+	};
+
 	window.KbrooStudio = window.KbrooStudio || {};
 	window.KbrooStudio.linkAttributes = linkAttributes;
 	window.KbrooStudio.hint = hint;

@@ -69,6 +69,13 @@ class NavMenu extends Widget {
 					'options'     => self::menus(),
 					'description' => __( 'Menus are made in Appearance > Menus.', 'kbroo-studio' ),
 				),
+				'menu_name'    => array(
+					'type'        => 'text',
+					'label'       => __( 'Menu name', 'kbroo-studio' ),
+					'section'     => $content,
+					'default'     => '',
+					'description' => __( 'Read out by screen readers. Empty uses the menu\'s own name.', 'kbroo-studio' ),
+				),
 				'layout'       => array(
 					'type'    => 'select',
 					'label'   => __( 'Layout', 'kbroo-studio' ),
@@ -216,6 +223,41 @@ class NavMenu extends Widget {
 					'default'   => '',
 					'condition' => $text_only,
 					'selectors' => array( $nav => '--kbroo-nav-hover: {{VALUE}};' ),
+				),
+				'pointer'                     => array(
+					'type'      => 'select',
+					'label'     => __( 'Pointer', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $items,
+					'default'   => '',
+					'condition' => $text_only,
+					'description' => __( 'Marks the item under the mouse and the current page, in the menu across the page.', 'kbroo-studio' ),
+					'options'   => array(
+						''            => __( 'None', 'kbroo-studio' ),
+						'underline'   => __( 'Underline', 'kbroo-studio' ),
+						'overline'    => __( 'Overline', 'kbroo-studio' ),
+						'double-line' => __( 'Double line', 'kbroo-studio' ),
+						'framed'      => __( 'Framed', 'kbroo-studio' ),
+						'background'  => __( 'Background', 'kbroo-studio' ),
+					),
+				),
+				'pointer_color_menu_item_hover' => array(
+					'type'      => 'color',
+					'label'     => __( 'Pointer color', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $items,
+					'default'   => '',
+					'condition' => array( 'pointer!' => '' ) + $text_only,
+					'selectors' => array( $nav => '--kbroo-nav-pointer: {{VALUE}};' ),
+				),
+				'pointer_width'               => array(
+					'type'      => 'slider',
+					'label'     => __( 'Pointer width', 'kbroo-studio' ),
+					'tab'       => 'style',
+					'section'   => $items,
+					'units'     => array( 'px' ),
+					'condition' => array( 'pointer' => array( 'underline', 'overline', 'double-line', 'framed' ) ) + $text_only,
+					'selectors' => array( $nav => '--kbroo-nav-pointer-width: {{SIZE}}{{UNIT}};' ),
 				),
 				'color_menu_item_active'      => array(
 					'type'      => 'color',
@@ -579,6 +621,10 @@ class NavMenu extends Widget {
 		if ( 'side' === $panel ) {
 			$classes[] = 'kbroo-nav--from-' . ( 'left' === ( $settings['side_panel_position'] ?? '' ) ? 'left' : 'right' );
 		}
+		$pointers = array( 'underline', 'overline', 'double-line', 'framed', 'background' );
+		if ( in_array( $settings['pointer'] ?? '', $pointers, true ) ) {
+			$classes[] = 'kbroo-nav--pointer-' . $settings['pointer'];
+		}
 		if ( 'dropdown' === $panel && 'stretch' === ( $settings['full_width'] ?? '' ) ) {
 			$classes[] = 'kbroo-nav--stretch';
 		}
@@ -593,7 +639,7 @@ class NavMenu extends Widget {
 		return sprintf(
 			'<nav class="%1$s" aria-label="%2$s"><button type="button" class="kbroo-nav__toggle" aria-expanded="false" aria-controls="%3$s">%4$s<span class="kbroo-sr-only">%5$s</span></button>%6$s%7$s</nav>',
 			esc_attr( implode( ' ', $classes ) ),
-			esc_attr( $menu->name ),
+			esc_attr( '' !== trim( (string) ( $settings['menu_name'] ?? '' ) ) ? $settings['menu_name'] : $menu->name ),
 			esc_attr( $list_id ),
 			self::toggle_inner( $settings ),
 			esc_html__( 'Menu', 'kbroo-studio' ),

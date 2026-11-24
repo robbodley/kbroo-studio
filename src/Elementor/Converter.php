@@ -86,7 +86,10 @@ final class Converter {
 	);
 
 	/** Elementor settings with no visible effect, left out of the report. */
-	const QUIET_SETTINGS = array( '_column_size', 'structure', 'typography_typography', 'background_background', 'pa_condition_repeater', '_skin', 'slides_name' );
+	const QUIET_SETTINGS = array( '_column_size', 'structure', 'typography_typography', 'background_background', 'pa_condition_repeater', '_skin', 'slides_name', 'motion_fx_devices', 'background_slideshow_lazyload', 'classes' );
+
+	/** Elementor's flex item settings, saved without the "_" by some versions. */
+	const FLEX_ITEM = array( 'align_self', 'order', 'order_custom', 'size', 'grow', 'shrink' );
 
 	/** @var Registry */
 	private $widgets;
@@ -177,6 +180,12 @@ final class Converter {
 		if ( ! is_array( $element ) ) {
 			return null;
 		}
+		if ( '' !== Atomic::name( $element ) ) {
+			list( $element, $notes ) = Atomic::to_classic( $element );
+			foreach ( $notes as $note ) {
+				$this->drop( $note );
+			}
+		}
 		$type     = (string) ( $element['elType'] ?? '' );
 		$settings = isset( $element['settings'] ) && is_array( $element['settings'] ) ? $element['settings'] : array();
 
@@ -193,11 +202,19 @@ final class Converter {
 			$settings = $this->section( $settings );
 		} elseif ( 'column' === $type ) {
 			$settings = $this->column( $settings );
+			if ( 'slideshow' === ( $settings['background_background'] ?? '' ) ) {
+				$this->drop( 'background slideshow on a column (move it to the section)' );
+				foreach ( array_keys( $settings ) as $key ) {
+					if ( 0 === strpos( (string) $key, 'background_slideshow_' ) ) {
+						unset( $settings[ $key ] );
+					}
+				}
+			}
 		} else {
 			$settings = $this->container( $settings, ! empty( $element['isInner'] ) );
 		}
 
-		$this->note_dropped( $settings, Layout::controls_for( array( 'elType' => $type ), $this->widgets ) );
+		$this->note_dropped( $settings, Layout::controls_for( array( 'elType' => $type ), $this->widgets ), ucfirst( $type ) );
 		$this->report['elements']++;
 
 		$out = array(
@@ -263,10 +280,77 @@ final class Converter {
 				$settings[ $key ] = $this->animation( $settings[ $key ] );
 			}
 		}
+		$settings = $this->box_shadows( $this->flex_item( $settings ) );
+		// Background slideshows only fade, as Elementor's default does.
+		$transition = $settings['background_slideshow_slide_transition'] ?? '';
+		if ( is_string( $transition ) && '' !== $transition && 'fade' !== $transition && 'slideshow' === ( $settings['background_background'] ?? '' ) ) {
+			$this->drop( 'slideshow ' . str_replace( '_', ' ', $transition ) . ' transition (shown as a fade)' );
+		}
+		unset( $settings['background_slideshow_slide_transition'] );
 		if ( isset( $settings['hover_animation'] ) && is_string( $settings['hover_animation'] ) && '' !== $settings['hover_animation']
-			&& ! isset( ControlGroups::HOVER_ANIMATIONS[ $settings['hover_animation'] ] ) ) {
+			&& ! ControlGroups::has_hover_animation( $settings['hover_animation'] ) ) {
 			$this->drop( 'hover animation ' . $settings['hover_animation'] );
 			$settings['hover_animation'] = '';
+		}
+		return $settings;
+	}
+
+	/**
+	 * Flex item settings: some Elementor versions saved them without the
+	 * leading "_" (flex_grow); an inline widget's vertical align
+	 * (_element_vertical_align) is its align self.
+	 */
+	private function flex_item( array $settings ): array {
+		foreach ( array( '', '_tablet', '_mobile' ) as $device ) {
+			foreach ( self::FLEX_ITEM as $part ) {
+				$old = 'flex_' . $part . $device;
+				$new = '_flex_' . $part . $device;
+				if ( isset( $settings[ $old ] ) && ! self::is_empty( $settings[ $old ] ) && self::is_empty( $settings[ $new ] ?? '' ) ) {
+					$settings[ $new ] = $settings[ $old ];
+				}
+				unset( $settings[ $old ] );
+			}
+			// A grow or shrink number without a size means a custom size.
+			$custom = ! self::is_empty( $settings[ '_flex_grow' . $device ] ?? '' ) || ! self::is_empty( $settings[ '_flex_shrink' . $device ] ?? '' );
+			if ( $custom && self::is_empty( $settings[ '_flex_size' . $device ] ?? '' ) ) {
+				$settings[ '_flex_size' . $device ] = 'custom';
+			}
+			$valign = $settings[ '_element_vertical_align' . $device ] ?? '';
+			if ( is_string( $valign ) && '' !== $valign && self::is_empty( $settings[ '_flex_align_self' . $device ] ?? '' ) ) {
+				$settings[ '_flex_align_self' . $device ] = $valign;
+			}
+			unset( $settings[ '_element_vertical_align' . $device ] );
+		}
+		return $settings;
+	}
+
+	/**
+	 * Elementor keeps a box shadow in one value, { horizontal, vertical,
+	 * blur, spread, color }; Kbroo Studio has a control for each part.
+	 */
+	private function box_shadows( array $settings ): array {
+		foreach ( array( 'box_shadow', '_box_shadow' ) as $prefix ) {
+			$key   = $prefix . '_box_shadow';
+			$value = $settings[ $key ] ?? null;
+			unset( $settings[ $key ] );
+			if ( ! is_array( $value ) || 'yes' !== ( $settings[ $key . '_type' ] ?? '' ) ) {
+				continue;
+			}
+			foreach ( array( 'horizontal', 'vertical', 'blur', 'spread' ) as $part ) {
+				if ( isset( $value[ $part ] ) && is_numeric( $value[ $part ] ) ) {
+					$settings[ $key . '_' . $part ] = array(
+						'unit' => 'px',
+						'size' => 0 + $value[ $part ],
+					);
+				}
+			}
+			$color = Controls::sanitize_color( (string) ( $value['color'] ?? '' ) );
+			if ( '' !== $color ) {
+				$settings[ $key . '_color' ] = $color;
+			}
+			if ( 'outline' === ( $settings[ $key . '_position' ] ?? '' ) ) {
+				$settings[ $key . '_position' ] = '';
+			}
 		}
 		return $settings;
 	}
@@ -432,6 +516,19 @@ final class Converter {
 			if ( 'form' === $type ) {
 				$settings = $this->form( $settings );
 			}
+			if ( 'image' === $type ) {
+				$settings = $this->image_size( $settings );
+			}
+			if ( 'nav-menu' === $type && ! isset( $settings['pointer'] ) ) {
+				$settings['pointer'] = 'underline'; // Elementor's default.
+			}
+			if ( 'nav-menu' === $type && 'text' === ( $settings['pointer'] ?? '' ) ) {
+				$this->drop( 'menu text pointer (shows no pointer)' );
+				$settings['pointer'] = '';
+			}
+			if ( 'nav-menu' === $type && 'none' === ( $settings['pointer'] ?? '' ) ) {
+				$settings['pointer'] = '';
+			}
 			if ( in_array( $type, array( 'icon-box', 'image-box' ), true ) ) {
 				$settings = $this->box( $settings );
 			}
@@ -456,7 +553,7 @@ final class Converter {
 				$settings['look'] = 'line';
 				$this->drop( 'divider icon' );
 			}
-			$this->note_dropped( $settings, $widget->get_controls() );
+			$this->note_dropped( $settings, $widget->get_controls(), $widget->get_title() );
 			return array(
 				'id'         => (string) ( $element['id'] ?? '' ),
 				'elType'     => 'widget',
@@ -593,6 +690,25 @@ final class Converter {
 	 * (classic_columns, cards_meta_data); Kbroo Studio's does not.
 	 */
 	private function posts( array $settings ): array {
+		// Older Elementor Pro versions picked categories by id in
+		// posts_selected_categories rather than include by term.
+		$picked = $settings['posts_selected_categories'] ?? null;
+		unset( $settings['posts_selected_categories'] );
+		if ( is_array( $picked ) && $picked && empty( $settings['posts_include_term_ids'] ) ) {
+			$ids = array();
+			foreach ( $picked as $term ) {
+				$found = is_numeric( $term ) ? get_term( (int) $term, 'category' ) : get_term_by( 'slug', (string) $term, 'category' );
+				if ( $found && ! is_wp_error( $found ) ) {
+					$ids[] = (string) $found->term_id;
+				}
+			}
+			if ( $ids ) {
+				$settings['posts_include']          = array( 'terms' );
+				$settings['posts_include_term_ids'] = $ids;
+			} else {
+				$this->drop( 'posts categories (none found on this site)' );
+			}
+		}
 		$skin  = in_array( $settings['_skin'] ?? '', array( 'classic', 'cards' ), true ) ? $settings['_skin'] : 'classic';
 		$clean = array( '_skin' => $skin );
 		foreach ( $settings as $key => $value ) {
@@ -631,6 +747,39 @@ final class Converter {
 			}
 		}
 		return $clean;
+	}
+
+	/**
+	 * An image at a custom size (image_size "custom" with
+	 * image_custom_dimension { width, height }): Elementor makes a copy of
+	 * the file at that size. Here the large or full file shows at that
+	 * width, and at that height too (cropped to fill) when both are given.
+	 */
+	private function image_size( array $settings ): array {
+		$size = $settings['image_custom_dimension'] ?? null;
+		unset( $settings['image_custom_dimension'] );
+		if ( 'custom' !== ( $settings['image_size'] ?? '' ) ) {
+			return $settings;
+		}
+		$width  = is_array( $size ) && is_numeric( $size['width'] ?? '' ) ? (int) $size['width'] : 0;
+		$height = is_array( $size ) && is_numeric( $size['height'] ?? '' ) ? (int) $size['height'] : 0;
+		$settings['image_size'] = $width > 1024 || $height > 1024 ? 'full' : 'large';
+		if ( $width && self::is_empty( $settings['width'] ?? '' ) ) {
+			$settings['width'] = array(
+				'unit' => 'px',
+				'size' => $width,
+			);
+		}
+		if ( $height && self::is_empty( $settings['height'] ?? '' ) ) {
+			$settings['height'] = array(
+				'unit' => 'px',
+				'size' => $height,
+			);
+			if ( $width && self::is_empty( $settings['object-fit'] ?? '' ) ) {
+				$settings['object-fit'] = 'cover';
+			}
+		}
+		return $settings;
 	}
 
 	/**
@@ -693,7 +842,18 @@ final class Converter {
 		if ( is_array( $actions ) && ! in_array( 'email', $actions, true ) ) {
 			$this->drop( 'form without an email action (Kbroo Studio emails every form)' );
 		}
-		unset( $settings['submit_actions'], $settings['email_content_2'], $settings['step_next_label'], $settings['step_previous_label'] );
+		if ( is_array( $actions ) && in_array( 'email2', $actions, true ) ) {
+			$settings['email_2'] = 'yes';
+			// Elementor's second email sends to the address typed in the form unless told otherwise.
+			$settings += array( 'email_to_2' => '[field id="email"]' );
+		} else {
+			foreach ( array_keys( $settings ) as $key ) {
+				if ( preg_match( '/^email_.+_2$/', (string) $key ) ) {
+					unset( $settings[ $key ] ); // Filled in once, never sent.
+				}
+			}
+		}
+		unset( $settings['submit_actions'], $settings['step_next_label'], $settings['step_previous_label'], $settings['email_content_type'], $settings['email_content_type_2'], $settings['form_metadata'], $settings['form_metadata_2'] );
 		return $settings;
 	}
 
@@ -740,7 +900,7 @@ final class Converter {
 	/**
 	 * Count settings that have a value but no Kbroo Studio control.
 	 */
-	private function note_dropped( array $settings, array $controls ): void {
+	private function note_dropped( array $settings, array $controls, string $where = '' ): void {
 		$known = array( '__globals__' => true, '_title' => true );
 		foreach ( $controls as $key => $control ) {
 			foreach ( Controls::keys( $key, $control ) as $setting_key ) {
@@ -754,7 +914,9 @@ final class Converter {
 			if ( isset( $known[ $key ] ) || in_array( $key, self::QUIET_SETTINGS, true ) || self::is_empty( $value ) ) {
 				continue;
 			}
-			$this->drop( (string) preg_replace( '/_(tablet|mobile)$/', '', (string) $key ) );
+			$name = (string) preg_replace( '/_(tablet|mobile)$/', '', (string) $key );
+			// Say where it was, so a setting that could mean several things can be traced.
+			$this->drop( '' !== $where ? $name . ' (' . $where . ')' : $name );
 		}
 	}
 
