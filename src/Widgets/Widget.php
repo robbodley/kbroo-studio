@@ -69,6 +69,10 @@ abstract class Widget {
 			$this->controls = array_merge(
 				$this->widget_controls(),
 				ControlGroups::advanced( '_' ),
+				ControlGroups::element_width(),
+				ControlGroups::flex_item(),
+				ControlGroups::border( '{{WRAPPER}}', array( 'tab' => 'advanced' ), '_border' ),
+				ControlGroups::box_shadow( '{{WRAPPER}}', array( 'tab' => 'advanced' ), '_box_shadow' ),
 				ControlGroups::background(
 					'{{WRAPPER}}',
 					array( 'tab' => 'advanced' ),

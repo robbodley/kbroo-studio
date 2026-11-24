@@ -1930,3 +1930,10 @@ input[type="checkbox"].kb-switch:focus-visible {
 .kb-canvas-wrap.is-loop-item:not([data-device="mobile"]) .kb-canvas {
 	max-width: 420px;
 }
+
+/* Columns with inline widgets lay out in rows (see frontend.css): the
+   drop line and empty hint still take a whole row. */
+.kbroo-column-inner > .kb-placeholder-widget,
+.kbroo-column-inner > .kb-column-empty {
+	flex-basis: 100%;
+}

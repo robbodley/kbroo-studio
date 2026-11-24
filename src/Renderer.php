@@ -152,6 +152,12 @@ final class Renderer {
 		}
 		$attributes .= ' data-id="' . esc_attr( $id ) . '"';
 
+		$mouse = ControlGroups::mouse_data( $settings );
+		if ( '' !== $mouse ) {
+			$attributes .= " data-kbroo-mouse='" . esc_attr( $mouse ) . "'";
+			Frontend::enqueue_script();
+		}
+
 		$animation = (string) ( $settings[ $prefix . 'animation' ] ?? '' );
 		if ( in_array( $animation, ControlGroups::ENTRANCE_ANIMATIONS, true ) ) {
 			$this->animated = true;
@@ -166,6 +172,59 @@ final class Renderer {
 			}
 		}
 		return $attributes;
+	}
+
+	/**
+	 * Background slideshow markup for an element whose background type is
+	 * "slideshow", or ''. The first image shows without scripts;
+	 * frontend.js fades through the rest. It sits under the overlay and
+	 * the content, like a background video.
+	 */
+	public static function background_slideshow( array $settings, string $prefix = 'background' ): string {
+		if ( 'slideshow' !== ( $settings[ $prefix . '_background' ] ?? '' ) ) {
+			return '';
+		}
+		$p      = $prefix . '_slideshow_';
+		$slides = '';
+		$count  = 0;
+		foreach ( (array) ( $settings[ $p . 'gallery' ] ?? array() ) as $image ) {
+			$id  = absint( $image['id'] ?? 0 );
+			$url = $id ? (string) wp_get_attachment_image_url( $id, 'full' ) : '';
+			if ( '' === $url ) {
+				$url = (string) ( $image['url'] ?? '' );
+			}
+			$url = esc_url( $url );
+			if ( '' === $url ) {
+				continue;
+			}
+			$slides .= sprintf(
+				'<div class="kbroo-bg-slideshow__slide%1$s"><div class="kbroo-bg-slideshow__image" style="background-image:url(&quot;%2$s&quot;)"></div></div>',
+				0 === $count ? ' is-active' : '',
+				str_replace( array( '"', '\\' ), '', $url )
+			);
+			$count++;
+		}
+		if ( ! $count ) {
+			return '';
+		}
+		if ( $count > 1 ) {
+			Frontend::enqueue_script();
+		}
+		$class = 'kbroo-bg-slideshow';
+		if ( 'yes' === ( $settings[ $p . 'ken_burns' ] ?? '' ) ) {
+			$class .= ' kbroo-bg-slideshow--ken-burns-' . ( 'out' === ( $settings[ $p . 'ken_burns_zoom_direction' ] ?? '' ) ? 'out' : 'in' );
+		}
+		$options = array(
+			'duration'   => max( 500, absint( $settings[ $p . 'slide_duration' ] ?? 5000 ) ),
+			'transition' => min( 10000, absint( $settings[ $p . 'transition_duration' ] ?? 500 ) ),
+			'loop'       => 'yes' === ( $settings[ $p . 'loop' ] ?? 'yes' ),
+		);
+		return sprintf(
+			'<div class="%1$s" aria-hidden="true" data-kbroo-slideshow=\'%2$s\'>%3$s</div>',
+			esc_attr( $class ),
+			esc_attr( (string) wp_json_encode( $options ) ),
+			$slides
+		);
 	}
 
 	/**
@@ -297,7 +356,7 @@ final class Renderer {
 			$tag,
 			$this->attributes( $section, $settings, $classes, '' ),
 			$this->render_children( (array) ( $section['elements'] ?? array() ) ),
-			self::background_video( $settings ) . ShapeDividers::render( $settings )
+			self::background_video( $settings ) . self::background_slideshow( $settings ) . ShapeDividers::render( $settings )
 		);
 	}
 
@@ -326,8 +385,22 @@ final class Renderer {
 			$tag,
 			$this->attributes( $container, $settings, $classes, '' ),
 			$this->render_children( (array) ( $container['elements'] ?? array() ) ),
-			self::background_video( $settings ) . ShapeDividers::render( $settings )
+			self::background_video( $settings ) . self::background_slideshow( $settings ) . ShapeDividers::render( $settings )
 		);
+	}
+
+	/**
+	 * A widget wrapper's classes. Inline widgets (Advanced > Width) make
+	 * their column lay widgets out in rows (see frontend.css).
+	 *
+	 * @return string[]
+	 */
+	public static function widget_classes( string $name, array $settings ): array {
+		$classes = array( 'kbroo-widget', 'kbroo-widget--' . $name );
+		if ( ControlGroups::is_inline( $settings ) ) {
+			$classes[] = 'kbroo-widget--inline';
+		}
+		return $classes;
 	}
 
 	private function render_widget( array $widget ): string {
@@ -340,7 +413,7 @@ final class Renderer {
 
 		return sprintf(
 			'<div%1$s>%2$s</div>',
-			$this->attributes( $widget, $settings, array( 'kbroo-widget', 'kbroo-widget--' . $instance->get_name() ), '_' ),
+			$this->attributes( $widget, $settings, self::widget_classes( $instance->get_name(), $settings ), '_' ),
 			$instance->render( $settings )
 		);
 	}

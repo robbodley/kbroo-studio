@@ -40,7 +40,7 @@ final class Layout {
 
 	/** Background options for sections and containers. */
 	const WITH_VIDEO = array(
-		'types' => array( 'classic', 'gradient', 'video' ),
+		'types' => array( 'classic', 'gradient', 'video', 'slideshow' ),
 		'hover' => '{{WRAPPER}}:hover',
 	);
 
@@ -149,6 +149,7 @@ final class Layout {
 			ControlGroups::overlay( '{{WRAPPER}}::before', '{{WRAPPER}}:hover::before' ),
 			ShapeDividers::all_controls(),
 			ControlGroups::border( '{{WRAPPER}}' ),
+			ControlGroups::box_shadow( '{{WRAPPER}}' ),
 			ControlGroups::advanced(
 				'',
 				'{{WRAPPER}}',
@@ -198,13 +199,31 @@ final class Layout {
 						'center' => 'center',
 						'bottom' => 'flex-end',
 					),
-					'selectors'            => array( $inner => 'justify-content: {{VALUE}};' ),
+					// Read as justify-content, or as align-content when the
+					// column holds inline widgets (see frontend.css).
+					'selectors'            => array( $inner => '--kbroo-column-valign: {{VALUE}};' ),
+				),
+				'align'                 => $layout + array(
+					'type'                 => 'select',
+					'label'                => __( 'Horizontal align', 'kbroo-studio' ),
+					'description'          => __( 'Lines up inline widgets (Advanced > Width: Inline or Custom) across the column.', 'kbroo-studio' ),
+					'default'              => '',
+					'options'              => array(
+						''              => __( 'Default', 'kbroo-studio' ),
+						'flex-start'    => __( 'Start', 'kbroo-studio' ),
+						'center'        => __( 'Center', 'kbroo-studio' ),
+						'flex-end'      => __( 'End', 'kbroo-studio' ),
+						'space-between' => __( 'Space between', 'kbroo-studio' ),
+						'space-around'  => __( 'Space around', 'kbroo-studio' ),
+						'space-evenly'  => __( 'Space evenly', 'kbroo-studio' ),
+					),
+					'selectors'            => array( $inner => '--kbroo-column-halign: {{VALUE}};' ),
 				),
 				'space_between_widgets' => $layout + array(
 					'type'      => 'slider',
 					'label'     => __( 'Widgets space', 'kbroo-studio' ),
 					'units'     => array( 'px' ),
-					'selectors' => array( $inner => 'gap: {{SIZE}}{{UNIT}};' ),
+					'selectors' => array( $inner => 'row-gap: {{SIZE}}{{UNIT}};' ),
 				),
 			),
 			ControlGroups::background(
@@ -215,6 +234,7 @@ final class Layout {
 			),
 			ControlGroups::overlay( $inner . '::before', '{{WRAPPER}}:hover > .kbroo-column-inner::before' ),
 			ControlGroups::border( $inner ),
+			ControlGroups::box_shadow( $inner ),
 			ControlGroups::advanced( '', $inner )
 		);
 	}
@@ -346,7 +366,9 @@ final class Layout {
 			ControlGroups::overlay( '{{WRAPPER}}::before', '{{WRAPPER}}:hover::before' ),
 			ShapeDividers::all_controls(),
 			ControlGroups::border( '{{WRAPPER}}' ),
-			ControlGroups::advanced( '' )
+			ControlGroups::box_shadow( '{{WRAPPER}}' ),
+			ControlGroups::advanced( '' ),
+			ControlGroups::flex_item()
 		);
 	}
 
