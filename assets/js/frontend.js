@@ -16,6 +16,9 @@
  * - Background slideshows (data-kbroo-slideshow): fade through the images.
  * - Mouse effects (data-kbroo-mouse): follow or tilt towards the pointer.
  * - Counters (data-kbroo-counter): count up when they scroll into view.
+ * - Load more (data-kbroo-load-more): fetch the next page of a posts grid
+ *   and add its posts below, on a click or when the button scrolls into
+ *   view. Without this script the button is a link to that page.
  *
  * The editor calls KbrooStudio.initCarousels( canvas, { autoplay: false } )
  * after drawing the canvas.
@@ -190,6 +193,87 @@
 		Array.prototype.forEach.call( counters, function ( counter ) {
 			observer.observe( counter );
 		} );
+	}
+
+	/* Load more ---------------------------------------------------------- */
+
+	function initLoadMore( box ) {
+		var button = box.querySelector( '.kbroo-load-more__button' );
+		var widget = box.closest( '[data-id]' );
+		var grid = widget && widget.querySelector( '.kbroo-posts' );
+		if ( ! button || ! grid ) {
+			return;
+		}
+		var busy = false;
+		var observer = null;
+
+		function load() {
+			if ( busy || ! button.getAttribute( 'href' ) ) {
+				return;
+			}
+			busy = true;
+			box.classList.add( 'is-loading' );
+			button.setAttribute( 'aria-busy', 'true' );
+			fetch( button.href, { credentials: 'same-origin' } )
+				.then( function ( response ) {
+					if ( ! response.ok ) {
+						throw new Error( response.status );
+					}
+					return response.text();
+				} )
+				.then( function ( html ) {
+					var doc = new DOMParser().parseFromString( html, 'text/html' );
+					var same = doc.querySelector( '.kbroo-el-' + widget.getAttribute( 'data-id' ) );
+					var posts = same && same.querySelector( '.kbroo-posts' );
+					if ( ! posts ) {
+						throw new Error( 'no posts' );
+					}
+					var first = null;
+					Array.prototype.slice.call( posts.children ).forEach( function ( post ) {
+						var added = document.importNode( post, true );
+						grid.appendChild( added );
+						first = first || added;
+					} );
+					var next = same.querySelector( '.kbroo-load-more__button' );
+					if ( next ) {
+						button.setAttribute( 'href', next.getAttribute( 'href' ) );
+					} else {
+						if ( observer ) {
+							observer.disconnect();
+						}
+						box.remove();
+					}
+					// Keyboard users carry on from the first new post.
+					var link = first && first.querySelector( 'a[href]:not([tabindex="-1"])' );
+					if ( link && box.getAttribute( 'data-kbroo-load-more' ) === 'click' && document.activeElement === button ) {
+						link.focus();
+					}
+				} )
+				.catch( function () {
+					window.location.href = button.href; // Fall back to the next page itself.
+				} )
+				.then( function () {
+					busy = false;
+					box.classList.remove( 'is-loading' );
+					button.removeAttribute( 'aria-busy' );
+				} );
+		}
+
+		button.addEventListener( 'click', function ( e ) {
+			e.preventDefault();
+			load();
+		} );
+		if ( box.getAttribute( 'data-kbroo-load-more' ) === 'scroll' && 'IntersectionObserver' in window ) {
+			observer = new IntersectionObserver(
+				function ( entries ) {
+					if ( entries[ 0 ].isIntersecting ) {
+						load();
+					}
+				},
+				{ rootMargin: '0px 0px 300px 0px' }
+			);
+			observer.observe( box );
+		}
 	}
 
 	/* Carousels ---------------------------------------------------------- */
@@ -669,6 +753,7 @@
 			Array.prototype.forEach.call( document.querySelectorAll( '[data-kbroo-slideshow]' ), initSlideshow );
 			initMouseEffects();
 			initCounters();
+			Array.prototype.forEach.call( document.querySelectorAll( '[data-kbroo-load-more]' ), initLoadMore );
 			stopMobileAutoplay();
 		}
 		Array.prototype.forEach.call( document.querySelectorAll( '.kbroo-form' ), initForm );

@@ -2364,3 +2364,15 @@ body.kbroo-template-canvas {
 	line-height: 2.5;
 	color: var(--kbroo-global-color-secondary, inherit);
 }
+
+/* Posts: the load more button under the grid. */
+.kbroo-load-more {
+	display: flex;
+	justify-content: center;
+	margin-top: 30px;
+}
+
+.kbroo-load-more.is-loading .kbroo-load-more__button {
+	opacity: 0.6;
+	pointer-events: none;
+}
