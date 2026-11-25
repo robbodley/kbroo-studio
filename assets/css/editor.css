@@ -424,10 +424,10 @@ body.kbroo-editor-body {
 	background: var(--kb-container);
 }
 
-/* Nested sections and containers put their toolbar at the top right, clear
-   of their parent's. */
-.kbroo-section--inner > .kb-toolbar-section,
-.kbroo-con--child > .kb-toolbar-container {
+/* Nested sections put their toolbar at the top right, clear of their
+   parent's. Nested containers keep theirs centred like any container: only
+   one container toolbar shows at a time (see below), so they never meet. */
+.kbroo-section--inner > .kb-toolbar-section {
 	left: auto;
 	right: 0;
 	transform: none;
@@ -454,11 +454,19 @@ body.kbroo-editor-body {
 	display: flex;
 }
 
-/* Only the innermost hovered element's toolbar shows (top-level section
-   toolbars stay, as they sit apart from the others). */
+/* Only the innermost hovered element's toolbar shows. Top-level sections
+   and containers keep theirs while a column or widget inside is hovered, as
+   those toolbars sit apart from it, but hide it for a nested container. */
 .kb-column:has(.kb-el:hover) > .kb-toolbar,
-.kb-container:has(.kb-el:hover) > .kb-toolbar,
-.kbroo-section--inner:has(.kb-el:hover) > .kb-toolbar {
+.kbroo-con--child:has(.kb-el:hover) > .kb-toolbar,
+.kbroo-section--inner:has(.kb-el:hover) > .kb-toolbar,
+.kb-container:has(.kb-container:hover) > .kb-toolbar {
+	display: none;
+}
+
+/* Pointing at an element hides the toolbars of the selected elements inside
+   it, which would otherwise sit on top of its own. */
+.kb-el:hover:not(:has(.kb-el:hover)) .kb-el:not(.kb-toolbar-pinned) > .kb-toolbar {
 	display: none;
 }
 
@@ -475,8 +483,17 @@ body.kbroo-editor-body {
 }
 
 .kb-toolbar-label {
+	align-self: stretch;
+	display: flex;
+	align-items: center;
 	padding: 0 6px;
+	border-radius: 4px;
 	font-weight: 600;
+	cursor: pointer;
+}
+
+.kb-toolbar-label:hover {
+	background: rgba(255, 255, 255, 0.2);
 }
 
 .kb-tool {
