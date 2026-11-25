@@ -4206,7 +4206,9 @@
 
 	function bindCanvasEvents() {
 		ui.canvas.addEventListener( 'click', function ( e ) {
-			if ( e.target.closest( '.kb-toolbar, .kb-add-section' ) ) {
+			// A toolbar's buttons do their own thing; the rest of the toolbar
+			// (its label) selects the element it belongs to.
+			if ( e.target.closest( '.kb-tool, .kb-add-section' ) ) {
 				return;
 			}
 			// Links inside the preview should not navigate away from the editor.
